@@ -1,17 +1,79 @@
 "use client";
 
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { CalendarPlus, Lock, BarChart2, LogOut, BookOpen } from 'lucide-react'; // Added BookOpen icon
+import { CalendarPlus, Lock, BarChart2, LogOut, BookOpen } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { showSuccess, showError } from '@/utils/toast';
 
 const AdminDashboard = () => {
+  const navigate = useNavigate();
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchAdminStatus = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('is_admin')
+          .eq('id', user.id)
+          .single();
+
+        if (error || !profile?.is_admin) {
+          setIsAdmin(false);
+          showError("Accesso negato. Non sei un amministratore.");
+          navigate('/dashboard');
+        } else {
+          setIsAdmin(true);
+        }
+      } else {
+        setIsAdmin(false);
+        navigate('/login');
+      }
+      setLoading(false);
+    };
+    fetchAdminStatus();
+  }, [navigate]);
+
+  const handleLogout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        showError(error.message);
+      } else {
+        showSuccess("Disconnessione effettuata con successo!");
+        navigate('/login');
+      }
+    } catch (error: any) {
+      showError(error.message || "Errore durante la disconnessione.");
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-center">
+          <h1 className="text-4xl font-bold mb-4 text-primary">Caricamento...</h1>
+          <p className="text-xl text-gray-600">Verifica permessi amministrativi.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    // Questo blocco dovrebbe essere raggiunto solo se c'è un ritardo nel reindirizzamento
+    return null; 
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 sm:p-6 lg:p-8">
       <header className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold text-primary">Pannello Amministrativo</h1>
-        <Button variant="outline" className="text-primary border-primary hover:bg-secondary">
+        <Button variant="outline" className="text-primary border-primary hover:bg-secondary" onClick={handleLogout}>
           <LogOut className="mr-2 h-4 w-4" /> Esci
         </Button>
       </header>
