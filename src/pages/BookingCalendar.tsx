@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, LogOut } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
-import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, isEqual } from 'date-fns';
+import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, isEqual, setSeconds, setMilliseconds } from 'date-fns';
 import { it } from 'date-fns/locale'; // Import Italian locale
 
 // Import types
@@ -67,8 +67,8 @@ const BookingCalendar = () => {
       if (!date || !selectedCourtId) return;
 
       setFetchingData(true);
-      const startOfDay = format(date, "yyyy-MM-dd'T'00:00:00.000'Z'"); // Corrected format
-      const endOfDay = format(date, "yyyy-MM-dd'T'23:59:59.999'Z'");   // Corrected format
+      const startOfDay = format(date, "yyyy-MM-dd'T'00:00:00.000'Z'");
+      const endOfDay = format(date, "yyyy-MM-dd'T'23:59:59.999'Z'");
 
       const { data, error } = await supabase
         .from('reservations')
@@ -101,7 +101,9 @@ const BookingCalendar = () => {
   const isSlotAvailable = (slotTime: string): boolean => {
     if (!date || !selectedCourtId) return false;
 
-    const slotStart = setMinutes(setHours(date, parseInt(slotTime.split(':')[0])), parseInt(slotTime.split(':')[1]));
+    let slotStart = setMinutes(setHours(date, parseInt(slotTime.split(':')[0])), parseInt(slotTime.split(':')[1]));
+    slotStart = setSeconds(slotStart, 0);
+    slotStart = setMilliseconds(slotStart, 0);
     const slotEnd = addHours(slotStart, 1);
 
     // Check if the slot is in the past
@@ -203,7 +205,9 @@ const BookingCalendar = () => {
 
       const courtIdNum = parseInt(selectedCourtId);
       const reservationsToInsert = selectedSlots.sort().map((slotTime, index) => {
-        const slotStart = setMinutes(setHours(date, parseInt(slotTime.split(':')[0])), parseInt(slotTime.split(':')[1]));
+        let slotStart = setMinutes(setHours(date, parseInt(slotTime.split(':')[0])), parseInt(slotTime.split(':')[1]));
+        slotStart = setSeconds(slotStart, 0); // Imposta i secondi a 0
+        slotStart = setMilliseconds(slotStart, 0); // Imposta i millisecondi a 0
         const slotEnd = addHours(slotStart, 1);
 
         return {
@@ -232,8 +236,8 @@ const BookingCalendar = () => {
           setLoading(false);
           setSelectedSlots([]); // Clear selection
           // Re-fetch reservations to update UI
-          const startOfDay = format(date, "yyyy-MM-dd'T'00:00:00.000'Z'"); // Corrected format
-          const endOfDay = format(date, "yyyy-MM-dd'T'23:59:59.999'Z'");   // Corrected format
+          const startOfDay = format(date, "yyyy-MM-dd'T'00:00:00.000'Z'");
+          const endOfDay = format(date, "yyyy-MM-dd'T'23:59:59.999'Z'");
           const { data, error } = await supabase
             .from('reservations')
             .select('*')
@@ -255,8 +259,8 @@ const BookingCalendar = () => {
         showSuccess("Prenotazione effettuata con successo!");
         setSelectedSlots([]); // Clear selected slots
         // Re-fetch reservations to update UI
-        const startOfDay = format(date, "yyyy-MM-dd'T'00:00:00.000'Z'"); // Corrected format
-        const endOfDay = format(date, "yyyy-MM-dd'T'23:59:59.999'Z'");   // Corrected format
+        const startOfDay = format(date, "yyyy-MM-dd'T'00:00:00.000'Z'");
+        const endOfDay = format(date, "yyyy-MM-dd'T'23:59:59.999'Z'");
         const { data, error } = await supabase
           .from('reservations')
           .select('*')
