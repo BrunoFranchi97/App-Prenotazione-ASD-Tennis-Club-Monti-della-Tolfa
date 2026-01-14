@@ -354,10 +354,15 @@ const BookingCalendar = () => {
                   {allTimeSlots.map((slotTime) => {
                     const isSelected = selectedSlots.includes(slotTime);
                     const available = isSlotAvailable(slotTime);
+                    
+                    // Calculate end time for display
+                    const [hours, minutes] = slotTime.split(':').map(Number);
+                    const endTime = format(setMinutes(setHours(new Date(), hours + 1), minutes), 'HH:mm');
+
                     const slotClasses = `
                       px-3 py-2 rounded-md text-sm font-medium
                       ${isSelected
-                        ? 'bg-club-orange text-club-orange-foreground hover:bg-club-orange/90' // Colore arancione per gli slot selezionati
+                        ? 'bg-club-orange text-club-orange-foreground hover:bg-club-orange/90'
                         : available
                           ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                           : 'bg-gray-300 text-gray-600 cursor-not-allowed opacity-70'
@@ -367,10 +372,10 @@ const BookingCalendar = () => {
                       <Button
                         key={slotTime}
                         onClick={() => handleSlotClick(slotTime)}
-                        disabled={!available && !isSelected} // Can only click if available or already selected
+                        disabled={!available && !isSelected}
                         className={slotClasses}
                       >
-                        {slotTime}
+                        {slotTime} - {endTime}
                       </Button>
                     );
                   })}
