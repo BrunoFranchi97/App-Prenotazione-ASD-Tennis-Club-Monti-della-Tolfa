@@ -16,26 +16,26 @@ function Calendar({
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
-      className={cn("p-4", className)}
+      className={cn("p-4 w-full", className)}
       classNames={{
-        months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
-        month: "space-y-6",
+        months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0 w-full",
+        month: "space-y-6 w-full",
         caption: "flex justify-center pt-2 pb-4 relative items-center border-b border-gray-100",
-        caption_label: "text-lg font-semibold text-primary capitalize",
+        caption_label: "text-xl font-semibold text-primary capitalize",
         nav: "space-x-2 flex items-center",
         nav_button: cn(
           buttonVariants({ variant: "outline" }),
-          "h-9 w-9 bg-white p-0 hover:bg-primary hover:text-white transition-colors duration-200 border-gray-200",
+          "h-10 w-10 bg-white p-0 hover:bg-primary hover:text-white transition-colors duration-200 border-gray-200",
         ),
         nav_button_previous: "absolute left-2",
         nav_button_next: "absolute right-2",
         table: "w-full border-collapse",
-        head_row: "flex mb-2",
+        head_row: "flex mb-2 justify-between",
         head_cell:
-          "text-primary/70 rounded-md w-12 h-10 font-semibold text-sm flex items-center justify-center uppercase tracking-wide",
-        row: "flex w-full",
+          "text-primary/70 rounded-md flex-1 h-12 font-semibold text-sm flex items-center justify-center uppercase tracking-wide",
+        row: "flex w-full justify-between",
         cell: cn(
-          "relative h-12 w-12 text-center text-sm p-0.5",
+          "relative flex-1 aspect-square text-center text-sm p-1",
           "focus-within:relative focus-within:z-20",
           "[&:has([aria-selected])]:bg-primary/10 [&:has([aria-selected])]:rounded-lg",
           "[&:has([aria-selected].day-outside)]:bg-primary/5",
@@ -44,7 +44,7 @@ function Calendar({
         ),
         day: cn(
           buttonVariants({ variant: "ghost" }),
-          "h-11 w-11 p-0 font-medium text-base hover:bg-primary/10 hover:text-primary transition-all duration-200 rounded-lg",
+          "h-full w-full p-0 font-medium text-base hover:bg-primary/10 hover:text-primary transition-all duration-200 rounded-lg",
           "aria-selected:opacity-100"
         ),
         day_range_end: "day-range-end",

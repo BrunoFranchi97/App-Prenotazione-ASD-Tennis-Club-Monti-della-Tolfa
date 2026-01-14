@@ -351,7 +351,7 @@ const BookingCalendar = () => {
               onSelect={setDate}
               initialFocus
               locale={it}
-              className="rounded-xl border-0 shadow-sm bg-white p-2"
+              className="rounded-xl border-0 shadow-sm bg-white p-4 w-full max-w-md"
               disabled={(date) => isBefore(date, new Date())}
             />
           </CardContent>
