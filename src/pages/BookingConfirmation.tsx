@@ -6,12 +6,13 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { format, parseISO } from 'date-fns';
 import { it } from 'date-fns/locale';
-import { CheckCircle2, CalendarDays, Clock, MapPin } from 'lucide-react';
+import { CheckCircle2, CalendarDays, Clock, MapPin, User } from 'lucide-react'; // Importa l'icona User
 import { Reservation } from '@/types/supabase';
 
 interface BookingConfirmationState {
   reservations: Reservation[];
   courtName: string;
+  bookedFor?: string; // Aggiungi il campo per il nome del socio terzo
 }
 
 const BookingConfirmation = () => {
@@ -40,7 +41,7 @@ const BookingConfirmation = () => {
     );
   }
 
-  const { reservations, courtName } = state;
+  const { reservations, courtName, bookedFor } = state;
   const sortedReservations = [...reservations].sort((a, b) => parseISO(a.starts_at).getTime() - parseISO(b.starts_at).getTime());
 
   const firstReservation = sortedReservations[0];
@@ -61,6 +62,12 @@ const BookingConfirmation = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {bookedFor && (
+            <div className="flex items-center justify-center text-lg text-gray-800">
+              <User className="mr-2 h-5 w-5 text-club-orange" />
+              <span>Prenotato per: <span className="font-semibold">{bookedFor}</span></span>
+            </div>
+          )}
           <div className="flex items-center justify-center text-lg text-gray-800">
             <MapPin className="mr-2 h-5 w-5 text-club-orange" />
             <span>Campo: <span className="font-semibold">{courtName}</span></span>

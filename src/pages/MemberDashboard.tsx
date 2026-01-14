@@ -4,7 +4,7 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { CalendarDays, History, LogOut } from 'lucide-react';
+import { CalendarDays, History, LogOut, Users } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 
@@ -63,7 +63,19 @@ const MemberDashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Placeholder per altre card, es. Profilo, Notifiche */}
+        <Card className="shadow-lg rounded-lg">
+          <CardHeader>
+            <CardTitle className="text-primary flex items-center">
+              <Users className="mr-2 h-5 w-5" /> Prenota per un Socio
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-gray-700 mb-4">Effettua una prenotazione per un altro socio.</p>
+            <Link to="/book-for-third-party">
+              <Button variant="outline" className="w-full text-primary border-primary hover:bg-secondary">Prenota per Terzi</Button>
+            </Link>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
