@@ -19,6 +19,8 @@ import AdminReservations from "./pages/AdminReservations";
 import AdminManageSchedules from "./pages/AdminManageSchedules";
 import AdminBlockSlots from "./pages/AdminBlockSlots";
 import AdminUsageStats from "./pages/AdminUsageStats";
+import FindMatch from "./pages/FindMatch";
+import MedicalCertificates from "./pages/MedicalCertificates";
 
 const queryClient = new QueryClient();
 
@@ -44,6 +46,8 @@ const App = () => (
             <Route path="/admin/manage-schedules" element={<AdminManageSchedules />} />
             <Route path="/admin/block-slots" element={<AdminBlockSlots />} />
             <Route path="/admin/usage-stats" element={<AdminUsageStats />} />
+            <Route path="/find-match" element={<FindMatch />} />
+            <Route path="/medical-certificates" element={<MedicalCertificates />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

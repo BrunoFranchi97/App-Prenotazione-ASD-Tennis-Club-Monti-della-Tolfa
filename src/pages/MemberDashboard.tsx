@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { CalendarDays, History, LogOut, Users, Settings } from 'lucide-react'; // Added Settings icon
+import { CalendarDays, History, LogOut, Users, Settings, Search, FileText } from 'lucide-react'; // Added Search and FileText icons
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 
@@ -101,6 +101,34 @@ const MemberDashboard = () => {
             <p className="text-gray-700 mb-4">Effettua una prenotazione per un altro socio.</p>
             <Link to="/book-for-third-party">
               <Button variant="outline" className="w-full text-primary border-primary hover:bg-secondary">Prenota per Terzi</Button>
+            </Link>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-lg rounded-lg">
+          <CardHeader>
+            <CardTitle className="text-primary flex items-center">
+              <Search className="mr-2 h-5 w-5" /> Cerco Partita
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-gray-700 mb-4">Trova compagni di gioco del tuo livello.</p>
+            <Link to="/find-match">
+              <Button variant="outline" className="w-full text-primary border-primary hover:bg-secondary">Cerca Partita</Button>
+            </Link>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-lg rounded-lg">
+          <CardHeader>
+            <CardTitle className="text-primary flex items-center">
+              <FileText className="mr-2 h-5 w-5" /> Certificato Medico
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-gray-700 mb-4">Gestisci il tuo certificato medico e le scadenze.</p>
+            <Link to="/medical-certificates">
+              <Button variant="outline" className="w-full text-primary border-primary hover:bg-secondary">Gestisci Documenti</Button>
             </Link>
           </CardContent>
         </Card>

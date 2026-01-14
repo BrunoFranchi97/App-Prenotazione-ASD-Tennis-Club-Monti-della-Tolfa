@@ -246,7 +246,8 @@ const BookingCalendar = () => {
           starts_at: slotStart.toISOString(),
           ends_at: slotEnd.toISOString(),
           status: 'confirmed', // Assuming instant confirmation for now
-          notes: `Prenotazione personale di ${bookerFullName || user.email} dalle ${format(slotStart, 'HH:mm')} alle ${format(slotEnd, 'HH:mm')}`,
+          booking_type: bookingType,
+          notes: `${bookingTypeLabels[bookingType]} - Prenotazione di ${bookerFullName || user.email} dalle ${format(slotStart, 'HH:mm')} alle ${format(slotEnd, 'HH:mm')}`,
         };
       });
 
