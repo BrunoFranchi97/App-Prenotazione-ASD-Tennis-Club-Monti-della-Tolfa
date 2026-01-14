@@ -4,12 +4,24 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-import { ArrowLeft, LogOut, CalendarDays, Clock, MapPin, Info } from 'lucide-react';
+import { ArrowLeft, LogOut, CalendarDays, Clock, MapPin, Info, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isBefore, addHours } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { Reservation } from '@/types/supabase';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+
 
 // Estendi l'interfaccia Reservation per includere i dettagli del campo
 interface DetailedReservation extends Reservation {
@@ -24,6 +36,7 @@ const BookingHistory = () => {
   const [reservations, setReservations] = useState<DetailedReservation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isCancelling, setIsCancelling] = useState<string | null>(null); // Stores the ID of the reservation being cancelled
 
   const handleLogout = async () => {
     try {
@@ -39,46 +52,73 @@ const BookingHistory = () => {
     }
   };
 
-  useEffect(() => {
-    const fetchUserReservations = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          showError("Utente non autenticato. Effettua il login.");
-          navigate('/login');
-          return;
-        }
-
-        const { data, error } = await supabase
-          .from('reservations')
-          .select(`
-            *,
-            courts (
-              name,
-              surface
-            )
-          `)
-          .eq('user_id', user.id)
-          .order('starts_at', { ascending: false }); // Ordina dalla più recente alla meno recente
-
-        if (error) {
-          throw new Error(error.message);
-        }
-
-        setReservations(data as DetailedReservation[]);
-      } catch (err: any) {
-        console.error("Errore nel caricamento delle prenotazioni:", err.message);
-        setError("Errore nel caricamento delle prenotazioni: " + err.message);
-        showError("Errore nel caricamento delle prenotazioni.");
-      } finally {
-        setLoading(false);
+  const fetchUserReservations = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        showError("Utente non autenticato. Effettua il login.");
+        navigate('/login');
+        return;
       }
-    };
 
+      const { data, error } = await supabase
+        .from('reservations')
+        .select(`
+          *,
+          courts (
+            name,
+            surface
+          )
+        `)
+        .eq('user_id', user.id)
+        .order('starts_at', { ascending: false }); // Ordina dalla più recente alla meno recente
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      setReservations(data as DetailedReservation[]);
+    } catch (err: any) {
+      console.error("Errore nel caricamento delle prenotazioni:", err.message);
+      setError("Errore nel caricamento delle prenotazioni: " + err.message);
+      showError("Errore nel caricamento delle prenotazioni.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchUserReservations();
   }, [navigate]);
+
+  const handleCancelReservation = async (reservationId: string) => {
+    setIsCancelling(reservationId);
+    try {
+      const { error } = await supabase
+        .from('reservations')
+        .delete()
+        .eq('id', reservationId);
+
+      if (error) {
+        showError("Errore durante l'annullamento della prenotazione: " + error.message);
+      } else {
+        showSuccess("Prenotazione annullata con successo!");
+        fetchUserReservations(); // Refresh the list
+      }
+    } catch (err: any) {
+      showError(err.message || "Errore inaspettato durante l'annullamento.");
+    } finally {
+      setIsCancelling(null);
+    }
+  };
+
+  const isCancellable = (startsAt: string): boolean => {
+    const reservationStartTime = parseISO(startsAt);
+    const oneHourFromNow = addHours(new Date(), 1);
+    return isBefore(oneHourFromNow, reservationStartTime);
+  };
 
   if (loading) {
     return (
@@ -177,6 +217,43 @@ const BookingHistory = () => {
                     <span>Note: <span className="font-medium">{res.notes}</span></span>
                   </div>
                 )}
+                <div className="pt-4">
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="destructive"
+                        className="w-full"
+                        disabled={!isCancellable(res.starts_at) || isCancelling === res.id}
+                      >
+                        {isCancelling === res.id ? "Annullamento..." : "Annulla Prenotazione"}
+                        <Trash2 className="ml-2 h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Sei assolutamente sicuro?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Questa azione non può essere annullata. Verrà eliminata la tua prenotazione per il campo{" "}
+                          <span className="font-semibold">{res.courts?.name || 'sconosciuto'}</span> il{" "}
+                          <span className="font-semibold capitalize">{format(parseISO(res.starts_at), 'EEEE, dd MMMM yyyy', { locale: it })}</span> dalle{" "}
+                          <span className="font-semibold">{format(parseISO(res.starts_at), 'HH:mm')}</span> alle{" "}
+                          <span className="font-semibold">{format(parseISO(res.ends_at), 'HH:mm')}</span>.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Annulla</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleCancelReservation(res.id)}>
+                          Conferma Annullamento
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                  {!isCancellable(res.starts_at) && (
+                    <p className="text-sm text-red-500 mt-2">
+                      Non è possibile annullare prenotazioni che iniziano entro 1 ora.
+                    </p>
+                  )}
+                </div>
               </CardContent>
             </Card>
           ))
