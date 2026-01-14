@@ -157,7 +157,7 @@ const AdminManageSchedules = () => {
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
-          <h1 className="text-3xl font-bold text-primary">Gestione Campi e Orari</h1>
+          <h1 className="text-3xl font-bold text-primary">Gestione Campi</h1>
         </div>
         <Button variant="outline" className="text-primary border-primary hover:bg-secondary" onClick={handleLogout}>
           <LogOut className="mr-2 h-4 w-4" /> Esci

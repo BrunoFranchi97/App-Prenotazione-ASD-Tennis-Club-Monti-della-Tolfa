@@ -103,11 +103,11 @@ const AdminDashboard = () => {
         <Card className="shadow-lg rounded-lg">
           <CardHeader>
             <CardTitle className="text-primary flex items-center">
-              <CalendarPlus className="mr-2 h-5 w-5" /> Gestisci Orari
+              <CalendarPlus className="mr-2 h-5 w-5" /> Gestisci Campi
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-gray-700 mb-4">Aggiungi o modifica gli orari disponibili per i campi.</p>
+            <p className="text-gray-700 mb-4">Attiva o disattiva i campi per renderli prenotabili.</p>
             <Link to="/admin/manage-schedules">
               <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">Gestisci</Button>
             </Link>
