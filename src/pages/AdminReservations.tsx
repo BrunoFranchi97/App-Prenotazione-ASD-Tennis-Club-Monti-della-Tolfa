@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ArrowLeft, LogOut, Edit, Trash2, PlusCircle, CalendarDays, Clock, MapPin, User, Info } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
-import { format, parseISO, addHours, isBefore } from 'date-fns';
+import { format, parseISO, addHours, isBefore, setHours, setMinutes } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { Reservation, Court } from '@/types/supabase';
 import {
@@ -256,7 +256,7 @@ const AdminReservations = () => {
           booked_for_first_name: editBookedForFirstName || null,
           booked_for_last_name: editBookedForLastName || null,
           notes: editNotes || null,
-          status: 'confirmed', // Admin creates confirmed bookings
+          status: 'confirmed',
         });
 
       if (error) {
