@@ -2,12 +2,11 @@
 
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { format, addDays, setHours, setMinutes, setSeconds, setMilliseconds } from 'date-fns';
+import { setHours, setMinutes, setSeconds, setMilliseconds } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -47,26 +46,26 @@ const AdminBlockSlots = () => {
     }
   };
 
-  const fetchAdminStatus = async () => {
+  const fetchAdminStatus = async (): Promise<boolean> => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('is_admin')
-        .eq('id', user.id)
-        .single();
-
-      if (error || !profile?.is_admin) {
-        setIsAdmin(false);
-        showError("Accesso negato. Non sei un amministratore.");
-        navigate('/dashboard');
-      } else {
-        setIsAdmin(true);
-      }
-    } else {
-      setIsAdmin(false);
+    if (!user) {
       navigate('/login');
+      return false;
     }
+
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('is_admin')
+      .eq('id', user.id)
+      .single();
+
+    if (error || !profile?.is_admin) {
+      showError("Accesso negato. Non sei un amministratore.");
+      navigate('/dashboard');
+      return false;
+    }
+
+    return true;
   };
 
   const fetchCourts = async () => {
@@ -77,7 +76,10 @@ const AdminBlockSlots = () => {
         .order('name', { ascending: true });
 
       if (error) throw error;
+      
       setCourts(data || []);
+      
+      // Imposta il primo campo come selezionato di default
       if (data && data.length > 0) {
         setSelectedCourt(String(data[0].id));
       }
@@ -88,19 +90,29 @@ const AdminBlockSlots = () => {
 
   useEffect(() => {
     const initialize = async () => {
-      const adminStatus = await fetchAdminStatus();
-      if (adminStatus) {
-        await fetchCourts();
+      setLoading(true);
+      try {
+        const adminOk = await fetchAdminStatus();
+        if (adminOk) {
+          setIsAdmin(true);
+          await fetchCourts();
+        } else {
+          setIsAdmin(false);
+        }
+      } catch (err: any) {
+        showError("Errore durante l'inizializzazione: " + err.message);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
+    
     initialize();
-  }, []);
+  }, [navigate]);
 
   const createDateTime = (date: Date | undefined, time: string) => {
     if (!date) return null;
     const [hours, minutes] = time.split(':').map(Number);
-    let result = setHours(date, hours);
+    let result = setHours(new Date(date), hours);
     result = setMinutes(result, minutes);
     result = setSeconds(result, 0);
     result = setMilliseconds(result, 0);
@@ -128,13 +140,19 @@ const AdminBlockSlots = () => {
 
     setSaving(true);
     try {
-      // Create a reservation with "blocked" status to represent the blocked slot
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        showError("Utente non autenticato.");
+        return;
+      }
+
       const { error } = await supabase.from('reservations').insert({
         court_id: Number(selectedCourt),
-        user_id: (await supabase.auth.getUser()).data.user?.id || '',
+        user_id: user.id,
         starts_at: startDateTime.toISOString(),
         ends_at: endDateTime.toISOString(),
-        status: 'cancelled', // Using cancelled status for blocked slots
+        status: 'cancelled',
         notes: `BLOCCATO: ${reason || 'Nessun motivo specificato'}`,
         booked_for_first_name: 'SLOT',
         booked_for_last_name: 'BLOCCATO'
@@ -156,10 +174,6 @@ const AdminBlockSlots = () => {
     }
   };
 
-  if (!isAdmin && !loading) {
-    return null;
-  }
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-white p-4">
@@ -169,6 +183,10 @@ const AdminBlockSlots = () => {
         </div>
       </div>
     );
+  }
+
+  if (!isAdmin) {
+    return null;
   }
 
   return (
@@ -203,11 +221,17 @@ const AdminBlockSlots = () => {
                   <SelectValue placeholder="Seleziona un campo" />
                 </SelectTrigger>
                 <SelectContent>
-                  {courts.map((court) => (
-                    <SelectItem key={court.id} value={String(court.id)}>
-                      {court.name}
+                  {courts.length === 0 ? (
+                    <SelectItem value="no-courts" disabled>
+                      Nessun campo disponibile
                     </SelectItem>
-                  ))}
+                  ) : (
+                    courts.map((court) => (
+                      <SelectItem key={court.id} value={String(court.id)}>
+                        {court.name} ({court.surface})
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
