@@ -16,54 +16,55 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
   const location = useLocation();
 
   useEffect(() => {
-    const getSessionAndProfile = async () => {
+    const checkAuthAndRedirect = async () => {
       setLoading(true);
       const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
 
+      const publicRoutes = ['/login', '/register', '/forgot-password'];
+      const isPublicAuthRoute = publicRoutes.includes(location.pathname);
+      const isAdminRoute = location.pathname.startsWith('/admin');
+
       if (session) {
+        // L'utente è autenticato
         const { data: profile, error } = await supabase
           .from('profiles')
           .select('is_admin')
           .eq('id', session.user.id)
           .single();
-
         const isAdmin = profile?.is_admin || false;
-        const publicRoutes = ['/login', '/register', '/forgot-password'];
-        const isPublicRoute = publicRoutes.includes(location.pathname);
-        const isAdminRoute = location.pathname.startsWith('/admin');
 
-        // Se l'utente NON è admin ma tenta di accedere a una rotta admin, reindirizza alla dashboard socio
-        if (!isAdmin && isAdminRoute) {
+        if (location.pathname === '/') {
+          // Utenti autenticati che atterrano sulla root vanno alla dashboard socio
           navigate('/dashboard');
-        } 
-        // Se l'utente è autenticato (sia admin che non admin) e tenta di accedere a una rotta pubblica, reindirizza alla dashboard socio
-        else if (session && isPublicRoute) {
+        } else if (!isAdmin && isAdminRoute) {
+          // Utente non admin che tenta di accedere a una rotta admin
           navigate('/dashboard');
-        } 
-        // Se l'utente non è autenticato e tenta di accedere a una rotta protetta, reindirizza al login
-        else if (!session && !isPublicRoute) {
-          navigate('/login');
+        } else if (isPublicAuthRoute) {
+          // Utente autenticato su una rotta di autenticazione pubblica (login, register, forgot-password)
+          navigate('/dashboard');
         }
-        // Altrimenti, l'utente è autenticato e sulla rotta corretta (admin su admin, o qualsiasi utente su non-admin/non-pubblica)
-        // Non facciamo nulla, lasciamo che il children venga renderizzato.
+        // Altrimenti, l'utente autenticato è su una rotta protetta valida o una rotta admin (se admin), renderizza i children
       } else {
-        // Utente non autenticato
-        const publicRoutes = ['/login', '/register', '/forgot-password', '/'];
-        const isPublicRoute = publicRoutes.includes(location.pathname);
-        if (!isPublicRoute) {
+        // L'utente NON è autenticato
+        if (location.pathname === '/') {
+          // Utenti non autenticati che atterrano sulla root vanno al login
+          navigate('/login');
+        } else if (!isPublicAuthRoute && !isAdminRoute) { // Se non è una rotta pubblica di auth e non è una rotta admin
+          // Utente non autenticato su una rotta protetta
           navigate('/login');
         }
+        // Altrimenti, l'utente non autenticato è su una rotta di autenticazione pubblica valida, renderizza i children
       }
       setLoading(false);
     };
 
-    getSessionAndProfile();
+    checkAuthAndRedirect();
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      // Rilancia la logica di reindirizzamento al cambio di stato dell'autenticazione
-      getSessionAndProfile(); 
+      // Rilancia la logica di controllo e reindirizzamento al cambio di stato dell'autenticazione
+      checkAuthAndRedirect(); 
     });
 
     return () => {
