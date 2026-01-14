@@ -4,7 +4,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { CalendarPlus, Lock, BarChart2, LogOut } from 'lucide-react';
+import { CalendarPlus, Lock, BarChart2, LogOut, BookOpen } from 'lucide-react'; // Added BookOpen icon
 
 const AdminDashboard = () => {
   return (
@@ -17,6 +17,20 @@ const AdminDashboard = () => {
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <Card className="shadow-lg rounded-lg">
+          <CardHeader>
+            <CardTitle className="text-primary flex items-center">
+              <BookOpen className="mr-2 h-5 w-5" /> Gestisci Prenotazioni
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-gray-700 mb-4">Visualizza, modifica, elimina e crea nuove prenotazioni.</p>
+            <Link to="/admin/reservations">
+              <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">Gestisci</Button>
+            </Link>
+          </CardContent>
+        </Card>
+
         <Card className="shadow-lg rounded-lg">
           <CardHeader>
             <CardTitle className="text-primary flex items-center">

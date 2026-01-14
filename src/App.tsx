@@ -14,7 +14,8 @@ import AuthLayout from "./components/AuthLayout";
 import ForgotPassword from "./pages/ForgotPassword";
 import BookingConfirmation from "./pages/BookingConfirmation";
 import BookingHistory from "./pages/BookingHistory";
-import ThirdPartyBooking from "./pages/ThirdPartyBooking"; // Importa la nuova pagina
+import ThirdPartyBooking from "./pages/ThirdPartyBooking";
+import AdminReservations from "./pages/AdminReservations"; // Importa la nuova pagina AdminReservations
 
 const queryClient = new QueryClient();
 
@@ -34,8 +35,9 @@ const App = () => (
             <Route path="/book" element={<BookingCalendar />} />
             <Route path="/booking-confirmation" element={<BookingConfirmation />} />
             <Route path="/history" element={<BookingHistory />} />
-            <Route path="/book-for-third-party" element={<ThirdPartyBooking />} /> {/* Aggiungi la rotta per la prenotazione conto terzi */}
+            <Route path="/book-for-third-party" element={<ThirdPartyBooking />} />
             <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/reservations" element={<AdminReservations />} /> {/* Aggiungi la rotta per AdminReservations */}
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

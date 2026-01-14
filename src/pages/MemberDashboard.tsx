@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -10,6 +10,32 @@ import { showSuccess, showError } from '@/utils/toast';
 
 const MemberDashboard = () => {
   const navigate = useNavigate();
+  const [fullName, setFullName] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .single();
+
+        if (error) {
+          console.error("Error fetching user profile:", error.message);
+          setFullName(user.email); // Fallback to email if name not found
+        } else if (profile) {
+          setFullName(profile.full_name);
+        } else {
+          setFullName(user.email); // Fallback to email if no profile
+        }
+      } else {
+        setFullName("Socio"); // Default if no user session
+      }
+    };
+    fetchUserProfile();
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -28,7 +54,7 @@ const MemberDashboard = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 sm:p-6 lg:p-8">
       <header className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-primary">Benvenuto, Socio!</h1>
+        <h1 className="text-3xl font-bold text-primary">Benvenuto, {fullName}!</h1>
         <Button variant="outline" className="text-primary border-primary hover:bg-secondary" onClick={handleLogout}>
           <LogOut className="mr-2 h-4 w-4" /> Esci
         </Button>
