@@ -1,16 +1,19 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { format, parseISO } from "date-fns";
+import { it } from "date-fns/locale";
+import { ArrowLeft, Eye, LogOut, PlusCircle, RefreshCw, Search, Trash2 } from "lucide-react";
+
+import { supabase } from "@/integrations/supabase/client";
+import { showError, showSuccess } from "@/utils/toast";
+
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, LogOut, Edit, Trash2, PlusCircle, CalendarDays, Clock, MapPin, User, Info } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { showSuccess, showError } from '@/utils/toast';
-import { format, parseISO, addHours, isBefore, setHours, setMinutes } from 'date-fns';
-import { it } from 'date-fns/locale';
-import { Reservation, Court } from '@/types/supabase';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,594 +25,539 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar } from "@/components/ui/calendar";
-import { Textarea } from "@/components/ui/textarea";
 
-interface Profile {
-  id: string;
-  full_name: string;
-  is_admin: boolean;
+import ReservationFormDialog from "@/components/admin/ReservationFormDialog";
+import ReservationDetailsDialog from "@/components/admin/ReservationDetailsDialog";
+
+import type { Court, Reservation } from "@/types/supabase";
+
+type ProfileLite = { id: string; full_name: string | null };
+
+type ReservationRow = Reservation & {
+  court?: Court;
+  bookedByName: string;
+  bookedForName: string;
+};
+
+function statusLabel(s: Reservation["status"]) {
+  if (s === "confirmed") return "Confermata";
+  if (s === "pending") return "In attesa";
+  return "Annullata";
 }
 
-interface DetailedAdminReservation extends Reservation {
-  courts: {
-    name: string;
-    surface: string;
-  } | null;
-  profiles: {
-    full_name: string;
-  } | null;
+function statusBadgeClasses(s: Reservation["status"]) {
+  if (s === "confirmed") return "bg-green-100 text-green-800";
+  if (s === "pending") return "bg-yellow-100 text-yellow-800";
+  return "bg-red-100 text-red-800";
 }
 
-const AdminReservations = () => {
+export default function AdminReservations() {
   const navigate = useNavigate();
-  const [reservations, setReservations] = useState<DetailedAdminReservation[]>([]);
-  const [courts, setCourts] = useState<Court[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [isCancelling, setIsCancelling] = useState<string | null>(null);
-  const [isEditing, setIsEditing] = useState<DetailedAdminReservation | null>(null);
-  const [isCreating, setIsCreating] = useState(false);
 
-  // Form states for editing/creating
-  const [editDate, setEditDate] = useState<Date | undefined>(new Date());
-  const [editStartTime, setEditStartTime] = useState('');
-  const [editEndTime, setEditEndTime] = useState('');
-  const [editCourtId, setEditCourtId] = useState<string | undefined>(undefined);
-  const [editUserId, setEditUserId] = useState('');
-  const [editBookedForFirstName, setEditBookedForFirstName] = useState('');
-  const [editBookedForLastName, setEditBookedForLastName] = useState('');
-  const [editNotes, setEditNotes] = useState('');
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const [courts, setCourts] = useState<Court[]>([]);
+  const [profiles, setProfiles] = useState<ProfileLite[]>([]);
+  const [reservations, setReservations] = useState<ReservationRow[]>([]);
+
+  const [filterCourtId, setFilterCourtId] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterDay, setFilterDay] = useState<string>(""); // dd/MM/yyyy
+  const [search, setSearch] = useState<string>("");
+
+  const [formOpen, setFormOpen] = useState(false);
+  const [formMode, setFormMode] = useState<"create" | "edit">("create");
+  const [formInitial, setFormInitial] = useState<Reservation | null>(null);
+  const [formSaving, setFormSaving] = useState(false);
+
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsReservationId, setDetailsReservationId] = useState<string | null>(null);
+
+  const detailsReservation = useMemo(() => {
+    return reservations.find((r) => r.id === detailsReservationId) || null;
+  }, [reservations, detailsReservationId]);
+
+  const detailsCourt = useMemo(() => {
+    if (!detailsReservation) return undefined;
+    return courts.find((c) => c.id === detailsReservation.court_id);
+  }, [courts, detailsReservation]);
 
   const handleLogout = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        showError(error.message);
-      } else {
-        showSuccess("Disconnessione effettuata con successo!");
-        navigate('/login');
-      }
-    } catch (error: any) {
-      showError(error.message || "Errore durante la disconnessione.");
+    const { error } = await supabase.auth.signOut();
+    if (error) showError(error.message);
+    else {
+      showSuccess("Disconnessione effettuata con successo!");
+      navigate("/login");
     }
   };
 
   const fetchAdminStatus = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('is_admin')
-        .eq('id', user.id)
-        .single();
-
-      if (error || !profile?.is_admin) {
-        setIsAdmin(false);
-        showError("Accesso negato. Non sei un amministratore.");
-        navigate('/dashboard');
-      } else {
-        setIsAdmin(true);
-      }
-    } else {
-      setIsAdmin(false);
-      navigate('/login');
+    const { data } = await supabase.auth.getUser();
+    const user = data.user;
+    if (!user) {
+      navigate("/login");
+      return false;
     }
-  };
 
-  const fetchAllReservations = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { data, error } = await supabase
-        .from('reservations')
-        .select(`
-          *,
-          courts (
-            name,
-            surface
-          ),
-          profiles (
-            full_name
-          )
-        `)
-        .order('starts_at', { ascending: false });
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      setReservations(data as DetailedAdminReservation[]);
-    } catch (err: any) {
-      console.error("Errore nel caricamento delle prenotazioni:", err.message);
-      setError("Errore nel caricamento delle prenotazioni: " + err.message);
-      showError("Errore nel caricamento delle prenotazioni.");
-    } finally {
-      setLoading(false);
+    const { data: profile, error } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single();
+    if (error || !profile?.is_admin) {
+      showError("Accesso negato. Non sei un amministratore.");
+      navigate("/dashboard");
+      return false;
     }
+    return true;
   };
 
   const fetchCourts = async () => {
+    const { data, error } = await supabase.from("courts").select("*").order("name", { ascending: true });
+    if (error) throw error;
+    setCourts((data || []) as Court[]);
+  };
+
+  const fetchProfiles = async () => {
+    const { data, error } = await supabase.from("profiles").select("id, full_name").order("full_name", { ascending: true });
+    if (error) throw error;
+    setProfiles((data || []) as ProfileLite[]);
+  };
+
+  const fetchReservations = async () => {
     const { data, error } = await supabase
-      .from('courts')
-      .select('*')
-      .eq('is_active', true);
-    if (error) {
-      showError("Errore nel caricamento dei campi: " + error.message);
-    } else {
-      setCourts(data || []);
+      .from("reservations")
+      .select("*")
+      .order("starts_at", { ascending: false });
+
+    if (error) throw error;
+
+    const raw = (data || []) as Reservation[];
+
+    const courtMap = new Map<number, Court>();
+    courts.forEach((c) => courtMap.set(c.id, c));
+
+    const profileMap = new Map<string, string>();
+    profiles.forEach((p) => profileMap.set(p.id, p.full_name || ""));
+
+    const rows: ReservationRow[] = raw.map((r) => {
+      const bookedForName =
+        r.booked_for_first_name && r.booked_for_last_name ? `${r.booked_for_first_name} ${r.booked_for_last_name}` : "Se stesso";
+
+      const bookedByName = profileMap.get(r.user_id) || "Socio (nome non impostato)";
+
+      return {
+        ...r,
+        court: courtMap.get(r.court_id),
+        bookedByName,
+        bookedForName,
+      };
+    });
+
+    setReservations(rows);
+  };
+
+  const refreshAll = async () => {
+    setLoading(true);
+    try {
+      const ok = await fetchAdminStatus();
+      setIsAdmin(ok);
+      if (!ok) return;
+
+      await fetchCourts();
+      await fetchProfiles();
+
+      // fetchReservations usa courts/profiles già in state: quindi dopo averli caricati, li rileggo da DB e poi mappo.
+      const { data: courtsData } = await supabase.from("courts").select("*").order("name", { ascending: true });
+      const { data: profilesData } = await supabase.from("profiles").select("id, full_name").order("full_name", { ascending: true });
+
+      const newCourts = (courtsData || []) as Court[];
+      const newProfiles = (profilesData || []) as ProfileLite[];
+
+      setCourts(newCourts);
+      setProfiles(newProfiles);
+
+      const profileMap = new Map<string, string>();
+      newProfiles.forEach((p) => profileMap.set(p.id, p.full_name || ""));
+
+      const courtMap = new Map<number, Court>();
+      newCourts.forEach((c) => courtMap.set(c.id, c));
+
+      const { data: resData, error: resErr } = await supabase.from("reservations").select("*").order("starts_at", { ascending: false });
+      if (resErr) throw resErr;
+
+      const raw = (resData || []) as Reservation[];
+      const rows: ReservationRow[] = raw.map((r) => {
+        const bookedForName =
+          r.booked_for_first_name && r.booked_for_last_name ? `${r.booked_for_first_name} ${r.booked_for_last_name}` : "Se stesso";
+        const bookedByName = profileMap.get(r.user_id) || "Socio (nome non impostato)";
+        return { ...r, court: courtMap.get(r.court_id), bookedByName, bookedForName };
+      });
+
+      setReservations(rows);
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchAdminStatus();
-    fetchCourts();
-    fetchAllReservations();
-  }, [navigate]);
-
-  const handleCancelReservation = async (reservationId: string) => {
-    setIsCancelling(reservationId);
-    try {
-      const { error } = await supabase
-        .from('reservations')
-        .delete()
-        .eq('id', reservationId);
-
-      if (error) {
-        showError("Errore durante l'annullamento della prenotazione: " + error.message);
-      } else {
-        showSuccess("Prenotazione annullata con successo!");
-        fetchAllReservations();
-      }
-    } catch (err: any) {
-      showError(err.message || "Errore inaspettato durante l'annullamento.");
-    } finally {
-      setIsCancelling(null);
-    }
-  };
-
-  const handleEditClick = (reservation: DetailedAdminReservation) => {
-    setIsEditing(reservation);
-    setEditDate(parseISO(reservation.starts_at));
-    setEditStartTime(format(parseISO(reservation.starts_at), 'HH:mm'));
-    setEditEndTime(format(parseISO(reservation.ends_at), 'HH:mm'));
-    setEditCourtId(reservation.court_id.toString());
-    setEditUserId(reservation.user_id);
-    setEditBookedForFirstName(reservation.booked_for_first_name || '');
-    setEditBookedForLastName(reservation.booked_for_last_name || '');
-    setEditNotes(reservation.notes || '');
-  };
-
-  const handleUpdateReservation = async () => {
-    if (!isEditing || !editDate || !editCourtId || !editStartTime || !editEndTime || !editUserId) {
-      showError("Compila tutti i campi richiesti.");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      let startsAt = new Date(editDate);
-      startsAt = new Date(startsAt.setHours(parseInt(editStartTime.split(':')[0]), parseInt(editStartTime.split(':')[1]), 0, 0));
-      let endsAt = new Date(editDate);
-      endsAt = new Date(endsAt.setHours(parseInt(editEndTime.split(':')[0]), parseInt(editEndTime.split(':')[1]), 0, 0));
-
-      const { error } = await supabase
-        .from('reservations')
-        .update({
-          starts_at: startsAt.toISOString(),
-          ends_at: endsAt.toISOString(),
-          court_id: parseInt(editCourtId),
-          user_id: editUserId,
-          booked_for_first_name: editBookedForFirstName || null,
-          booked_for_last_name: editBookedForLastName || null,
-          notes: editNotes || null,
-        })
-        .eq('id', isEditing.id);
-
-      if (error) {
-        showError("Errore durante l'aggiornamento della prenotazione: " + error.message);
-      } else {
-        showSuccess("Prenotazione aggiornata con successo!");
-        setIsEditing(null);
-        fetchAllReservations();
-      }
-    } catch (err: any) {
-      showError(err.message || "Errore inaspettato durante l'aggiornamento.");
-    } finally {
+    refreshAll().catch((e) => {
+      showError(`Errore caricamento: ${e.message || e}`);
       setLoading(false);
-    }
-  };
-
-  const handleCreateReservation = async () => {
-    if (!editDate || !editCourtId || !editStartTime || !editEndTime || !editUserId) {
-      showError("Compila tutti i campi richiesti per la nuova prenotazione.");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      let startsAt = new Date(editDate);
-      startsAt = new Date(startsAt.setHours(parseInt(editStartTime.split(':')[0]), parseInt(editStartTime.split(':')[1]), 0, 0));
-      let endsAt = new Date(editDate);
-      endsAt = new Date(endsAt.setHours(parseInt(editEndTime.split(':')[0]), parseInt(editEndTime.split(':')[1]), 0, 0));
-
-      const { error } = await supabase
-        .from('reservations')
-        .insert({
-          starts_at: startsAt.toISOString(),
-          ends_at: endsAt.toISOString(),
-          court_id: parseInt(editCourtId),
-          user_id: editUserId,
-          booked_for_first_name: editBookedForFirstName || null,
-          booked_for_last_name: editBookedForLastName || null,
-          notes: editNotes || null,
-          status: 'confirmed',
-        });
-
-      if (error) {
-        showError("Errore durante la creazione della prenotazione: " + error.message);
-      } else {
-        showSuccess("Prenotazione creata con successo!");
-        setIsCreating(false);
-        fetchAllReservations();
-        // Clear form fields
-        setEditDate(new Date());
-        setEditStartTime('');
-        setEditEndTime('');
-        setEditCourtId(undefined);
-        setEditUserId('');
-        setEditBookedForFirstName('');
-        setEditBookedForLastName('');
-        setEditNotes('');
-      }
-    } catch (err: any) {
-      showError(err.message || "Errore inaspettato durante la creazione.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const timeSlots = useMemo(() => {
-    const slots: string[] = [];
-    for (let i = 0; i < 24; i++) {
-      slots.push(format(setMinutes(setHours(new Date(), i), 0), 'HH:mm'));
-    }
-    return slots;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (!isAdmin) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold mb-4">Accesso Negato</h1>
-          <p className="text-xl text-gray-600">Non hai i permessi per accedere a questa pagina.</p>
-          <Link to="/dashboard" className="text-blue-500 hover:text-blue-700 underline mt-4 block">
-            Torna alla Dashboard
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return reservations.filter((r) => {
+      if (filterCourtId !== "all" && String(r.court_id) !== filterCourtId) return false;
+      if (filterStatus !== "all" && r.status !== filterStatus) return false;
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-white p-4">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold mb-4 text-primary">Caricamento...</h1>
-          <p className="text-xl text-gray-600">Recupero prenotazioni.</p>
-        </div>
-      </div>
-    );
-  }
+      if (filterDay) {
+        const day = format(parseISO(r.starts_at), "dd/MM/yyyy", { locale: it });
+        if (day !== filterDay) return false;
+      }
 
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-white p-4">
-        <Card className="w-full max-w-md shadow-lg rounded-lg text-center">
-          <CardHeader>
-            <CardTitle className="text-destructive text-3xl font-bold">Errore</CardTitle>
-            <CardDescription className="text-gray-600 mt-2">
-              {error}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={() => window.location.reload()} className="bg-primary hover:bg-primary/90 text-primary-foreground">
-              Riprova
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+      if (!q) return true;
+
+      const hay = [
+        r.court?.name || "",
+        r.bookedByName,
+        r.bookedForName,
+        r.notes || "",
+        statusLabel(r.status),
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      return hay.includes(q);
+    });
+  }, [reservations, filterCourtId, filterStatus, filterDay, search]);
+
+  const openCreate = () => {
+    setFormMode("create");
+    setFormInitial(null);
+    setFormOpen(true);
+  };
+
+  const openEdit = (r: Reservation) => {
+    setFormMode("edit");
+    setFormInitial(r);
+    setFormOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    const { error } = await supabase.from("reservations").delete().eq("id", id);
+    if (error) {
+      showError("Errore eliminazione: " + error.message);
+      return;
+    }
+    showSuccess("Prenotazione eliminata.");
+    await refreshAll();
+  };
+
+  const checkConflict = async (payload: { id?: string; court_id: number; starts_at: string; ends_at: string }) => {
+    let q = supabase
+      .from("reservations")
+      .select("id")
+      .eq("court_id", payload.court_id)
+      .lt("starts_at", payload.ends_at)
+      .gt("ends_at", payload.starts_at);
+
+    if (payload.id) q = q.neq("id", payload.id);
+
+    const { data, error } = await q;
+    if (error) throw error;
+    return (data || []).length > 0;
+  };
+
+  const upsertReservation = async (values: {
+    id?: string;
+    user_id: string;
+    court_id: number;
+    starts_at: string;
+    ends_at: string;
+    booked_for_first_name?: string | null;
+    booked_for_last_name?: string | null;
+    notes?: string | null;
+  }) => {
+    setFormSaving(true);
+    try {
+      const conflict = await checkConflict({
+        id: values.id,
+        court_id: values.court_id,
+        starts_at: values.starts_at,
+        ends_at: values.ends_at,
+      });
+
+      if (conflict) {
+        showError("Conflitto: esiste già una prenotazione che si sovrappone per questo campo e orario.");
+        return;
+      }
+
+      if (formMode === "create") {
+        const { error } = await supabase.from("reservations").insert({
+          user_id: values.user_id,
+          court_id: values.court_id,
+          starts_at: values.starts_at,
+          ends_at: values.ends_at,
+          status: "confirmed",
+          booked_for_first_name: values.booked_for_first_name ?? null,
+          booked_for_last_name: values.booked_for_last_name ?? null,
+          notes: values.notes ?? null,
+        });
+
+        if (error) throw error;
+
+        showSuccess("Prenotazione creata.");
+      } else {
+        const { error } = await supabase
+          .from("reservations")
+          .update({
+            user_id: values.user_id,
+            court_id: values.court_id,
+            starts_at: values.starts_at,
+            ends_at: values.ends_at,
+            booked_for_first_name: values.booked_for_first_name ?? null,
+            booked_for_last_name: values.booked_for_last_name ?? null,
+            notes: values.notes ?? null,
+          })
+          .eq("id", values.id);
+
+        if (error) throw error;
+
+        showSuccess("Prenotazione aggiornata.");
+      }
+
+      setFormOpen(false);
+      setFormInitial(null);
+      await refreshAll();
+    } catch (e: any) {
+      showError("Errore salvataggio: " + (e?.message || e));
+    } finally {
+      setFormSaving(false);
+    }
+  };
+
+  if (!isAdmin && !loading) return null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 sm:p-6 lg:p-8">
-      <header className="flex justify-between items-center mb-8">
-        <div className="flex items-center">
-          <Link to="/admin" className="mr-4">
+      <header className="mb-6 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Link to="/admin">
             <Button variant="outline" size="icon" className="text-primary border-primary hover:bg-secondary">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
-          <h1 className="text-3xl font-bold text-primary">Gestione Prenotazioni</h1>
+          <div>
+            <h1 className="text-2xl font-bold text-primary sm:text-3xl">Gestisci Prenotazioni</h1>
+            <p className="text-sm text-muted-foreground">Ricerca, dettagli, modifica ed elimina prenotazioni su tutti i campi.</p>
+          </div>
         </div>
-        <Button variant="outline" className="text-primary border-primary hover:bg-secondary" onClick={handleLogout}>
-          <LogOut className="mr-2 h-4 w-4" /> Esci
-        </Button>
+
+        <div className="flex items-center gap-2">
+          <Button variant="outline" className="text-primary border-primary hover:bg-secondary" onClick={() => refreshAll()}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Aggiorna
+          </Button>
+          <Button variant="outline" className="text-primary border-primary hover:bg-secondary" onClick={handleLogout}>
+            <LogOut className="mr-2 h-4 w-4" />
+            Esci
+          </Button>
+        </div>
       </header>
 
-      <div className="mb-6 flex justify-end">
-        <Dialog open={isCreating} onOpenChange={setIsCreating}>
-          <DialogTrigger asChild>
-            <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
-              <PlusCircle className="mr-2 h-4 w-4" /> Crea Nuova Prenotazione
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[600px]">
-            <DialogHeader>
-              <DialogTitle>Crea Nuova Prenotazione</DialogTitle>
-              <DialogDescription>
-                Inserisci i dettagli per la nuova prenotazione.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="create-user-id" className="text-right">ID Utente</Label>
-                <Input id="create-user-id" value={editUserId} onChange={(e) => setEditUserId(e.target.value)} className="col-span-3" placeholder="ID Utente (es. UUID)" />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="create-first-name" className="text-right">Nome Socio Terzo</Label>
-                <Input id="create-first-name" value={editBookedForFirstName} onChange={(e) => setEditBookedForFirstName(e.target.value)} className="col-span-3" placeholder="Nome (opzionale)" />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="create-last-name" className="text-right">Cognome Socio Terzo</Label>
-                <Input id="create-last-name" value={editBookedForLastName} onChange={(e) => setEditBookedForLastName(e.target.value)} className="col-span-3" placeholder="Cognome (opzionale)" />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="create-court" className="text-right">Campo</Label>
-                <Select onValueChange={setEditCourtId} value={editCourtId} >
-                  <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Seleziona un campo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {courts.map((court) => (
-                      <SelectItem key={court.id} value={court.id.toString()}>{court.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="create-date" className="text-right">Data</Label>
-                <div className="col-span-3">
-                  <Calendar
-                    mode="single"
-                    selected={editDate}
-                    onSelect={setEditDate}
-                    initialFocus
-                    locale={it}
-                    className="rounded-md border shadow"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="create-start-time" className="text-right">Ora Inizio</Label>
-                <Select onValueChange={setEditStartTime} value={editStartTime}>
-                  <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Seleziona ora inizio" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {timeSlots.map(slot => <SelectItem key={slot} value={slot}>{slot}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="create-end-time" className="text-right">Ora Fine</Label>
-                <Select onValueChange={setEditEndTime} value={editEndTime}>
-                  <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Seleziona ora fine" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {timeSlots.map(slot => <SelectItem key={slot} value={slot}>{slot}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="create-notes" className="text-right">Note</Label>
-                <Textarea id="create-notes" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} className="col-span-3" placeholder="Note aggiuntive (opzionale)" />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsCreating(false)}>Annulla</Button>
-              <Button onClick={handleCreateReservation} disabled={loading}>
-                {loading ? "Creazione..." : "Crea Prenotazione"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      <Card className="shadow-lg rounded-lg">
-        <CardHeader>
-          <CardTitle className="text-primary">Tutte le Prenotazioni</CardTitle>
-          <CardDescription>Panoramica e gestione di tutte le prenotazioni effettuate.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Campo</TableHead>
-                  <TableHead>Data</TableHead>
-                  <TableHead>Orario</TableHead>
-                  <TableHead>Prenotato da</TableHead>
-                  <TableHead>Prenotato per</TableHead>
-                  <TableHead>Note</TableHead>
-                  <TableHead>Stato</TableHead>
-                  <TableHead className="text-right">Azioni</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {reservations.map((res) => (
-                  <TableRow key={res.id}>
-                    <TableCell className="font-medium">{res.courts?.name || 'N/D'}</TableCell>
-                    <TableCell>{format(parseISO(res.starts_at), 'dd/MM/yyyy', { locale: it })}</TableCell>
-                    <TableCell>{format(parseISO(res.starts_at), 'HH:mm')} - {format(parseISO(res.ends_at), 'HH:mm')}</TableCell>
-                    <TableCell>{res.profiles?.full_name || 'Sconosciuto'}</TableCell>
-                    <TableCell>
-                      {res.booked_for_first_name && res.booked_for_last_name
-                        ? `${res.booked_for_first_name} ${res.booked_for_last_name}`
-                        : 'Se stesso'}
-                    </TableCell>
-                    <TableCell className="max-w-[150px] truncate">{res.notes || '-'}</TableCell>
-                    <TableCell>
-                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                        res.status === 'confirmed' ? 'bg-green-100 text-green-800' :
-                        res.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-red-100 text-red-800'
-                      }`}>
-                        {res.status === 'confirmed' ? 'Confermata' :
-                         res.status === 'pending' ? 'In Attesa' :
-                         'Annullata'}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end space-x-2">
-                        <Button variant="outline" size="icon" onClick={() => handleEditClick(res)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="destructive" size="icon" disabled={isCancelling === res.id}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Sei assolutamente sicuro?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Questa azione non può essere annullata. Verrà eliminata la prenotazione per il campo{" "}
-                                <span className="font-semibold">{res.courts?.name || 'sconosciuto'}</span> il{" "}
-                                <span className="font-semibold capitalize">{format(parseISO(res.starts_at), 'EEEE, dd MMMM yyyy', { locale: it })}</span> dalle{" "}
-                                <span className="font-semibold">{format(parseISO(res.starts_at), 'HH:mm')}</span> alle{" "}
-                                <span className="font-semibold">{format(parseISO(res.ends_at), 'HH:mm')}</span>.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Annulla</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleCancelReservation(res.id)}>
-                                Conferma Eliminazione
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Edit Reservation Dialog */}
-      <Dialog open={!!isEditing} onOpenChange={() => setIsEditing(null)}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>Modifica Prenotazione</DialogTitle>
-            <DialogDescription>
-              Apporta modifiche alla prenotazione selezionata.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-user-id" className="text-right">ID Utente</Label>
-              <Input id="edit-user-id" value={editUserId} onChange={(e) => setEditUserId(e.target.value)} className="col-span-3" placeholder="ID Utente (es. UUID)" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-first-name" className="text-right">Nome Socio Terzo</Label>
-              <Input id="edit-first-name" value={editBookedForFirstName} onChange={(e) => setEditBookedForFirstName(e.target.value)} className="col-span-3" placeholder="Nome (opzionale)" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-last-name" className="text-right">Cognome Socio Terzo</Label>
-              <Input id="edit-last-name" value={editBookedForLastName} onChange={(e) => setEditBookedForLastName(e.target.value)} className="col-span-3" placeholder="Cognome (opzionale)" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-court" className="text-right">Campo</Label>
-              <Select onValueChange={setEditCourtId} value={editCourtId} >
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Seleziona un campo" />
+      <div className="mb-6 grid gap-3 lg:grid-cols-12">
+        <Card className="lg:col-span-12">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-primary">Filtri</CardTitle>
+            <CardDescription>Filtra per campo, stato, giorno (dd/MM/yyyy) e testo libero.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2 lg:grid-cols-12">
+            <div className="lg:col-span-3">
+              <Label className="text-sm">Campo</Label>
+              <Select value={filterCourtId} onValueChange={setFilterCourtId}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {courts.map((court) => (
-                    <SelectItem key={court.id} value={court.id.toString()}>{court.name}</SelectItem>
+                  <SelectItem value="all">Tutti i campi</SelectItem>
+                  {courts.map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>
+                      {c.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-date" className="text-right">Data</Label>
-              <div className="col-span-3">
-                <Calendar
-                  mode="single"
-                  selected={editDate}
-                  onSelect={setEditDate}
-                  initialFocus
-                  locale={it}
-                  className="rounded-md border shadow"
-                />
+
+            <div className="lg:col-span-3">
+              <Label className="text-sm">Stato</Label>
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tutti</SelectItem>
+                  <SelectItem value="confirmed">Confermata</SelectItem>
+                  <SelectItem value="pending">In attesa</SelectItem>
+                  <SelectItem value="cancelled">Annullata</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="lg:col-span-3">
+              <Label className="text-sm">Giorno (dd/MM/yyyy)</Label>
+              <Input className="mt-1" value={filterDay} onChange={(e) => setFilterDay(e.target.value)} placeholder="Es. 14/01/2026" />
+            </div>
+
+            <div className="lg:col-span-3">
+              <Label className="text-sm">Ricerca</Label>
+              <div className="mt-1 flex items-center gap-2">
+                <div className="relative w-full">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Campo, socio, note..." />
+                </div>
               </div>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-start-time" className="text-right">Ora Inizio</Label>
-              <Select onValueChange={setEditStartTime} value={editStartTime}>
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Seleziona ora inizio" />
-                </SelectTrigger>
-                <SelectContent>
-                  {timeSlots.map(slot => <SelectItem key={slot} value={slot}>{slot}</SelectItem>)}
-                </SelectContent>
-              </Select>
+
+            <div className="lg:col-span-12 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-sm text-muted-foreground">
+                Risultati: <span className="font-medium text-foreground">{filtered.length}</span>
+              </div>
+              <Button onClick={openCreate} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Nuova prenotazione
+              </Button>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-end-time" className="text-right">Ora Fine</Label>
-              <Select onValueChange={setEditEndTime} value={editEndTime}>
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Seleziona ora fine" />
-                </SelectTrigger>
-                <SelectContent>
-                  {timeSlots.map(slot => <SelectItem key={slot} value={slot}>{slot}</SelectItem>)}
-                </SelectContent>
-              </Select>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="shadow-lg rounded-lg">
+        <CardHeader>
+          <CardTitle className="text-primary">Elenco prenotazioni</CardTitle>
+          <CardDescription>Su mobile scorri orizzontalmente.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="py-10 text-center text-muted-foreground">Caricamento...</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Campo</TableHead>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Orario</TableHead>
+                    <TableHead>Prenotato da</TableHead>
+                    <TableHead>Prenotato per</TableHead>
+                    <TableHead>Stato</TableHead>
+                    <TableHead className="text-right">Azioni</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((r) => (
+                    <TableRow key={r.id}>
+                      <TableCell className="font-medium">{r.court?.name || `Campo #${r.court_id}`}</TableCell>
+                      <TableCell>{format(parseISO(r.starts_at), "dd/MM/yyyy", { locale: it })}</TableCell>
+                      <TableCell>
+                        {format(parseISO(r.starts_at), "HH:mm")} - {format(parseISO(r.ends_at), "HH:mm")}
+                      </TableCell>
+                      <TableCell className="min-w-[180px]">{r.bookedByName}</TableCell>
+                      <TableCell className="min-w-[160px]">{r.bookedForName}</TableCell>
+                      <TableCell>
+                        <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${statusBadgeClasses(r.status)}`}>
+                          {statusLabel(r.status)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => {
+                              setDetailsReservationId(r.id);
+                              setDetailsOpen(true);
+                            }}
+                            title="Dettagli"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+
+                          <Button variant="outline" onClick={() => openEdit(r)} className="hidden sm:inline-flex">
+                            Modifica
+                          </Button>
+
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="destructive" size="icon" title="Elimina">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Eliminare la prenotazione?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Questa azione è irreversibile. Verrà rimossa la prenotazione selezionata.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Annulla</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDelete(r.id)}>Conferma</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+
+                        <div className="mt-2 flex justify-end sm:hidden">
+                          <Button variant="outline" size="sm" onClick={() => openEdit(r)}>
+                            Modifica
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+
+                  {filtered.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                        Nessuna prenotazione trovata con i filtri attuali.
+                      </TableCell>
+                    </TableRow>
+                  ) : null}
+                </TableBody>
+              </Table>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-notes" className="text-right">Note</Label>
-              <Textarea id="edit-notes" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} className="col-span-3" placeholder="Note aggiuntive (opzionale)" />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditing(null)}>Annulla</Button>
-            <Button onClick={handleUpdateReservation} disabled={loading}>
-              {loading ? "Aggiornamento..." : "Salva Modifiche"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          )}
+        </CardContent>
+      </Card>
+
+      <ReservationFormDialog
+        open={formOpen}
+        onOpenChange={(o) => {
+          setFormOpen(o);
+          if (!o) setFormInitial(null);
+        }}
+        mode={formMode}
+        loading={formSaving}
+        courts={courts}
+        profiles={profiles}
+        initial={formInitial}
+        onSubmit={upsertReservation}
+      />
+
+      <ReservationDetailsDialog
+        open={detailsOpen}
+        onOpenChange={setDetailsOpen}
+        reservation={detailsReservation}
+        court={detailsCourt}
+        bookedByName={detailsReservation?.bookedByName || "—"}
+        onEdit={() => {
+          if (!detailsReservation) return;
+          setDetailsOpen(false);
+          openEdit(detailsReservation);
+        }}
+      />
     </div>
   );
-};
-
-export default AdminReservations;
+}
