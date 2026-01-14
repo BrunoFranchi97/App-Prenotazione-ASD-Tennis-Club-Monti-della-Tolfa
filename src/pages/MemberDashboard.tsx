@@ -1,17 +1,35 @@
 "use client";
 
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { CalendarDays, History, LogOut } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { showSuccess, showError } from '@/utils/toast';
 
 const MemberDashboard = () => {
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        showError(error.message);
+      } else {
+        showSuccess("Disconnessione effettuata con successo!");
+        navigate('/login');
+      }
+    } catch (error: any) {
+      showError(error.message || "Errore durante la disconnessione.");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 sm:p-6 lg:p-8">
       <header className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold text-primary">Benvenuto, Socio!</h1>
-        <Button variant="outline" className="text-primary border-primary hover:bg-secondary">
+        <Button variant="outline" className="text-primary border-primary hover:bg-secondary" onClick={handleLogout}>
           <LogOut className="mr-2 h-4 w-4" /> Esci
         </Button>
       </header>
