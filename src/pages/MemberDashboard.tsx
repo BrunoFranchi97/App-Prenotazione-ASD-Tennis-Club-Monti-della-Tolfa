@@ -4,13 +4,14 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { CalendarDays, History, LogOut, Users } from 'lucide-react';
+import { CalendarDays, History, LogOut, Users, Settings } from 'lucide-react'; // Added Settings icon
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 
 const MemberDashboard = () => {
   const navigate = useNavigate();
   const [fullName, setFullName] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false); // Nuovo stato per isAdmin
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -18,7 +19,7 @@ const MemberDashboard = () => {
       if (user) {
         const { data: profile, error } = await supabase
           .from('profiles')
-          .select('full_name')
+          .select('full_name, is_admin') // Seleziona anche is_admin
           .eq('id', user.id)
           .single();
 
@@ -27,6 +28,7 @@ const MemberDashboard = () => {
           setFullName(user.email); // Fallback to email if name not found
         } else if (profile) {
           setFullName(profile.full_name);
+          setIsAdmin(profile.is_admin); // Imposta lo stato isAdmin
         } else {
           setFullName(user.email); // Fallback to email if no profile
         }
@@ -102,6 +104,22 @@ const MemberDashboard = () => {
             </Link>
           </CardContent>
         </Card>
+
+        {isAdmin && ( // Mostra questa card solo se l'utente è un amministratore
+          <Card className="shadow-lg rounded-lg border-2 border-club-orange">
+            <CardHeader>
+              <CardTitle className="text-club-orange flex items-center">
+                <Settings className="mr-2 h-5 w-5" /> Pannello Amministrativo
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-gray-700 mb-4">Accedi alle funzionalità di gestione per gli amministratori.</p>
+              <Link to="/admin">
+                <Button className="w-full bg-club-orange hover:bg-club-orange/90 text-club-orange-foreground">Vai al Pannello Admin</Button>
+              </Link>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

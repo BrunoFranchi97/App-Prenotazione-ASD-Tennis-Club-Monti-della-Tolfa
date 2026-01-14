@@ -33,22 +33,23 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
         const isPublicRoute = publicRoutes.includes(location.pathname);
         const isAdminRoute = location.pathname.startsWith('/admin');
 
-        if (isAdmin && !isAdminRoute) {
-          // Se l'utente è admin e non è già su una rotta admin, reindirizza alla dashboard admin
-          navigate('/admin');
-        } else if (!isAdmin && isAdminRoute) {
-          // Se l'utente NON è admin ma tenta di accedere a una rotta admin, reindirizza alla dashboard socio
+        // Se l'utente NON è admin ma tenta di accedere a una rotta admin, reindirizza alla dashboard socio
+        if (!isAdmin && isAdminRoute) {
           navigate('/dashboard');
-        } else if (session && isPublicRoute) {
-          // Se l'utente è autenticato (non admin o già su rotta admin) e tenta di accedere a una rotta pubblica, reindirizza alla dashboard socio
+        } 
+        // Se l'utente è autenticato (sia admin che non admin) e tenta di accedere a una rotta pubblica, reindirizza alla dashboard socio
+        else if (session && isPublicRoute) {
           navigate('/dashboard');
-        } else if (!session && !isPublicRoute) {
-          // Se l'utente non è autenticato e tenta di accedere a una rotta protetta, reindirizza al login
+        } 
+        // Se l'utente non è autenticato e tenta di accedere a una rotta protetta, reindirizza al login
+        else if (!session && !isPublicRoute) {
           navigate('/login');
         }
+        // Altrimenti, l'utente è autenticato e sulla rotta corretta (admin su admin, o qualsiasi utente su non-admin/non-pubblica)
+        // Non facciamo nulla, lasciamo che il children venga renderizzato.
       } else {
         // Utente non autenticato
-        const publicRoutes = ['/login', '/register', '/forgot-password', '/']; // Aggiunto '/' come rotta pubblica iniziale
+        const publicRoutes = ['/login', '/register', '/forgot-password', '/'];
         const isPublicRoute = publicRoutes.includes(location.pathname);
         if (!isPublicRoute) {
           navigate('/login');
@@ -68,7 +69,7 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, [navigate, location.pathname]); // Aggiunto location.pathname come dipendenza
+  }, [navigate, location.pathname]);
 
   if (loading) {
     return (
