@@ -228,7 +228,7 @@ const AdminBlockSlots = () => {
                   ) : (
                     courts.map((court) => (
                       <SelectItem key={court.id} value={String(court.id)}>
-                        {court.name} ({court.surface})
+                        {court.name}
                       </SelectItem>
                     ))
                   )}
