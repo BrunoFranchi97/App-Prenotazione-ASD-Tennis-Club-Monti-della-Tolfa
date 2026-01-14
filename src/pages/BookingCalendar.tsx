@@ -24,6 +24,7 @@ const BookingCalendar = () => {
   const [selectedSlots, setSelectedSlots] = useState<string[]>([]); // e.g., ['08:00', '09:00']
   const [loading, setLoading] = useState(false);
   const [fetchingData, setFetchingData] = useState(true);
+  const [bookerFullName, setBookerFullName] = useState<string | null>(null); // Nuovo stato per il nome completo del prenotante
 
   const selectedCourt = useMemo(() => {
     return courts.find(court => court.id.toString() === selectedCourtId);
@@ -42,6 +43,27 @@ const BookingCalendar = () => {
       showError(error.message || "Errore durante la disconnessione.");
     }
   };
+
+  // Fetch booker's full name on component mount
+  useEffect(() => {
+    const fetchBookerProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .single();
+
+        if (error) {
+          console.error("[BookingCalendar] Error fetching profile:", error.message);
+        } else if (profile) {
+          setBookerFullName(profile.full_name);
+        }
+      }
+    };
+    fetchBookerProfile();
+  }, []);
 
   // Fetch courts on component mount
   useEffect(() => {
@@ -224,7 +246,7 @@ const BookingCalendar = () => {
           starts_at: slotStart.toISOString(),
           ends_at: slotEnd.toISOString(),
           status: 'confirmed', // Assuming instant confirmation for now
-          notes: `Prenotazione per ${user.email} - Slot ${index + 1}/${selectedSlots.length}`,
+          notes: `Prenotazione personale di ${bookerFullName || user.email} dalle ${format(slotStart, 'HH:mm')} alle ${format(slotEnd, 'HH:mm')}`,
         };
       });
 
@@ -272,7 +294,7 @@ const BookingCalendar = () => {
         await supabase.functions.invoke('send-booking-confirmation', {
           body: {
             userEmail: user.email,
-            userName: user.user_metadata?.full_name || user.email,
+            userName: bookerFullName || user.email,
             courtName: selectedCourt.name,
             reservations: insertedReservations,
           },

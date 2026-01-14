@@ -28,6 +28,7 @@ const ThirdPartyBooking = () => {
   const [bookedForLastName, setBookedForLastName] = useState('');
   const [loading, setLoading] = useState(false);
   const [fetchingData, setFetchingData] = useState(true);
+  const [bookerFullName, setBookerFullName] = useState<string | null>(null); // Nuovo stato per il nome completo del prenotante
 
   const selectedCourt = useMemo(() => {
     return courts.find(court => court.id.toString() === selectedCourtId);
@@ -46,6 +47,27 @@ const ThirdPartyBooking = () => {
       showError(error.message || "Errore durante la disconnessione.");
     }
   };
+
+  // Fetch booker's full name on component mount
+  useEffect(() => {
+    const fetchBookerProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .single();
+
+        if (error) {
+          console.error("[ThirdPartyBooking] Error fetching profile:", error.message);
+        } else if (profile) {
+          setBookerFullName(profile.full_name);
+        }
+      }
+    };
+    fetchBookerProfile();
+  }, []);
 
   useEffect(() => {
     const fetchCourts = async () => {
@@ -218,7 +240,7 @@ const ThirdPartyBooking = () => {
           starts_at: slotStart.toISOString(),
           ends_at: slotEnd.toISOString(),
           status: 'confirmed',
-          notes: `Prenotazione per ${bookedForFirstName} ${bookedForLastName} (effettuata da ${user.email}) - Slot ${index + 1}/${selectedSlots.length}`,
+          notes: `Prenotazione per ${bookedForFirstName} ${bookedForLastName} (effettuata da ${bookerFullName || 'Socio Sconosciuto'}) dalle ${format(slotStart, 'HH:mm')} alle ${format(slotEnd, 'HH:mm')}`,
           booked_for_first_name: bookedForFirstName,
           booked_for_last_name: bookedForLastName,
         };
@@ -265,7 +287,7 @@ const ThirdPartyBooking = () => {
         await supabase.functions.invoke('send-booking-confirmation', {
           body: {
             userEmail: user.email, // Email del socio che prenota
-            userName: user.user_metadata?.full_name || user.email,
+            userName: bookerFullName || user.email,
             courtName: selectedCourt.name,
             reservations: insertedReservations,
             bookedForFirstName: bookedForFirstName,

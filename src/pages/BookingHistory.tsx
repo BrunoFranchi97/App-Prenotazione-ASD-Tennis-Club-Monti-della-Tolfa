@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-import { ArrowLeft, LogOut, CalendarDays, Clock, MapPin, Info, Trash2 } from 'lucide-react';
+import { ArrowLeft, LogOut, CalendarDays, Clock, MapPin, Info, Trash2, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { format, parseISO, isBefore, addHours } from 'date-fns';
@@ -203,6 +203,17 @@ const BookingHistory = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-0 space-y-2">
+                {res.booked_for_first_name && res.booked_for_last_name ? (
+                  <div className="flex items-center text-gray-700">
+                    <User className="mr-2 h-4 w-4 text-club-orange" />
+                    <span>Prenotato per: <span className="font-semibold">{res.booked_for_first_name} {res.booked_for_last_name}</span></span>
+                  </div>
+                ) : (
+                  <div className="flex items-center text-gray-700">
+                    <User className="mr-2 h-4 w-4 text-club-orange" />
+                    <span>Prenotato da: <span className="font-semibold">Te stesso</span></span>
+                  </div>
+                )}
                 <div className="flex items-center text-gray-700">
                   <CalendarDays className="mr-2 h-4 w-4 text-club-orange" />
                   <span>Data: <span className="font-semibold capitalize">{format(parseISO(res.starts_at), 'EEEE, dd MMMM yyyy', { locale: it })}</span></span>
