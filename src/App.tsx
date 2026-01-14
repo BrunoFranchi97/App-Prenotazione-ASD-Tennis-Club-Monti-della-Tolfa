@@ -16,7 +16,9 @@ import BookingConfirmation from "./pages/BookingConfirmation";
 import BookingHistory from "./pages/BookingHistory";
 import ThirdPartyBooking from "./pages/ThirdPartyBooking";
 import AdminReservations from "./pages/AdminReservations";
-import AdminManageSchedules from "./pages/AdminManageSchedules"; // Importa la nuova pagina AdminManageSchedules
+import AdminManageSchedules from "./pages/AdminManageSchedules";
+import AdminBlockSlots from "./pages/AdminBlockSlots";
+import AdminUsageStats from "./pages/AdminUsageStats";
 
 const queryClient = new QueryClient();
 
@@ -39,7 +41,9 @@ const App = () => (
             <Route path="/book-for-third-party" element={<ThirdPartyBooking />} />
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/reservations" element={<AdminReservations />} />
-            <Route path="/admin/manage-schedules" element={<AdminManageSchedules />} /> {/* Aggiungi la rotta per AdminManageSchedules */}
+            <Route path="/admin/manage-schedules" element={<AdminManageSchedules />} />
+            <Route path="/admin/block-slots" element={<AdminBlockSlots />} />
+            <Route path="/admin/usage-stats" element={<AdminUsageStats />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
