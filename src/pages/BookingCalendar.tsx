@@ -67,8 +67,8 @@ const BookingCalendar = () => {
       if (!date || !selectedCourtId) return;
 
       setFetchingData(true);
-      const startOfDay = format(date, 'yyyy-MM-ddT00:00:00.000Z');
-      const endOfDay = format(date, 'yyyy-MM-ddT23:59:59.999Z');
+      const startOfDay = format(date, "yyyy-MM-dd'T'00:00:00.000'Z'"); // Corrected format
+      const endOfDay = format(date, "yyyy-MM-dd'T'23:59:59.999'Z'");   // Corrected format
 
       const { data, error } = await supabase
         .from('reservations')
@@ -232,8 +232,8 @@ const BookingCalendar = () => {
           setLoading(false);
           setSelectedSlots([]); // Clear selection
           // Re-fetch reservations to update UI
-          const startOfDay = format(date, 'yyyy-MM-ddT00:00:00.000Z');
-          const endOfDay = format(date, 'yyyy-MM-ddT23:59:59.999Z');
+          const startOfDay = format(date, "yyyy-MM-dd'T'00:00:00.000'Z'"); // Corrected format
+          const endOfDay = format(date, "yyyy-MM-dd'T'23:59:59.999'Z'");   // Corrected format
           const { data, error } = await supabase
             .from('reservations')
             .select('*')
@@ -255,8 +255,8 @@ const BookingCalendar = () => {
         showSuccess("Prenotazione effettuata con successo!");
         setSelectedSlots([]); // Clear selected slots
         // Re-fetch reservations to update UI
-        const startOfDay = format(date, 'yyyy-MM-ddT00:00:00.000Z');
-        const endOfDay = format(date, 'yyyy-MM-ddT23:59:59.999Z');
+        const startOfDay = format(date, "yyyy-MM-dd'T'00:00:00.000'Z'"); // Corrected format
+        const endOfDay = format(date, "yyyy-MM-dd'T'23:59:59.999'Z'");   // Corrected format
         const { data, error } = await supabase
           .from('reservations')
           .select('*')
