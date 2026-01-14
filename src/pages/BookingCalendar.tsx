@@ -25,6 +25,10 @@ const BookingCalendar = () => {
   const [loading, setLoading] = useState(false);
   const [fetchingData, setFetchingData] = useState(true);
 
+  const selectedCourt = useMemo(() => {
+    return courts.find(court => court.id.toString() === selectedCourtId);
+  }, [courts, selectedCourtId]);
+
   const handleLogout = async () => {
     try {
       const { error } = await supabase.auth.signOut();
@@ -193,6 +197,10 @@ const BookingCalendar = () => {
       showError("Seleziona una data, un campo e almeno un orario.");
       return;
     }
+    if (!selectedCourt) {
+      showError("Campo selezionato non trovato.");
+      return;
+    }
 
     setLoading(true);
     try {
@@ -249,25 +257,33 @@ const BookingCalendar = () => {
         }
       }
 
-      const { error: insertError } = await supabase
+      const { data: insertedReservations, error: insertError } = await supabase
         .from('reservations')
-        .insert(reservationsToInsert);
+        .insert(reservationsToInsert)
+        .select(); // Select the inserted data to pass to confirmation page
 
       if (insertError) {
         showError("Errore durante la prenotazione: " + insertError.message);
-      } else {
+      } else if (insertedReservations) {
         showSuccess("Prenotazione effettuata con successo!");
         setSelectedSlots([]); // Clear selected slots
-        // Re-fetch reservations to update UI
-        const startOfDay = format(date, "yyyy-MM-dd'T'00:00:00.000'Z'");
-        const endOfDay = format(date, "yyyy-MM-dd'T'23:59:59.999'Z'");
-        const { data, error } = await supabase
-          .from('reservations')
-          .select('*')
-          .eq('court_id', courtIdNum)
-          .gte('starts_at', startOfDay)
-          .lte('ends_at', endOfDay);
-        if (!error) setExistingReservations(data || []);
+
+        // Invoke Edge Function for email confirmation
+        await supabase.functions.invoke('send-booking-confirmation', {
+          body: {
+            userEmail: user.email,
+            userName: user.user_metadata?.full_name || user.email,
+            courtName: selectedCourt.name,
+            reservations: insertedReservations,
+          },
+        });
+
+        navigate('/booking-confirmation', {
+          state: {
+            reservations: insertedReservations,
+            courtName: selectedCourt.name,
+          },
+        });
       }
     } catch (error: any) {
       showError(error.message || "Errore inaspettato durante la prenotazione.");
@@ -341,7 +357,7 @@ const BookingCalendar = () => {
                     const slotClasses = `
                       px-3 py-2 rounded-md text-sm font-medium
                       ${isSelected
-                        ? 'bg-club-orange text-club-orange-foreground hover:bg-club-orange/90'
+                        ? 'bg-club-orange text-club-orange-foreground hover:bg-club-orange/90' // Colore arancione per gli slot selezionati
                         : available
                           ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                           : 'bg-gray-300 text-gray-600 cursor-not-allowed opacity-70'
