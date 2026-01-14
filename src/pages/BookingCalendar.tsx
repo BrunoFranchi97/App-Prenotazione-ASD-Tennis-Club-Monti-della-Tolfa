@@ -13,7 +13,14 @@ import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, is
 import { it } from 'date-fns/locale'; // Import Italian locale
 
 // Import types
-import { Court, Reservation } from '@/types/supabase';
+import { Court, Reservation, BookingType } from '@/types/supabase';
+
+// Booking type labels
+const bookingTypeLabels: Record<BookingType, string> = {
+  singolare: 'Singolare',
+  doppio: 'Doppio',
+  lezione: 'Lezione con Maestro'
+};
 
 const BookingCalendar = () => {
   const navigate = useNavigate();
@@ -22,6 +29,7 @@ const BookingCalendar = () => {
   const [selectedCourtId, setSelectedCourtId] = useState<string | undefined>(undefined);
   const [existingReservations, setExistingReservations] = useState<Reservation[]>([]);
   const [selectedSlots, setSelectedSlots] = useState<string[]>([]); // e.g., ['08:00', '09:00']
+  const [bookingType, setBookingType] = useState<BookingType>('singolare');
   const [loading, setLoading] = useState(false);
   const [fetchingData, setFetchingData] = useState(true);
   const [bookerFullName, setBookerFullName] = useState<string | null>(null); // Nuovo stato per il nome completo del prenotante
@@ -364,6 +372,20 @@ const BookingCalendar = () => {
                   {courts.map((court) => (
                     <SelectItem key={court.id} value={court.id.toString()}>{court.name}</SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <h3 className="text-lg font-semibold mb-2">Tipo di Prenotazione</h3>
+              <Select onValueChange={(v) => setBookingType(v as BookingType)} value={bookingType}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Seleziona tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="singolare">Singolare</SelectItem>
+                  <SelectItem value="doppio">Doppio</SelectItem>
+                  <SelectItem value="lezione">Lezione con Maestro</SelectItem>
                 </SelectContent>
               </Select>
             </div>
