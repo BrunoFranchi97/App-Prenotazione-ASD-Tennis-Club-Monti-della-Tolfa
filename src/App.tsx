@@ -15,7 +15,8 @@ import ForgotPassword from "./pages/ForgotPassword";
 import BookingConfirmation from "./pages/BookingConfirmation";
 import BookingHistory from "./pages/BookingHistory";
 import ThirdPartyBooking from "./pages/ThirdPartyBooking";
-import AdminReservations from "./pages/AdminReservations"; // Importa la nuova pagina AdminReservations
+import AdminReservations from "./pages/AdminReservations";
+import AdminManageSchedules from "./pages/AdminManageSchedules"; // Importa la nuova pagina AdminManageSchedules
 
 const queryClient = new QueryClient();
 
@@ -37,7 +38,8 @@ const App = () => (
             <Route path="/history" element={<BookingHistory />} />
             <Route path="/book-for-third-party" element={<ThirdPartyBooking />} />
             <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/reservations" element={<AdminReservations />} /> {/* Aggiungi la rotta per AdminReservations */}
+            <Route path="/admin/reservations" element={<AdminReservations />} />
+            <Route path="/admin/manage-schedules" element={<AdminManageSchedules />} /> {/* Aggiungi la rotta per AdminManageSchedules */}
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
