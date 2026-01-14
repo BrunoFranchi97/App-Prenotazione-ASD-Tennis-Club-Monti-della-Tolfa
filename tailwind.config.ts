@@ -62,6 +62,15 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        // Custom club colors
+        'club-green': {
+          DEFAULT: 'hsl(138 41% 30%)', // #2E6B3D
+          foreground: 'hsl(0 0% 100%)', // White
+        },
+        'club-orange': {
+          DEFAULT: 'hsl(23 72% 50%)', // #D96B27
+          foreground: 'hsl(0 0% 100%)', // White
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

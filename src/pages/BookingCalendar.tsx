@@ -40,17 +40,17 @@ const BookingCalendar = () => {
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 sm:p-6 lg:p-8">
       <header className="flex items-center mb-8">
         <Link to="/dashboard" className="mr-4">
-          <Button variant="outline" size="icon" className="text-green-700 border-green-700 hover:bg-green-50">
+          <Button variant="outline" size="icon" className="text-primary border-primary hover:bg-secondary">
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
-        <h1 className="text-3xl font-bold text-green-800">Prenota un Campo</h1>
+        <h1 className="text-3xl font-bold text-primary">Prenota un Campo</h1>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="shadow-lg rounded-lg">
           <CardHeader>
-            <CardTitle className="text-green-700">Seleziona Data</CardTitle>
+            <CardTitle className="text-primary">Seleziona Data</CardTitle>
           </CardHeader>
           <CardContent className="flex justify-center">
             <Calendar
@@ -65,7 +65,7 @@ const BookingCalendar = () => {
 
         <Card className="shadow-lg rounded-lg">
           <CardHeader>
-            <CardTitle className="text-green-700">Dettagli Prenotazione</CardTitle>
+            <CardTitle className="text-primary">Dettagli Prenotazione</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <div>
@@ -98,7 +98,7 @@ const BookingCalendar = () => {
 
             <Button
               onClick={handleBooking}
-              className="w-full bg-green-700 hover:bg-green-800 text-white"
+              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
               disabled={!date || !selectedCourt || !selectedTime}
             >
               Conferma Prenotazione

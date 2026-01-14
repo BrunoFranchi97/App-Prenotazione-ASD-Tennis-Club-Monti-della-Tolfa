@@ -12,7 +12,8 @@ const Login = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-white p-4">
       <Card className="w-full max-w-md shadow-lg rounded-lg">
         <CardHeader className="text-center">
-          <CardTitle className="text-3xl font-bold text-green-800">ASD Tennis Club Monti della Tolfa</CardTitle>
+          <img src="/logo.png" alt="ASD Tennis Club Monti della Tolfa Logo" className="mx-auto h-24 w-24 mb-4" />
+          <CardTitle className="text-3xl font-bold text-primary">ASD Tennis Club Monti della Tolfa</CardTitle>
           <CardDescription className="text-gray-600 mt-2">Accedi al tuo account per prenotare un campo.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -24,10 +25,10 @@ const Login = () => {
             <Label htmlFor="password">Password</Label>
             <Input id="password" type="password" placeholder="Inserisci password" />
           </div>
-          <Button className="w-full bg-green-700 hover:bg-green-800 text-white">Accedi</Button>
+          <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">Accedi</Button>
         </CardContent>
         <CardFooter className="flex flex-col gap-2 text-sm text-center">
-          <Link to="/register" className="text-green-700 hover:underline">Non hai un account? Registrati</Link>
+          <Link to="/register" className="text-primary hover:underline">Non hai un account? Registrati</Link>
           <Link to="/forgot-password" className="text-gray-500 hover:underline">Password dimenticata?</Link>
         </CardFooter>
       </Card>
