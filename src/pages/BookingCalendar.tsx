@@ -344,15 +344,15 @@ const BookingCalendar = () => {
           <CardHeader>
             <CardTitle className="text-primary">Seleziona Data</CardTitle>
           </CardHeader>
-          <CardContent className="flex justify-center">
+          <CardContent className="flex justify-center p-6">
             <Calendar
               mode="single"
               selected={date}
               onSelect={setDate}
               initialFocus
-              locale={it} // Use Italian locale for calendar
-              className="rounded-md border shadow"
-              disabled={(date) => isBefore(date, new Date())} // Disable past dates
+              locale={it}
+              className="rounded-xl border-0 shadow-sm bg-white p-2"
+              disabled={(date) => isBefore(date, new Date())}
             />
           </CardContent>
         </Card>
