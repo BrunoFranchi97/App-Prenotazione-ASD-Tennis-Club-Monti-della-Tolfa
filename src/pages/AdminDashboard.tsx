@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { CalendarPlus, Lock, BarChart2, LogOut, BookOpen } from 'lucide-react';
+import { CalendarPlus, Lock, BarChart2, LogOut, BookOpen, ArrowLeft } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 
@@ -72,7 +72,14 @@ const AdminDashboard = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 sm:p-6 lg:p-8">
       <header className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-primary">Pannello Amministrativo</h1>
+        <div className="flex items-center">
+          <Link to="/dashboard" className="mr-4">
+            <Button variant="outline" size="icon" className="text-primary border-primary hover:bg-secondary">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
+          <h1 className="text-3xl font-bold text-primary">Pannello Amministrativo</h1>
+        </div>
         <Button variant="outline" className="text-primary border-primary hover:bg-secondary" onClick={handleLogout}>
           <LogOut className="mr-2 h-4 w-4" /> Esci
         </Button>
