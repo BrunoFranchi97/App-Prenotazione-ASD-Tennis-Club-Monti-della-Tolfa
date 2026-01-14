@@ -88,8 +88,8 @@ const AdminBlockSlots = () => {
 
   useEffect(() => {
     const initialize = async () => {
-      await fetchAdminStatus();
-      if (isAdmin) {
+      const adminStatus = await fetchAdminStatus();
+      if (adminStatus) {
         await fetchCourts();
       }
       setLoading(false);
