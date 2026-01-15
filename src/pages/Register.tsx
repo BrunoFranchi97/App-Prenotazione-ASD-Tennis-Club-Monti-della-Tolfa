@@ -30,6 +30,10 @@ const Register = () => {
     }
 
     try {
+      // Ottieni l'URL corrente per il redirect dopo la conferma email
+      const currentOrigin = window.location.origin;
+      const redirectTo = `${currentOrigin}/dashboard`;
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -37,14 +41,15 @@ const Register = () => {
           data: {
             full_name: name,
           },
+          emailRedirectTo: redirectTo,
         },
       });
 
       if (error) {
         showError(error.message);
       } else if (data.user) {
-        // Non mostriamo showSuccess qui, ma cambiamo lo stato per mostrare la schermata di verifica
         setIsRegistered(true);
+        console.log('Registration successful, redirect URL:', redirectTo);
       }
     } catch (error: any) {
       showError(error.message || "Errore durante la registrazione.");
@@ -70,6 +75,9 @@ const Register = () => {
             </p>
             <p className="text-sm text-red-600 font-medium">
               Attenzione: Dopo la verifica, il tuo account dovrà essere approvato da un amministratore prima di poter prenotare.
+            </p>
+            <p className="text-xs text-gray-500 mt-4">
+              Se non ricevi l'email entro pochi minuti, controlla la cartella spam.
             </p>
           </CardContent>
           <CardFooter className="flex flex-col gap-2">
