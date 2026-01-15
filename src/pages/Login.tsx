@@ -43,7 +43,7 @@ const Login = () => {
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-green-50 to-white">
       {/* Institutional Logos at top corners */}
       <div className="container mx-auto px-4 py-4 flex justify-between items-start">
-        <div className="relative h-10 w-24 flex items-center">
+        <div className="relative h-10 flex items-center justify-start">
           <img 
             src="/assets/coni.jpeg" 
             alt="Logo CONI" 
@@ -54,7 +54,7 @@ const Login = () => {
             }}
           />
         </div>
-        <div className="relative h-10 w-24 flex items-center">
+        <div className="relative h-10 flex items-center justify-end">
           <img 
             src="/assets/fitp.jpeg" 
             alt="Logo FITP" 
