@@ -17,10 +17,9 @@ const supabaseAdmin = createClient(
 const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
 
 // Define the sender and recipient emails
-// !!! IMPORTANT: REPLACE THESE WITH YOUR ACTUAL VERIFIED EMAILS !!!
-const SENDER_EMAIL = 'onboarding@resend.dev'; // Must be a verified domain/email in Resend
-const ADMIN_EMAIL = 'admin@example.com'; // Replace with your actual admin email
-// !!! IMPORTANT: REPLACE THESE WITH YOUR ACTUAL VERIFIED EMAILS !!!
+// SENDER_EMAIL must be a verified domain/email in Resend.
+const SENDER_EMAIL = 'onboarding@resend.dev'; 
+const ADMIN_EMAIL = 'brunofranchi9@gmail.com'; // Updated Admin Email
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -58,7 +57,7 @@ serve(async (req) => {
       </ul>
       <p>Per approvare o rifiutare, accedi al pannello di amministrazione:</p>
       <a href="https://your-app-domain.com/admin/approvals" style="padding: 10px 20px; background-color: #2E6B3D; color: white; text-decoration: none; border-radius: 5px;">Vai a Gestisci Approvazioni</a>
-      <p>Ricorda di configurare l'indirizzo email di destinazione corretto nel codice della funzione Edge.</p>
+      <p>Ricorda di sostituire "https://your-app-domain.com" con l'URL reale della tua applicazione.</p>
     `;
 
     const { data: resendData, error: resendError } = await resend.emails.send({
