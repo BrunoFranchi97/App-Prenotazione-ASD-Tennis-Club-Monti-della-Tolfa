@@ -19,6 +19,25 @@ const Register = () => {
   const [isRegistered, setIsRegistered] = useState(false);
   const navigate = useNavigate();
 
+  const getEmailRedirectUrl = () => {
+    const hostname = window.location.hostname;
+    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+    
+    // Prima prova con la variabile d'ambiente, altrimenti usa fallback
+    const appDomain = import.meta.env.VITE_APP_DOMAIN;
+    
+    if (isLocalhost) {
+      // Ambiente locale
+      return 'http://localhost:8080/dashboard';
+    } else if (appDomain) {
+      // Usa la variabile d'ambiente configurata
+      return `${appDomain}/dashboard`;
+    } else {
+      // Fallback - usa il dominio corrente
+      return `${window.location.origin}/dashboard`;
+    }
+  };
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -30,9 +49,9 @@ const Register = () => {
     }
 
     try {
-      // Ottieni l'URL corrente per il redirect dopo la conferma email
-      const currentOrigin = window.location.origin;
-      const redirectTo = `${currentOrigin}/dashboard`;
+      // Usa un URL fisso per il redirect dopo la conferma email
+      const redirectTo = getEmailRedirectUrl();
+      console.log('Email redirect URL set to:', redirectTo);
 
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -49,7 +68,7 @@ const Register = () => {
         showError(error.message);
       } else if (data.user) {
         setIsRegistered(true);
-        console.log('Registration successful, redirect URL:', redirectTo);
+        console.log('Registration successful, redirect URL set to:', redirectTo);
       }
     } catch (error: any) {
       showError(error.message || "Errore durante la registrazione.");
