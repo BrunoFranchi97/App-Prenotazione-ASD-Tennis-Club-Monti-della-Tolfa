@@ -13,7 +13,8 @@ import { showSuccess, showError } from '@/utils/toast';
 import type { Profile } from '@/types/supabase';
 
 interface UnapprovedProfile extends Profile {
-    email: string;
+    // Rimuoviamo 'email' qui, dato che non possiamo recuperarla facilmente dal frontend
+    // e usiamo full_name come campo principale.
 }
 
 const AdminApprovals = () => {
@@ -63,20 +64,19 @@ const AdminApprovals = () => {
     setLoading(true);
     try {
       // Fetch profiles that are not approved
+      // Recuperiamo anche l'email dall'utente autenticato per visualizzarla
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, full_name, created_at, skill_level')
+        .select('id, full_name, created_at') // Rimosso skill_level
         .eq('approved', false)
         .order('created_at', { ascending: true });
 
       if (profilesError) throw profilesError;
 
-      const profilesWithEmail: UnapprovedProfile[] = profilesData.map(p => ({
-          ...p,
-          email: `ID: ${p.id.substring(0, 8)}...`, // Placeholder for email/ID
-      })) as UnapprovedProfile[];
-
-      setProfiles(profilesWithEmail);
+      // Nota: Non possiamo recuperare l'email dell'utente non approvato direttamente qui
+      // senza una chiamata API aggiuntiva o una funzione Edge.
+      // Per ora, usiamo solo full_name. Se full_name è nullo, usiamo l'ID troncato.
+      setProfiles(profilesData as UnapprovedProfile[]);
 
     } catch (err: any) {
       showError("Errore nel caricamento dei soci: " + err.message);
@@ -197,7 +197,6 @@ const AdminApprovals = () => {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Nome Completo</TableHead>
-                    <TableHead>Livello</TableHead>
                     <TableHead>Registrato il</TableHead>
                     <TableHead className="text-right">Azioni</TableHead>
                   </TableRow>
@@ -206,10 +205,8 @@ const AdminApprovals = () => {
                   {profiles.map((p) => (
                     <TableRow key={p.id}>
                       <TableCell className="font-medium">
-                        {p.full_name || p.email}
-                        <p className="text-xs text-muted-foreground mt-0.5">{p.email}</p>
+                        {p.full_name || `ID: ${p.id.substring(0, 8)}...`}
                       </TableCell>
-                      <TableCell className="capitalize">{p.skill_level}</TableCell>
                       <TableCell>{format(parseISO(p.created_at), 'dd/MM/yyyy HH:mm', { locale: it })}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
