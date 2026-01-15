@@ -110,7 +110,6 @@ const MemberDashboard = () => {
             <CardTitle className="text-primary flex items-center">
               <Search className="mr-2 h-5 w-5" /> Cerco Partita
             </CardTitle>
-          </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-gray-700 mb-4">Trova compagni di gioco del tuo livello.</p>
