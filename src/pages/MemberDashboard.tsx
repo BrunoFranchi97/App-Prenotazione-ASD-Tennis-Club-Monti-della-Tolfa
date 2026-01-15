@@ -57,7 +57,7 @@ const MemberDashboard = () => {
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 sm:p-6 lg:p-8">
       <header className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold text-primary">Benvenuto, {fullName}!</h1>
-        <Button variant="outline" className="text-primary border-primary hover:bg-secondary" onClick={handleLogout}>
+        <Button variant="outline" className="text-primary border-primary hover:bg-secondary hover:text-primary" onClick={handleLogout}>
           <LogOut className="mr-2 h-4 w-4" /> Esci
         </Button>
       </header>
@@ -86,7 +86,7 @@ const MemberDashboard = () => {
           <CardContent>
             <p className="text-gray-700 mb-4">Visualizza le tue prenotazioni passate e future.</p>
             <Link to="/history">
-              <Button variant="outline" className="w-full text-primary border-primary hover:bg-secondary">Vedi Storico</Button>
+              <Button variant="outline" className="w-full text-primary border-primary hover:bg-secondary hover:text-primary">Vedi Storico</Button>
             </Link>
           </CardContent>
         </Card>
@@ -100,7 +100,7 @@ const MemberDashboard = () => {
           <CardContent>
             <p className="text-gray-700 mb-4">Effettua una prenotazione per un altro socio.</p>
             <Link to="/book-for-third-party">
-              <Button variant="outline" className="w-full text-primary border-primary hover:bg-secondary">Prenota per Terzi</Button>
+              <Button variant="outline" className="w-full text-primary border-primary hover:bg-secondary hover:text-primary">Prenota per Terzi</Button>
             </Link>
           </CardContent>
         </Card>
@@ -110,11 +110,12 @@ const MemberDashboard = () => {
             <CardTitle className="text-primary flex items-center">
               <Search className="mr-2 h-5 w-5" /> Cerco Partita
             </CardTitle>
+          </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-gray-700 mb-4">Trova compagni di gioco del tuo livello.</p>
             <Link to="/find-match">
-              <Button variant="outline" className="w-full text-primary border-primary hover:bg-secondary">Cerca Partita</Button>
+              <Button variant="outline" className="w-full text-primary border-primary hover:bg-secondary hover:text-primary">Cerca Partita</Button>
             </Link>
           </CardContent>
         </Card>
@@ -128,7 +129,7 @@ const MemberDashboard = () => {
           <CardContent>
             <p className="text-gray-700 mb-4">Gestisci il tuo certificato medico e le scadenze.</p>
             <Link to="/medical-certificates">
-              <Button variant="outline" className="w-full text-primary border-primary hover:bg-secondary">Gestisci Documenti</Button>
+              <Button variant="outline" className="w-full text-primary border-primary hover:bg-secondary hover:text-primary">Gestisci Documenti</Button>
             </Link>
           </CardContent>
         </Card>
