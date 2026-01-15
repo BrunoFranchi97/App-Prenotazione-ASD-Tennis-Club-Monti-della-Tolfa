@@ -11,7 +11,6 @@ const getSupabaseConfig = () => {
 
   let supabaseUrl = defaultUrl;
   let supabaseAnonKey = defaultKey;
-  let appDomain = import.meta.env.VITE_APP_DOMAIN;
 
   // Se abbiamo variabili d'ambiente, usale
   if (import.meta.env.VITE_SUPABASE_URL) {
@@ -24,18 +23,15 @@ const getSupabaseConfig = () => {
 
   // Determina l'URL di reindirizzamento per l'autenticazione
   let redirectToUrl = '';
-  if (isLocalhost) {
-    // In locale, usiamo l'origine locale
-    redirectToUrl = `${window.location.origin}/dashboard`;
-  } else {
-    // In produzione, usiamo l'URL di produzione configurato
-    // Se VITE_APP_DOMAIN è impostato, usalo, altrimenti usa un dominio di produzione predefinito
-    const productionDomain = appDomain || 'https://dyad-generated-app.vercel.app';
-    redirectToUrl = `${productionDomain}/dashboard`;
-  }
+  
+  // Usa sempre l'origine corrente dell'applicazione per il redirect
+  // Questo risolve il problema dei link che puntano a localhost in produzione
+  const currentOrigin = window.location.origin;
+  redirectToUrl = `${currentOrigin}/dashboard`;
 
   console.log('Supabase Config:', {
     environment: isLocalhost ? 'localhost' : 'production',
+    currentOrigin: currentOrigin,
     redirectTo: redirectToUrl,
   });
 
@@ -50,7 +46,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     detectSessionInUrl: true,
     flowType: 'pkce',
-    // Configura il redirectTo in base all'ambiente corrente
+    // Configura il redirectTo in base all'URL corrente dell'applicazione
     redirectTo: redirectToUrl
   }
 });

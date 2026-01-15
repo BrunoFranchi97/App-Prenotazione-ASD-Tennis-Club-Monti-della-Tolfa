@@ -27,10 +27,11 @@ const Register = () => {
       return 'http://localhost:8080/dashboard';
     }
     
-    // In tutti gli altri casi (inclusi i deploy Vercel), usiamo l'URL di produzione configurato.
-    // Questo URL deve essere configurato come VITE_APP_DOMAIN in Vercel, altrimenti usiamo il predefinito.
-    const appDomain = import.meta.env.VITE_APP_DOMAIN || 'https://dyad-generated-app.vercel.app';
-    return `${appDomain}/dashboard`;
+    // In produzione, usiamo sempre l'URL corrente dell'applicazione
+    // Questo è più affidabile che dipendere da variabili d'ambiente
+    const currentOrigin = window.location.origin;
+    console.log('Current origin for email redirect:', currentOrigin);
+    return `${currentOrigin}/dashboard`;
   };
 
   const handleRegister = async (e: React.FormEvent) => {
