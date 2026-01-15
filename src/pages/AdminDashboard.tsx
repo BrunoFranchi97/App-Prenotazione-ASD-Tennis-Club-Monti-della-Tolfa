@@ -54,15 +54,25 @@ const AdminDashboard = () => {
   };
 
   useEffect(() => {
+    let isMounted = true;
+    
     const initialize = async () => {
+      setLoading(true);
       const adminOk = await fetchAdminStatus();
-      if (adminOk) {
+      if (isMounted && adminOk) {
         await fetchUnapprovedCount();
       }
-      setLoading(false);
+      if (isMounted) {
+        setLoading(false);
+      }
     };
+    
     initialize();
-  }, [navigate]);
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [navigate]); // Dependency array vuoto per eseguire solo al mount
 
   const handleLogout = async () => {
     try {
