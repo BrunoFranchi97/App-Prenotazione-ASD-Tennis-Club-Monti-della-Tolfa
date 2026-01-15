@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+import { Resend } from 'https://esm.sh/resend@3.5.0'; // Using Resend for email sending
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,6 +12,13 @@ const supabaseAdmin = createClient(
   Deno.env.get('SUPABASE_URL')!,
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 );
+
+// Initialize Resend client using the secret API key
+const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
+
+// Define the sender and recipient emails
+const SENDER_EMAIL = 'onboarding@resend.dev'; // Must be a verified domain/email in Resend
+const ADMIN_EMAIL = 'admin@example.com'; // Replace with your actual admin email
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -27,37 +35,55 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: 'Invalid payload' }), { status: 400, headers: corsHeaders });
     }
 
-    const newUserName = newProfile.full_name || newProfile.id;
-    console.log(`[notify-admin-on-signup] New user profile created: ${newUserName}`);
-
-    // 2. Fetch all administrators' emails
-    const { data: admins, error: adminError } = await supabaseAdmin
-      .from('profiles')
-      .select('id, full_name')
-      .eq('is_admin', true);
-
-    if (adminError) throw adminError;
-
-    const adminEmails = ['admin@example.com']; // Placeholder for actual admin emails
+    // 2. Fetch user email from auth.users (requires service role)
+    const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(newProfile.id);
+    if (userError) throw userError;
     
-    // In a real application, you would fetch admin emails from auth.users or a dedicated table
-    // For this simulation, we will log the notification.
-
-    console.log(`[notify-admin-on-signup] Notifying ${admins.length} administrators about new user: ${newUserName}`);
+    const userEmail = userData.user?.email || 'Email Sconosciuta';
+    const newUserName = newProfile.full_name || userEmail;
     
-    // --- Email Sending Logic Placeholder ---
-    // Here you would send an email to all adminEmails with a link to approve the user.
-    // Example content:
-    // Subject: Nuovo Socio da Approvare: ${newUserName}
-    // Body: Il socio ${newUserName} si è appena registrato e attende l'approvazione. [Link al pannello Admin]
+    console.log(`[notify-admin-on-signup] New user profile created: ${newUserName} (${userEmail})`);
 
-    return new Response(JSON.stringify({ message: 'Admin notification simulated successfully.' }), {
+    // 3. Send email notification to admin
+    const emailSubject = `[AZIONE RICHIESTA] Nuovo Socio Registrato: ${newUserName}`;
+    const emailBody = `
+      <h1>Nuova Registrazione Socio</h1>
+      <p>Il socio <strong>${newUserName}</strong> si è appena registrato e attende la tua approvazione per poter prenotare i campi.</p>
+      <ul>
+        <li>Nome: ${newUserName}</li>
+        <li>Email: ${userEmail}</li>
+        <li>Livello Skill: ${newProfile.skill_level || 'Non specificato'}</li>
+      </ul>
+      <p>Per approvare o rifiutare, accedi al pannello di amministrazione:</p>
+      <a href="https://your-app-domain.com/admin/approvals" style="padding: 10px 20px; background-color: #2E6B3D; color: white; text-decoration: none; border-radius: 5px;">Vai a Gestisci Approvazioni</a>
+      <p>Ricorda di configurare l'indirizzo email di destinazione corretto nel codice della funzione Edge.</p>
+    `;
+
+    const { data: resendData, error: resendError } = await resend.emails.send({
+      from: SENDER_EMAIL,
+      to: ADMIN_EMAIL,
+      subject: emailSubject,
+      html: emailBody,
+    });
+
+    if (resendError) {
+      console.error("[notify-admin-on-signup] Resend Error:", resendError);
+      // We still return 200 because the database trigger succeeded, but log the email error
+      return new Response(JSON.stringify({ message: 'Profile created, but email notification failed.', error: resendError.message }), { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      });
+    }
+
+    console.log("[notify-admin-on-signup] Admin notification email sent successfully.", resendData);
+
+    return new Response(JSON.stringify({ message: 'Admin notification sent successfully.' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
 
   } catch (error) {
-    console.error("[notify-admin-on-signup] Error processing request:", error.message);
+    console.error("[notify-admin-on-signup] Critical Error processing request:", error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
