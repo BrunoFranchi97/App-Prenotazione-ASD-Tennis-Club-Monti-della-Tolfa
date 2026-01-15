@@ -20,22 +20,16 @@ const Register = () => {
   const navigate = useNavigate();
 
   const getEmailRedirectUrl = () => {
-    const hostname = window.location.hostname;
-    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+    // URL di produzione ASSOLUTO - SOSTITUISCI CON IL TUO DOMINIO VERCEL
+    const PRODUCTION_URL = 'https://dyad-generated-app.vercel.app';
     
-    // Prima prova con la variabile d'ambiente, altrimenti usa fallback
-    const appDomain = import.meta.env.VITE_APP_DOMAIN;
-    
-    if (isLocalhost) {
-      // Ambiente locale
+    // Se stiamo in sviluppo locale, usa localhost
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
       return 'http://localhost:8080/dashboard';
-    } else if (appDomain) {
-      // Usa la variabile d'ambiente configurata
-      return `${appDomain}/dashboard`;
-    } else {
-      // Fallback - usa il dominio corrente
-      return `${window.location.origin}/dashboard`;
     }
+    
+    // Altrimenti, usa SEMPRE l'URL di produzione
+    return `${PRODUCTION_URL}/dashboard`;
   };
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -49,9 +43,9 @@ const Register = () => {
     }
 
     try {
-      // Usa un URL fisso per il redirect dopo la conferma email
+      // Usa SEMPRE l'URL di produzione per il redirect
       const redirectTo = getEmailRedirectUrl();
-      console.log('Email redirect URL set to:', redirectTo);
+      console.log('Email redirect URL set to:', redirectTo, 'from hostname:', window.location.hostname);
 
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -69,6 +63,7 @@ const Register = () => {
       } else if (data.user) {
         setIsRegistered(true);
         console.log('Registration successful, redirect URL set to:', redirectTo);
+        console.log('User registered from:', window.location.hostname);
       }
     } catch (error: any) {
       showError(error.message || "Errore durante la registrazione.");
@@ -91,6 +86,10 @@ const Register = () => {
           <CardContent className="space-y-4">
             <p className="text-sm text-gray-700">
               Per completare la registrazione e accedere, clicca sul link contenuto nell'email.
+              <br /><br />
+              <strong>NOTA:</strong> Il link di conferma punta sempre al dominio di produzione:
+              <br />
+              <code className="text-xs bg-gray-100 p-1 rounded">https://dyad-generated-app.vercel.app/dashboard</code>
             </p>
             <p className="text-sm text-red-600 font-medium">
               Attenzione: Dopo la verifica, il tuo account dovrà essere approvato da un amministratore prima di poter prenotare.
