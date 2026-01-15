@@ -43,16 +43,28 @@ const Login = () => {
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-green-50 to-white">
       {/* Institutional Logos at top corners */}
       <div className="container mx-auto px-4 py-4 flex justify-between items-start">
-        <img 
-          src="/assets/coni.jpeg" 
-          alt="Logo CONI" 
-          className="h-10 w-auto object-contain opacity-80"
-        />
-        <img 
-          src="/assets/fitp.jpeg" 
-          alt="Logo FITP" 
-          className="h-10 w-auto object-contain opacity-80"
-        />
+        <div className="relative h-10 w-24 flex items-center">
+          <img 
+            src="/assets/coni.jpeg" 
+            alt="Logo CONI" 
+            className="h-10 w-auto object-contain mix-blend-darken filter brightness-110 contrast-125"
+            style={{ 
+              backgroundColor: 'transparent',
+              isolation: 'isolate'
+            }}
+          />
+        </div>
+        <div className="relative h-10 w-24 flex items-center">
+          <img 
+            src="/assets/fitp.jpeg" 
+            alt="Logo FITP" 
+            className="h-10 w-auto object-contain mix-blend-darken filter brightness-110 contrast-125"
+            style={{ 
+              backgroundColor: 'transparent',
+              isolation: 'isolate'
+            }}
+          />
+        </div>
       </div>
 
       {/* Login Form */}
