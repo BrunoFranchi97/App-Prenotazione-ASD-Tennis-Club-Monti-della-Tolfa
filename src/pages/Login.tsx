@@ -72,7 +72,10 @@ const Login = () => {
         <Card className="w-full max-w-md shadow-lg rounded-lg">
           <CardHeader className="text-center">
             <img src="/logo.png" alt="ASD Tennis Club Monti della Tolfa Logo" className="mx-auto h-24 w-24 mb-4" />
-            <CardTitle className="text-3xl font-bold text-primary">ASD Tennis Club Monti della Tolfa</CardTitle>
+            <CardTitle className="text-3xl font-bold text-primary flex flex-col items-center">
+              <span>ASD Tennis Club</span>
+              <span>Monti della Tolfa</span>
+            </CardTitle>
             <CardDescription className="text-gray-600 mt-2">Accedi al tuo account per prenotare un campo.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
