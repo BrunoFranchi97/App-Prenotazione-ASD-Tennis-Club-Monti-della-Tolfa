@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { CalendarPlus, Lock, BarChart2, LogOut, BookOpen, ArrowLeft } from 'lucide-react';
+import { CalendarPlus, Lock, BarChart2, LogOut, BookOpen, ArrowLeft, Users, CheckCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 
@@ -12,31 +12,56 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [unapprovedCount, setUnapprovedCount] = useState(0);
+
+  const fetchAdminStatus = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('is_admin')
+        .eq('id', user.id)
+        .single();
+
+      if (error || !profile?.is_admin) {
+        setIsAdmin(false);
+        showError("Accesso negato. Non sei un amministratore.");
+        navigate('/dashboard');
+        return false;
+      } else {
+        setIsAdmin(true);
+        return true;
+      }
+    } else {
+      setIsAdmin(false);
+      navigate('/login');
+      return false;
+    }
+  };
+
+  const fetchUnapprovedCount = async () => {
+    const { count, error } = await supabase
+      .from('profiles')
+      .select('id', { count: 'exact', head: true })
+      .eq('approved', false);
+
+    if (error) {
+      console.error("Error fetching unapproved count:", error.message);
+      setUnapprovedCount(0);
+    } else {
+      setUnapprovedCount(count || 0);
+    }
+  };
 
   useEffect(() => {
-    const fetchAdminStatus = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('is_admin')
-          .eq('id', user.id)
-          .single();
-
-        if (error || !profile?.is_admin) {
-          setIsAdmin(false);
-          showError("Accesso negato. Non sei un amministratore.");
-          navigate('/dashboard');
-        } else {
-          setIsAdmin(true);
-        }
-      } else {
-        setIsAdmin(false);
-        navigate('/login');
+    const initialize = async () => {
+      const adminOk = await fetchAdminStatus();
+      if (adminOk) {
+        await fetchUnapprovedCount();
       }
       setLoading(false);
     };
-    fetchAdminStatus();
+    initialize();
   }, [navigate]);
 
   const handleLogout = async () => {
@@ -65,7 +90,6 @@ const AdminDashboard = () => {
   }
 
   if (!isAdmin) {
-    // Questo blocco dovrebbe essere raggiunto solo se c'è un ritardo nel reindirizzamento
     return null; 
   }
 
@@ -86,6 +110,28 @@ const AdminDashboard = () => {
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* New: Manage Approvals Card */}
+        <Card className={`shadow-lg rounded-lg ${unapprovedCount > 0 ? 'border-2 border-red-500' : ''}`}>
+          <CardHeader>
+            <CardTitle className="text-primary flex items-center">
+              <CheckCircle className="mr-2 h-5 w-5" /> Gestisci Approvazioni
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-gray-700 mb-4">
+              {unapprovedCount > 0 
+                ? <span className="font-bold text-red-600">{unapprovedCount} soci in attesa di approvazione.</span>
+                : "Nessun socio in attesa di approvazione."
+              }
+            </p>
+            <Link to="/admin/approvals">
+              <Button className="w-full bg-club-orange hover:bg-club-orange/90 text-club-orange-foreground">
+                <Users className="mr-2 h-4 w-4" /> Approva Soci
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+        
         <Card className="shadow-lg rounded-lg">
           <CardHeader>
             <CardTitle className="text-primary flex items-center">
