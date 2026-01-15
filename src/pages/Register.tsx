@@ -8,14 +8,15 @@ import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
+import { MailCheck, ArrowLeft } from 'lucide-react';
 
 const Register = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  // const [membershipNumber, setMembershipNumber] = useState(''); // Rimosso
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isRegistered, setIsRegistered] = useState(false);
   const navigate = useNavigate();
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -35,7 +36,6 @@ const Register = () => {
         options: {
           data: {
             full_name: name,
-            // membership_number: membershipNumber, // Rimosso
           },
         },
       });
@@ -43,8 +43,8 @@ const Register = () => {
       if (error) {
         showError(error.message);
       } else if (data.user) {
-        showSuccess("Registrazione avvenuta con successo! Controlla la tua email per la verifica.");
-        navigate('/login');
+        // Non mostriamo showSuccess qui, ma cambiamo lo stato per mostrare la schermata di verifica
+        setIsRegistered(true);
       }
     } catch (error: any) {
       showError(error.message || "Errore durante la registrazione.");
@@ -52,6 +52,40 @@ const Register = () => {
       setLoading(false);
     }
   };
+
+  if (isRegistered) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-white p-4">
+        <Card className="w-full max-w-md shadow-lg rounded-lg text-center">
+          <CardHeader>
+            <MailCheck className="mx-auto h-16 w-16 text-primary mb-4" />
+            <CardTitle className="text-3xl font-bold text-primary">Verifica Email Inviata</CardTitle>
+            <CardDescription className="text-gray-600 mt-2">
+              Abbiamo inviato un link di verifica a <strong>{email}</strong>.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-gray-700">
+              Per completare la registrazione e accedere, clicca sul link contenuto nell'email.
+            </p>
+            <p className="text-sm text-red-600 font-medium">
+              Attenzione: Dopo la verifica, il tuo account dovrà essere approvato da un amministratore prima di poter prenotare.
+            </p>
+          </CardContent>
+          <CardFooter className="flex flex-col gap-2">
+            <Link to="/login" className="w-full">
+              <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+                Vai al Login
+              </Button>
+            </Link>
+            <Button variant="link" onClick={() => setIsRegistered(false)} className="text-primary">
+              <ArrowLeft className="mr-2 h-4 w-4" /> Torna al modulo
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-white p-4">
@@ -71,7 +105,6 @@ const Register = () => {
               <Label htmlFor="email">Email</Label>
               <Input id="email" type="email" placeholder="Inserisci la tua email" value={email} onChange={(e) => setEmail(e.target.value)} required />
             </div>
-            {/* Rimosso il campo Numero Tessera */}
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <Input id="password" type="password" placeholder="Crea una password" value={password} onChange={(e) => setPassword(e.target.value)} required />
