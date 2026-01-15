@@ -2,11 +2,16 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import { format, parseISO } from 'https://esm.sh/date-fns@3.6.0';
 import { it } from 'https://esm.sh/date-fns@3.6.0/locale/it';
+import { Resend } from 'https://esm.sh/resend@3.5.0'; // Import Resend
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Initialize Resend client using the secret API key
+const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
+const SENDER_EMAIL = 'onboarding@resend.dev'; // Use the verified sender email
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -55,23 +60,25 @@ serve(async (req) => {
       <p>Grazie per aver prenotato con noi!</p>
     `;
 
-    // --- Email Sending Logic Placeholder ---
-    // In un'applicazione reale, qui integreresti un servizio di email come Resend, SendGrid, Mailgun, ecc.
-    // Avresti bisogno di una chiave API per il servizio di email, che dovresti configurare come un segreto di Supabase.
-    // Esempio con Resend (richiede l'installazione del client Resend e la configurazione della chiave API):
-    // import { Resend } from 'https://esm.sh/resend@1.1.0';
-    // const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
-    // await resend.emails.send({
-    //   from: 'onboarding@resend.dev',
-    //   to: userEmail,
-    //   subject: emailSubject,
-    //   html: emailBody,
-    // });
-    // console.log("[send-booking-confirmation] Simulated email sent to", userEmail);
+    // --- Email Sending Logic using Resend ---
+    const { data: resendData, error: resendError } = await resend.emails.send({
+      from: SENDER_EMAIL,
+      to: userEmail,
+      subject: emailSubject,
+      html: emailBody,
+    });
 
-    console.log(`[send-booking-confirmation] Simulazione invio email a ${userEmail} con oggetto: "${emailSubject}" e corpo: "${emailBody}"`);
+    if (resendError) {
+      console.error("[send-booking-confirmation] Resend Error:", resendError);
+      return new Response(JSON.stringify({ message: 'Booking confirmed, but email notification failed.', error: resendError.message }), { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      });
+    }
 
-    return new Response(JSON.stringify({ message: 'Email confirmation process initiated.' }), {
+    console.log("[send-booking-confirmation] Confirmation email sent successfully.", resendData);
+
+    return new Response(JSON.stringify({ message: 'Email confirmation sent successfully.' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
