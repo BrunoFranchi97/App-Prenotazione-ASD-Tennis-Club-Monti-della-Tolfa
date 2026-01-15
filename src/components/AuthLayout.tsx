@@ -17,20 +17,26 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
   const location = useLocation();
   const [searchParams] = useSearchParams();
 
-  // Gestisce i parametri di conferma email da Supabase
+  // DEBUG: Log dei parametri di query per verifica email
   useEffect(() => {
-    const hash = window.location.hash;
+    const token = searchParams.get('token');
+    const type = searchParams.get('type');
     
-    // Se c'è un hash con access_token, refresh_token, etc., significa che è un redirect di conferma email
-    if (hash && hash.includes('access_token') && hash.includes('type=email')) {
-      console.log('Email confirmation redirect detected');
-      // Supabase gestirà automaticamente il token e aggiornerà la sessione
-      // Dopo la conferma, reindirizziamo alla dashboard
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 1000);
+    if (token && type) {
+      console.log('AuthLayout - Email verification parameters detected:');
+      console.log('- Token:', token ? 'Present' : 'Missing');
+      console.log('- Type:', type);
+      console.log('- Full URL:', window.location.href);
+      console.log('- Origin:', window.location.origin);
+      console.log('- Pathname:', location.pathname);
+      
+      // Se siamo sulla dashboard con parametri di verifica, reindirizza al gestore di verifica
+      if (location.pathname === '/dashboard' && type === 'email') {
+        console.log('Redirecting to email verification handler...');
+        navigate(`/auth/verify?token=${token}&type=${type}`);
+      }
     }
-  }, [navigate]);
+  }, [searchParams, location, navigate]);
 
   const ensureProfileExists = async (userId: string, userEmail: string | undefined, rawMetaData: any) => {
     const { data: profile, error: fetchError } = await supabase
@@ -74,7 +80,7 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
     const { data: { session } } = await supabase.auth.getSession();
     setSession(session);
 
-    const publicRoutes = ['/login', '/register', '/forgot-password'];
+    const publicRoutes = ['/login', '/register', '/forgot-password', '/auth/verify'];
     const isPublicAuthRoute = publicRoutes.includes(location.pathname);
     const isAdminRoute = location.pathname.startsWith('/admin');
 
@@ -94,7 +100,7 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
         navigate('/dashboard');
       } else if (!isAdmin && isAdminRoute) {
         navigate('/dashboard');
-      } else if (isPublicAuthRoute) {
+      } else if (isPublicAuthRoute && !location.pathname.includes('/auth/verify')) {
         navigate('/dashboard');
       }
     } else {

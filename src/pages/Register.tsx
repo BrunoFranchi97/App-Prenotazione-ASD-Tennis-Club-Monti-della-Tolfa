@@ -9,6 +9,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { MailCheck, ArrowLeft } from 'lucide-react';
+import { getAuthRedirectTo } from '@/utils/authRedirect';
 
 const Register = () => {
   const [name, setName] = useState('');
@@ -18,21 +19,6 @@ const Register = () => {
   const [loading, setLoading] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
   const navigate = useNavigate();
-
-  const getEmailRedirectUrl = () => {
-    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    
-    // Se siamo in locale, usiamo localhost per il testing.
-    if (isLocalhost) {
-      return 'http://localhost:8080/dashboard';
-    }
-    
-    // In produzione, usiamo sempre l'URL corrente dell'applicazione
-    // Questo è più affidabile che dipendere da variabili d'ambiente
-    const currentOrigin = window.location.origin;
-    console.log('Current origin for email redirect:', currentOrigin);
-    return `${currentOrigin}/dashboard`;
-  };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,8 +31,8 @@ const Register = () => {
     }
 
     try {
-      // Usa l'URL di redirect determinato
-      const redirectTo = getEmailRedirectUrl();
+      // Usa l'URL di redirect determinato dinamicamente
+      const redirectTo = getAuthRedirectTo();
       console.log('Email redirect URL set to:', redirectTo);
 
       const { data, error } = await supabase.auth.signUp({
@@ -65,6 +51,8 @@ const Register = () => {
       } else if (data.user) {
         setIsRegistered(true);
         console.log('Registration successful, redirect URL set to:', redirectTo);
+        console.log('User ID:', data.user.id);
+        console.log('Session:', data.session);
       }
     } catch (error: any) {
       showError(error.message || "Errore durante la registrazione.");
@@ -94,6 +82,13 @@ const Register = () => {
             <p className="text-xs text-gray-500 mt-4">
               Se non ricevi l'email entro pochi minuti, controlla la cartella spam.
             </p>
+            <div className="text-left text-sm bg-yellow-50 p-3 rounded-md border border-yellow-200">
+              <p className="font-semibold text-yellow-800 mb-1">Link di verifica atteso:</p>
+              <p className="text-yellow-700">{getAuthRedirectTo()}</p>
+              <p className="text-xs text-yellow-600 mt-2">
+                Se il link punta a localhost:3000, configura i Redirect URLs in Supabase Dashboard.
+              </p>
+            </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-2">
             <Link to="/login" className="w-full">
