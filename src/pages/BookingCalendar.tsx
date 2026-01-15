@@ -306,17 +306,18 @@ const BookingCalendar = () => {
         showError("Errore durante la prenotazione: " + insertError.message);
       } else if (insertedReservations) {
         showSuccess("Prenotazione effettuata con successo!");
-        setSelectedSlots([]); // Clear selected slots
+        setSelectedSlots([]);
 
-        // Invoke Edge Function for email confirmation
-        await supabase.functions.invoke('send-booking-confirmation', {
+        // *** FIRE-AND-FORGET: Invoke Edge Function for email confirmation without waiting ***
+        supabase.functions.invoke('send-booking-confirmation', {
           body: {
             userEmail: user.email,
             userName: bookerFullName || user.email,
             courtName: selectedCourt.name,
             reservations: insertedReservations,
           },
-        });
+        }).catch(e => console.error("Error invoking confirmation email function (async):", e));
+        // *********************************************************************************
 
         navigate('/booking-confirmation', {
           state: {

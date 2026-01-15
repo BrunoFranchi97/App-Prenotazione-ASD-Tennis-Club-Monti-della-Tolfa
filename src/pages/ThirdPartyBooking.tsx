@@ -293,7 +293,8 @@ const ThirdPartyBooking = () => {
         showSuccess("Prenotazione effettuata con successo per conto terzi!");
         setSelectedSlots([]);
 
-        await supabase.functions.invoke('send-booking-confirmation', {
+        // *** FIRE-AND-FORGET: Invoke Edge Function for email confirmation without waiting ***
+        supabase.functions.invoke('send-booking-confirmation', {
           body: {
             userEmail: user.email, // Email del socio che prenota
             userName: bookerFullName || user.email,
@@ -302,7 +303,8 @@ const ThirdPartyBooking = () => {
             bookedForFirstName: bookedForFirstName,
             bookedForLastName: bookedForLastName,
           },
-        });
+        }).catch(e => console.error("Error invoking confirmation email function (async):", e));
+        // *********************************************************************************
 
         navigate('/booking-confirmation', {
           state: {
