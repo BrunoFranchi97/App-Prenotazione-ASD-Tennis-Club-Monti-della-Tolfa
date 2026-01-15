@@ -4,8 +4,6 @@ import { createClient } from '@supabase/supabase-js';
 const getSupabaseConfig = () => {
   const hostname = window.location.hostname;
   const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
-  const isVercel = hostname.includes('.vercel.app');
-  const currentUrl = window.location.origin;
 
   // URL e chiave di fallback (il tuo progetto Supabase)
   const defaultUrl = 'https://nrnyfuqyeqcegnpoetrd.supabase.co';
@@ -13,6 +11,7 @@ const getSupabaseConfig = () => {
 
   let supabaseUrl = defaultUrl;
   let supabaseAnonKey = defaultKey;
+  let appDomain = import.meta.env.VITE_APP_DOMAIN;
 
   // Se abbiamo variabili d'ambiente, usale
   if (import.meta.env.VITE_SUPABASE_URL) {
@@ -23,17 +22,28 @@ const getSupabaseConfig = () => {
     supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
   }
 
+  // Determina l'URL di reindirizzamento per l'autenticazione
+  let redirectToUrl = '';
+  if (isLocalhost) {
+    // In locale, usiamo l'origine locale
+    redirectToUrl = `${window.location.origin}/dashboard`;
+  } else if (appDomain) {
+    // In produzione, usiamo il dominio Vercel configurato
+    redirectToUrl = `${appDomain}/dashboard`;
+  } else {
+    // Fallback: usa l'origine corrente (dovrebbe essere il dominio Vercel)
+    redirectToUrl = `${window.location.origin}/dashboard`;
+  }
+
   console.log('Supabase Config:', {
-    environment: isLocalhost ? 'localhost' : isVercel ? 'vercel' : 'production',
-    hostname,
-    currentUrl,
-    usingEnvVars: !!(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY)
+    environment: isLocalhost ? 'localhost' : 'production',
+    redirectTo: redirectToUrl,
   });
 
-  return { supabaseUrl, supabaseAnonKey, currentUrl };
+  return { supabaseUrl, supabaseAnonKey, redirectToUrl };
 };
 
-const { supabaseUrl, supabaseAnonKey, currentUrl } = getSupabaseConfig();
+const { supabaseUrl, supabaseAnonKey, redirectToUrl } = getSupabaseConfig();
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
@@ -42,6 +52,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: true,
     flowType: 'pkce',
     // Configura il redirectTo in base all'ambiente corrente
-    redirectTo: `${currentUrl}/dashboard`
+    redirectTo: redirectToUrl
   }
 });
