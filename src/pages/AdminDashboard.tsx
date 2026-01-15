@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { CalendarPlus, Lock, BarChart2, LogOut, BookOpen, ArrowLeft, Users, CheckCircle } from 'lucide-react';
@@ -10,6 +10,7 @@ import { showSuccess, showError } from '@/utils/toast';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
+  const location = useLocation(); // Import useLocation
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [unapprovedCount, setUnapprovedCount] = useState(0);
@@ -67,12 +68,13 @@ const AdminDashboard = () => {
       }
     };
     
+    // Esegui l'inizializzazione ogni volta che la location cambia (cioè, quando si naviga verso questa pagina)
     initialize();
     
     return () => {
       isMounted = false;
     };
-  }, [navigate]); // Dependency array vuoto per eseguire solo al mount
+  }, [navigate, location.pathname]); // Aggiunto location.pathname come dipendenza
 
   const handleLogout = async () => {
     try {
