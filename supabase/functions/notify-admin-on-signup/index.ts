@@ -13,12 +13,14 @@ const supabaseAdmin = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 );
 
-// Initialize Resend client using the secret API key
+// Initialize Resend client using the secret API key (Must be set in Supabase Secrets: RESEND_API_KEY)
 const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
 
 // Define the sender and recipient emails
+// !!! IMPORTANT: REPLACE THESE WITH YOUR ACTUAL VERIFIED EMAILS !!!
 const SENDER_EMAIL = 'onboarding@resend.dev'; // Must be a verified domain/email in Resend
 const ADMIN_EMAIL = 'admin@example.com'; // Replace with your actual admin email
+// !!! IMPORTANT: REPLACE THESE WITH YOUR ACTUAL VERIFIED EMAILS !!!
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
