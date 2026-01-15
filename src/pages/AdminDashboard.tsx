@@ -157,7 +157,6 @@ const AdminDashboard = () => {
             <Link to="/admin/manage-schedules">
               <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">Gestisci</Button>
             </Link>
-          </Link>
           </CardContent>
         </Card>
 
