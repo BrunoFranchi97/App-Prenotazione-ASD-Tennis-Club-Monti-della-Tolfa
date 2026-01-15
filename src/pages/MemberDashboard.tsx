@@ -145,7 +145,7 @@ const MemberDashboard = () => {
             <CardContent>
               <p className="text-gray-700 mb-4">Accedi alle funzionalità di gestione per gli amministratori.</p>
               <Link to="/admin">
-                <Button className="w-full bg-club-orange hover:bg-club-orange/90 text-club-orange-foreground">Vai al Pannello Admin</Button>
+                <Button className="w-full bg-club-orange hover:bg-club-orange/80 text-club-orange-foreground">Vai al Pannello Admin</Button>
               </Link>
             </CardContent>
           </Card>

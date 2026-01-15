@@ -125,7 +125,7 @@ const AdminDashboard = () => {
               }
             </p>
             <Link to="/admin/approvals">
-              <Button className="w-full bg-club-orange hover:bg-club-orange/90 text-club-orange-foreground">
+              <Button className="w-full bg-club-orange hover:bg-club-orange/80 text-club-orange-foreground">
                 <Users className="mr-2 h-4 w-4" /> Approva Soci
               </Button>
             </Link>
@@ -157,6 +157,7 @@ const AdminDashboard = () => {
             <Link to="/admin/manage-schedules">
               <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">Gestisci</Button>
             </Link>
+          </Link>
           </CardContent>
         </Card>
 
