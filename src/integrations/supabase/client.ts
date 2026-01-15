@@ -27,12 +27,11 @@ const getSupabaseConfig = () => {
   if (isLocalhost) {
     // In locale, usiamo l'origine locale
     redirectToUrl = `${window.location.origin}/dashboard`;
-  } else if (appDomain) {
-    // In produzione, usiamo il dominio Vercel configurato
-    redirectToUrl = `${appDomain}/dashboard`;
   } else {
-    // Fallback: usa l'origine corrente (dovrebbe essere il dominio Vercel)
-    redirectToUrl = `${window.location.origin}/dashboard`;
+    // In produzione, usiamo l'URL di produzione configurato
+    // Se VITE_APP_DOMAIN è impostato, usalo, altrimenti usa un dominio di produzione predefinito
+    const productionDomain = appDomain || 'https://dyad-generated-app.vercel.app';
+    redirectToUrl = `${productionDomain}/dashboard`;
   }
 
   console.log('Supabase Config:', {

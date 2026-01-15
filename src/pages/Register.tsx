@@ -28,7 +28,7 @@ const Register = () => {
     }
     
     // In tutti gli altri casi (inclusi i deploy Vercel), usiamo l'URL di produzione configurato.
-    // Questo URL deve essere configurato come VITE_APP_DOMAIN in Vercel.
+    // Questo URL deve essere configurato come VITE_APP_DOMAIN in Vercel, altrimenti usiamo il predefinito.
     const appDomain = import.meta.env.VITE_APP_DOMAIN || 'https://dyad-generated-app.vercel.app';
     return `${appDomain}/dashboard`;
   };
