@@ -33,7 +33,6 @@ const Register = () => {
     try {
       // Usa l'URL di redirect determinato dinamicamente
       const redirectTo = getAuthRedirectTo();
-      console.log('Email redirect URL set to:', redirectTo);
 
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -50,9 +49,6 @@ const Register = () => {
         showError(error.message);
       } else if (data.user) {
         setIsRegistered(true);
-        console.log('Registration successful, redirect URL set to:', redirectTo);
-        console.log('User ID:', data.user.id);
-        console.log('Session:', data.session);
       }
     } catch (error: any) {
       showError(error.message || "Errore durante la registrazione.");
@@ -82,13 +78,6 @@ const Register = () => {
             <p className="text-xs text-gray-500 mt-4">
               Se non ricevi l'email entro pochi minuti, controlla la cartella spam.
             </p>
-            <div className="text-left text-sm bg-yellow-50 p-3 rounded-md border border-yellow-200">
-              <p className="font-semibold text-yellow-800 mb-1">Link di verifica atteso:</p>
-              <p className="text-yellow-700">{getAuthRedirectTo()}</p>
-              <p className="text-xs text-yellow-600 mt-2">
-                Se il link punta a localhost:3000, configura i Redirect URLs in Supabase Dashboard.
-              </p>
-            </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-2">
             <Link to="/login" className="w-full">
