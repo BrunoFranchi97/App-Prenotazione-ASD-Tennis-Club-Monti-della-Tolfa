@@ -12,7 +12,7 @@ import { showSuccess, showError } from '@/utils/toast';
 const Register = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [membershipNumber, setMembershipNumber] = useState('');
+  // const [membershipNumber, setMembershipNumber] = useState(''); // Rimosso
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -35,7 +35,7 @@ const Register = () => {
         options: {
           data: {
             full_name: name,
-            membership_number: membershipNumber, // Questo campo verrà ignorato da handle_new_user se non presente nel trigger
+            // membership_number: membershipNumber, // Rimosso
           },
         },
       });
@@ -71,10 +71,7 @@ const Register = () => {
               <Label htmlFor="email">Email</Label>
               <Input id="email" type="email" placeholder="Inserisci la tua email" value={email} onChange={(e) => setEmail(e.target.value)} required />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="membershipNumber">Numero Tessera (opzionale)</Label>
-              <Input id="membershipNumber" type="text" placeholder="Inserisci il numero tessera" value={membershipNumber} onChange={(e) => setMembershipNumber(e.target.value)} />
-            </div>
+            {/* Rimosso il campo Numero Tessera */}
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <Input id="password" type="password" placeholder="Crea una password" value={password} onChange={(e) => setPassword(e.target.value)} required />
