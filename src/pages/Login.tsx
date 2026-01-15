@@ -40,8 +40,23 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <div className="flex-grow flex items-center justify-center bg-gradient-to-br from-green-50 to-white p-4">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-green-50 to-white">
+      {/* Institutional Logos at top corners */}
+      <div className="container mx-auto px-4 py-4 flex justify-between items-start">
+        <img 
+          src="/assets/coni.jpeg" 
+          alt="Logo CONI" 
+          className="h-10 w-auto object-contain opacity-80"
+        />
+        <img 
+          src="/assets/fitp.jpeg" 
+          alt="Logo FITP" 
+          className="h-10 w-auto object-contain opacity-80"
+        />
+      </div>
+
+      {/* Login Form */}
+      <div className="flex-grow flex items-center justify-center p-4">
         <Card className="w-full max-w-md shadow-lg rounded-lg">
           <CardHeader className="text-center">
             <img src="/logo.png" alt="ASD Tennis Club Monti della Tolfa Logo" className="mx-auto h-24 w-24 mb-4" />
