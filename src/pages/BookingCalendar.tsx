@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, isEqual, setSeconds, setMilliseconds } from 'date-fns';
 import { it } from 'date-fns/locale'; // Import Italian locale
+import { useApprovalCheck } from '@/hooks/use-approval-check'; // Import the new hook
 
 // Import types
 import { Court, Reservation, BookingType } from '@/types/supabase';
@@ -24,6 +25,8 @@ const bookingTypeLabels: Record<BookingType, string> = {
 
 const BookingCalendar = () => {
   const navigate = useNavigate();
+  const { isApproved, loading: approvalLoading } = useApprovalCheck(); // Use the approval check hook
+
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [courts, setCourts] = useState<Court[]>([]);
   const [selectedCourtId, setSelectedCourtId] = useState<string | undefined>(undefined);
@@ -54,6 +57,8 @@ const BookingCalendar = () => {
 
   // Fetch booker's full name on component mount
   useEffect(() => {
+    if (!isApproved) return; // Skip fetching if not approved
+
     const fetchBookerProfile = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
@@ -71,10 +76,12 @@ const BookingCalendar = () => {
       }
     };
     fetchBookerProfile();
-  }, []);
+  }, [isApproved]);
 
   // Fetch courts on component mount
   useEffect(() => {
+    if (!isApproved) return; // Skip fetching if not approved
+
     const fetchCourts = async () => {
       setFetchingData(true);
       const { data, error } = await supabase
@@ -93,10 +100,12 @@ const BookingCalendar = () => {
       setFetchingData(false);
     };
     fetchCourts();
-  }, []);
+  }, [isApproved]);
 
   // Fetch existing reservations when date or selectedCourtId changes
   useEffect(() => {
+    if (!isApproved) return; // Skip fetching if not approved
+    
     const fetchReservations = async () => {
       if (!date || !selectedCourtId) return;
 
@@ -120,7 +129,7 @@ const BookingCalendar = () => {
     };
     fetchReservations();
     setSelectedSlots([]); // Clear selected slots when date or court changes
-  }, [date, selectedCourtId]);
+  }, [date, selectedCourtId, isApproved]);
 
   // Generate all possible 1-hour time slots for the day (8:00 to 20:00)
   const allTimeSlots = useMemo(() => {
@@ -322,6 +331,23 @@ const BookingCalendar = () => {
       setLoading(false);
     }
   };
+
+  if (approvalLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-white p-4">
+        <div className="text-center">
+          <h1 className="text-4xl font-bold mb-4 text-primary">Verifica...</h1>
+          <p className="text-xl text-gray-600">Stato approvazione utente.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Se non è approvato, l'hook reindirizza, quindi non dovremmo arrivare qui.
+  // Ma per completezza, se l'hook non ha reindirizzato ma isApproved è false, mostriamo un messaggio.
+  if (!isApproved) {
+    return null; 
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 sm:p-6 lg:p-8">

@@ -13,12 +13,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, isEqual, setSeconds, setMilliseconds } from 'date-fns';
 import { it } from 'date-fns/locale';
+import { useApprovalCheck } from '@/hooks/use-approval-check'; // Import the new hook
 
 // Import types
 import { Court, Reservation } from '@/types/supabase';
 
 const ThirdPartyBooking = () => {
   const navigate = useNavigate();
+  const { isApproved, loading: approvalLoading } = useApprovalCheck(); // Use the approval check hook
+
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [courts, setCourts] = useState<Court[]>([]);
   const [selectedCourtId, setSelectedCourtId] = useState<string | undefined>(undefined);
@@ -50,6 +53,8 @@ const ThirdPartyBooking = () => {
 
   // Fetch booker's full name on component mount
   useEffect(() => {
+    if (!isApproved) return; // Skip fetching if not approved
+
     const fetchBookerProfile = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
@@ -67,9 +72,11 @@ const ThirdPartyBooking = () => {
       }
     };
     fetchBookerProfile();
-  }, []);
+  }, [isApproved]);
 
   useEffect(() => {
+    if (!isApproved) return; // Skip fetching if not approved
+
     const fetchCourts = async () => {
       setFetchingData(true);
       const { data, error } = await supabase
@@ -88,9 +95,11 @@ const ThirdPartyBooking = () => {
       setFetchingData(false);
     };
     fetchCourts();
-  }, []);
+  }, [isApproved]);
 
   useEffect(() => {
+    if (!isApproved) return; // Skip fetching if not approved
+
     const fetchReservations = async () => {
       if (!date || !selectedCourtId) return;
 
@@ -114,7 +123,7 @@ const ThirdPartyBooking = () => {
     };
     fetchReservations();
     setSelectedSlots([]);
-  }, [date, selectedCourtId]);
+  }, [date, selectedCourtId, isApproved]);
 
   const allTimeSlots = useMemo(() => {
     const slots: string[] = [];
@@ -309,6 +318,21 @@ const ThirdPartyBooking = () => {
       setLoading(false);
     }
   };
+
+  if (approvalLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-white p-4">
+        <div className="text-center">
+          <h1 className="text-4xl font-bold mb-4 text-primary">Verifica...</h1>
+          <p className="text-xl text-gray-600">Stato approvazione utente.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isApproved) {
+    return null; 
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 sm:p-6 lg:p-8">

@@ -16,6 +16,7 @@ import { ArrowLeft, LogOut, Users, Search, UserPlus, Clock, Calendar as Calendar
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import type { MatchRequest, SkillLevel, MatchType, Profile } from '@/types/supabase';
+import { useApprovalCheck } from '@/hooks/use-approval-check'; // Import the new hook
 
 interface MatchRequestWithProfile extends MatchRequest {
   profile?: {
@@ -40,6 +41,8 @@ const skillLevelColors: Record<SkillLevel, string> = {
 
 const FindMatch = () => {
   const navigate = useNavigate();
+  const { isApproved, loading: approvalLoading } = useApprovalCheck(); // Use the approval check hook
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -74,6 +77,11 @@ const FindMatch = () => {
   };
 
   const fetchData = async () => {
+    if (!isApproved) {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -132,8 +140,10 @@ const FindMatch = () => {
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (isApproved) {
+      fetchData();
+    }
+  }, [isApproved]);
 
   const handleCreateRequest = async () => {
     if (!selectedDate || !startTime || !endTime || !skillLevel || !matchType) {
@@ -214,6 +224,21 @@ const FindMatch = () => {
       showError("Errore: " + err.message);
     }
   };
+
+  if (approvalLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-white">
+        <div className="text-center">
+          <h1 className="text-4xl font-bold mb-4 text-primary">Verifica...</h1>
+          <p className="text-xl text-gray-600">Stato approvazione utente.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isApproved) {
+    return null;
+  }
 
   if (loading) {
     return (
