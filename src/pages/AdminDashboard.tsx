@@ -54,36 +54,6 @@ const AdminDashboard = () => {
     }
   };
 
-  const initialize = async () => {
-    setLoading(true);
-    const adminOk = await fetchAdminStatus();
-    if (adminOk) {
-      await fetchUnapprovedCount();
-    }
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    // 1. Esegui all'inizio e al cambio di rotta (come prima)
-    initialize();
-
-    // 2. Aggiungi un listener per l'evento 'focus' della finestra
-    // Questo cattura quando l'utente torna alla tab/finestra del browser,
-    // garantendo l'aggiornamento anche dopo navigazioni interne o cambio tab.
-    const handleFocus = () => {
-      // Ricarica solo se l'utente è un admin (per evitare chiamate inutili)
-      if (isAdmin) {
-        fetchUnapprovedCount();
-      }
-    };
-
-    window.addEventListener('focus', handleFocus);
-
-    return () => {
-      window.removeEventListener('focus', handleFocus);
-    };
-  }, [navigate, location.pathname, isAdmin]); // Aggiunto isAdmin come dipendenza per il listener
-
   const handleLogout = async () => {
     try {
       const { error } = await supabase.auth.signOut();
@@ -97,6 +67,38 @@ const AdminDashboard = () => {
       showError(error.message || "Errore durante la disconnessione.");
     }
   };
+
+  useEffect(() => {
+    let isMounted = true;
+    
+    const initialize = async () => {
+      setLoading(true);
+      const adminOk = await fetchAdminStatus();
+      if (isMounted && adminOk) {
+        await fetchUnapprovedCount();
+      }
+      if (isMounted) {
+        setLoading(false);
+      }
+    };
+    
+    initialize();
+    
+    // Funzione per aggiornare il conteggio quando la finestra torna in focus
+    const handleFocus = () => {
+      // Esegui il fetch solo se l'utente è già stato identificato come admin
+      if (isAdmin) {
+        fetchUnapprovedCount();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [navigate, location.pathname, isAdmin]); // Manteniamo location.pathname e isAdmin per robustezza
 
   if (loading) {
     return (
