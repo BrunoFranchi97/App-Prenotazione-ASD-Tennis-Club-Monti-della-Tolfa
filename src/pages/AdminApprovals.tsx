@@ -71,22 +71,6 @@ const AdminApprovals = () => {
 
       if (profilesError) throw profilesError;
 
-      const profileIds = profilesData.map(p => p.id);
-      
-      // Fetch corresponding user emails from auth.users (requires service role, but we simulate fetching data)
-      // NOTE: In a real app, fetching auth.users data requires RLS bypass or a service role client/edge function.
-      // Since we are using the client, we will simulate the email retrieval or rely on the fact that the profile ID is the user ID.
-      
-      // For now, we will assume we can get the email via a separate query or mock it.
-      // Since we cannot query auth.users directly from the client, we will just display the ID for now, 
-      // or rely on the fact that the user's email is often available in the auth session, but here we only have the profile data.
-      
-      // To keep it simple and functional within client constraints, we will fetch the email via a separate query 
-      // (which might fail due to RLS on auth.users, but we proceed assuming the admin context allows it, or we rely on the profile data).
-      
-      // Since we cannot reliably fetch email from auth.users on the client side, we will skip the email for now 
-      // and rely on the full_name and ID.
-      
       const profilesWithEmail: UnapprovedProfile[] = profilesData.map(p => ({
           ...p,
           email: `ID: ${p.id.substring(0, 8)}...`, // Placeholder for email/ID
@@ -123,7 +107,10 @@ const AdminApprovals = () => {
       if (error) throw error;
 
       showSuccess("Socio approvato con successo!");
-      await fetchUnapprovedProfiles();
+      
+      // Rimuovi il profilo approvato dallo stato locale
+      setProfiles(prev => prev.filter(p => p.id !== profileId));
+      
     } catch (err: any) {
       showError("Errore durante l'approvazione: " + err.message);
     } finally {
@@ -143,11 +130,11 @@ const AdminApprovals = () => {
 
       if (error) throw error;
 
-      // Optionally, delete the user from auth.users (requires service role or admin API)
-      // await supabase.auth.admin.deleteUser(profileId);
-
       showSuccess("Socio rifiutato e rimosso.");
-      await fetchUnapprovedProfiles();
+      
+      // Rimuovi il profilo rifiutato dallo stato locale
+      setProfiles(prev => prev.filter(p => p.id !== profileId));
+      
     } catch (err: any) {
       showError("Errore durante il rifiuto: " + err.message);
     } finally {
