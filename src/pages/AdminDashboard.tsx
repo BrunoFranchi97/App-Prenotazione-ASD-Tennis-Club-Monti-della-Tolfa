@@ -10,7 +10,7 @@ import { showSuccess, showError } from '@/utils/toast';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
-  const location = useLocation(); // Import useLocation
+  const location = useLocation();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [unapprovedCount, setUnapprovedCount] = useState(0);
@@ -54,27 +54,35 @@ const AdminDashboard = () => {
     }
   };
 
+  const initialize = async () => {
+    setLoading(true);
+    const adminOk = await fetchAdminStatus();
+    if (adminOk) {
+      await fetchUnapprovedCount();
+    }
+    setLoading(false);
+  };
+
   useEffect(() => {
-    let isMounted = true;
-    
-    const initialize = async () => {
-      setLoading(true);
-      const adminOk = await fetchAdminStatus();
-      if (isMounted && adminOk) {
-        await fetchUnapprovedCount();
-      }
-      if (isMounted) {
-        setLoading(false);
-      }
-    };
-    
-    // Esegui l'inizializzazione ogni volta che la location cambia (cioè, quando si naviga verso questa pagina)
+    // 1. Esegui all'inizio e al cambio di rotta (come prima)
     initialize();
-    
-    return () => {
-      isMounted = false;
+
+    // 2. Aggiungi un listener per l'evento 'focus' della finestra
+    // Questo cattura quando l'utente torna alla tab/finestra del browser,
+    // garantendo l'aggiornamento anche dopo navigazioni interne o cambio tab.
+    const handleFocus = () => {
+      // Ricarica solo se l'utente è un admin (per evitare chiamate inutili)
+      if (isAdmin) {
+        fetchUnapprovedCount();
+      }
     };
-  }, [navigate, location.pathname]); // Aggiunto location.pathname come dipendenza
+
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [navigate, location.pathname, isAdmin]); // Aggiunto isAdmin come dipendenza per il listener
 
   const handleLogout = async () => {
     try {
