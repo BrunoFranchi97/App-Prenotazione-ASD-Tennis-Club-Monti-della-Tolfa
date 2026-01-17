@@ -7,7 +7,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ArrowLeft, LogOut, Users, CheckCircle2, AlertCircle, MessageSquare } from 'lucide-react';
+import { ArrowLeft, LogOut, Users, CheckCircle2, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, isEqual, setSeconds, setMilliseconds } from 'date-fns';
@@ -382,12 +382,10 @@ const MatchBooking = () => {
         );
       }
 
-      showSuccess("Prenotazione creata con successo!");
-      
-      // Aggiungi messaggio WhatsApp reminder nella notifica
-      showSuccess("Ricorda di avvisare l'altro giocatore via WhatsApp per confermare i dettagli!", {
-        duration: 8000,
-        description: "Contatta il tuo avversario per concordare tutti i dettagli della partita."
+      // MOSTRA LA NOTIFICA WHATSAPP SOLO DOPO LA CONFERMA DELLA PRENOTAZIONE
+      showSuccess("Prenotazione creata con successo! Partita confermata.", {
+        duration: 10000,
+        description: `Ricorda di contattare ${opponentName} via WhatsApp per confermare tutti i dettagli della partita.`
       });
       
       navigate('/history');
@@ -460,24 +458,6 @@ const MatchBooking = () => {
         </Button>
       </header>
 
-      {/* WhatsApp Reminder */}
-      <div className="mb-8">
-        <Card className="border-amber-200 bg-amber-50">
-          <CardContent className="p-4">
-            <div className="flex items-start gap-3">
-              <MessageSquare className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="font-medium text-amber-800">Ricorda di avvisare l'altro giocatore via WhatsApp</p>
-                <p className="text-sm text-amber-700 mt-1">
-                  Dopo aver confermato la prenotazione, contatta <strong>{opponentName}</strong> via WhatsApp 
-                  per confermare tutti i dettagli della partita e assicurarti che sia tutto concordato.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Match Request Details */}
         <Card className="shadow-lg rounded-lg">
@@ -520,7 +500,7 @@ const MatchBooking = () => {
               <AlertTitle className="text-green-800">Informazioni</AlertTitle>
               <AlertDescription className="text-green-700">
                 Seleziona un campo e uno slot orario all'interno della fascia indicata dall'avversario.
-                Dopo la prenotazione, ricordati di contattare l'altro giocatore via WhatsApp.
+                Dopo la prenotazione, riceverai una notifica per contattare l'altro giocatore via WhatsApp.
               </AlertDescription>
             </Alert>
           </CardContent>

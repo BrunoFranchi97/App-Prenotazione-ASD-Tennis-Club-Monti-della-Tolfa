@@ -35,7 +35,7 @@ const BookingHistory = () => {
   const [courts, setCourts] = useState<Court[]>([]);
   const [groupedReservations, setGroupedReservations] = useState<ReservationGroup[]>([]);
   const [editingGroup, setEditingGroup] = useState<ReservationGroup | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
 
   const handleLogout = async () => {
     try {
@@ -156,22 +156,25 @@ const BookingHistory = () => {
     navigate('/edit-booking', { state: { group } });
   };
 
-  const handleDelete = async (reservationId: string) => {
-    setDeletingId(reservationId);
+  const handleDelete = async (group: ReservationGroup) => {
+    setDeletingGroupId(group.id);
     try {
-      const { error } = await supabase
-        .from('reservations')
-        .delete()
-        .eq('id', reservationId);
+      // Elimina TUTTE le prenotazioni del gruppo
+      for (const reservation of group.reservations) {
+        const { error } = await supabase
+          .from('reservations')
+          .delete()
+          .eq('id', reservation.id);
 
-      if (error) throw error;
+        if (error) throw error;
+      }
 
       showSuccess("Prenotazione eliminata con successo!");
       fetchData(); // Refresh data
     } catch (err: any) {
       showError("Errore durante l'eliminazione: " + err.message);
     } finally {
-      setDeletingId(null);
+      setDeletingGroupId(null);
     }
   };
 
@@ -280,17 +283,17 @@ const BookingHistory = () => {
                                   variant="outline"
                                   size="sm"
                                   onClick={() => handleEdit(group)}
-                                  disabled={deletingId !== null}
+                                  disabled={deletingGroupId !== null}
                                 >
                                   <Edit className="mr-2 h-4 w-4" /> Modifica
                                 </Button>
                                 <Button
                                   variant="destructive"
                                   size="sm"
-                                  onClick={() => handleDelete(group.reservations[0].id)}
-                                  disabled={deletingId === group.reservations[0].id}
+                                  onClick={() => handleDelete(group)}
+                                  disabled={deletingGroupId === group.id}
                                 >
-                                  {deletingId === group.reservations[0].id ? (
+                                  {deletingGroupId === group.id ? (
                                     "Eliminazione..."
                                   ) : (
                                     <>
