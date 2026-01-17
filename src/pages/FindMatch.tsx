@@ -9,7 +9,6 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, LogOut, Calendar, Clock, Target, Users, UserPlus, XCircle, AlertCircle, MessageSquare, CheckCircle2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -262,367 +261,331 @@ const FindMatch = () => {
         </Button>
       </header>
 
-      {/* WhatsApp Reminder */}
+      {/* Tab Navigation */}
       <div className="mb-8">
-        <Card className="border-amber-200 bg-amber-50">
-          <CardContent className="p-4">
-            <div className="flex items-start gap-3">
-              <MessageSquare className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="font-medium text-amber-800">Ricorda di avvisare l'altro giocatore via WhatsApp</p>
-                <p className="text-sm text-amber-700 mt-1">
-                  Dopo aver accettato una richiesta, contatta l'altro giocatore per confermare i dettagli della partita.
-                  La prenotazione del campo verrà effettuata solo dopo aver concordato tutti i dettagli.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+        <Tabs defaultValue="publish" className="w-full">
+          <TabsList className="grid w-full grid-cols-3 mb-6">
+            <TabsTrigger value="publish" className="flex items-center gap-2">
+              <UserPlus className="h-4 w-4" /> Pubblica Richiesta
+            </TabsTrigger>
+            <TabsTrigger value="others" className="flex items-center gap-2">
+              <Users className="h-4 w-4" /> Richieste di Altri
+              {othersRequests.length > 0 && (
+                <Badge variant="secondary" className="ml-1 text-xs">
+                  {othersRequests.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="my" className="flex items-center gap-2">
+              <Target className="h-4 w-4" /> Le mie Richieste
+              {myRequests.length > 0 && (
+                <Badge variant="secondary" className="ml-1 text-xs">
+                  {myRequests.filter(r => r.status === 'open').length}
+                </Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
 
-      {/* Three Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: Pubblica Richiesta */}
-        <Card className="shadow-lg rounded-lg">
-          <CardHeader>
-            <CardTitle className="text-primary flex items-center">
-              <UserPlus className="mr-2 h-5 w-5" /> Pubblica Richiesta
-            </CardTitle>
-            <CardDescription>Indica la tua disponibilità per trovare un compagno di gioco</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmitRequest} className="space-y-4">
-              <div>
-                <Label htmlFor="requestedDate">Data preferita <span className="text-red-500">*</span></Label>
-                <Input
-                  id="requestedDate"
-                  type="date"
-                  className="mt-1"
-                  value={requestedDate}
-                  onChange={(e) => setRequestedDate(e.target.value)}
-                  required
-                  min={new Date().toISOString().split('T')[0]}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Ora inizio preferita <span className="text-red-500">*</span></Label>
-                  <Select value={preferredTimeStart} onValueChange={setPreferredTimeStart}>
-                    <SelectTrigger className="mt-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {timeSlots.map((time) => (
-                        <SelectItem key={time} value={time}>
-                          {time}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label>Ora fine preferita <span className="text-red-500">*</span></Label>
-                  <Select value={preferredTimeEnd} onValueChange={setPreferredTimeEnd}>
-                    <SelectTrigger className="mt-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {timeSlots.map((time) => (
-                        <SelectItem key={time} value={time}>
-                          {time}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Livello skill <span className="text-red-500">*</span></Label>
-                  <Select value={skillLevel} onValueChange={(v) => setSkillLevel(v as SkillLevel)}>
-                    <SelectTrigger className="mt-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="principiante">Principiante</SelectItem>
-                      <SelectItem value="intermedio">Intermedio</SelectItem>
-                      <SelectItem value="avanzato">Avanzato</SelectItem>
-                      <SelectItem value="agonista">Agonista</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label>Tipo di partita <span className="text-red-500">*</span></Label>
-                  <Select value={matchType} onValueChange={(v) => setMatchType(v as MatchType)}>
-                    <SelectTrigger className="mt-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="singolare">Singolare</SelectItem>
-                      <SelectItem value="doppio">Doppio</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div>
-                <Label>Note (opzionali)</Label>
-                <Textarea
-                  className="mt-1"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Es. Preferisco giocare al campo centrale, disponibile solo al mattino..."
-                  rows={3}
-                />
-              </div>
-
-              <Button
-                type="submit"
-                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-                disabled={submitting || !requestedDate || !preferredTimeStart || !preferredTimeEnd}
-              >
-                {submitting ? "Pubblicazione in corso..." : "Pubblica Richiesta"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        {/* Middle Column: Richieste di Altri */}
-        <Card className="shadow-lg rounded-lg">
-          <CardHeader>
-            <div className="flex justify-between items-center">
-              <div>
+          {/* Tab Content: Pubblica Richiesta */}
+          <TabsContent value="publish" className="space-y-6">
+            <Card className="shadow-lg rounded-lg">
+              <CardHeader>
                 <CardTitle className="text-primary flex items-center">
-                  <Users className="mr-2 h-5 w-5" /> Richieste di Altri
+                  <UserPlus className="mr-2 h-5 w-5" /> Pubblica una Nuova Richiesta
                 </CardTitle>
-                <CardDescription>
-                  {loading ? "Caricamento..." : `${othersRequests.length} richieste disponibili`}
-                </CardDescription>
-              </div>
-              <Badge variant="secondary" className="text-lg px-3 py-1">
-                {othersRequests.length}
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="text-center py-8">
-                <p className="text-gray-600">Caricamento richieste...</p>
-              </div>
-            ) : othersRequests.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Users className="mx-auto h-12 w-12 mb-4 opacity-50" />
-                <p>Nessuna richiesta disponibile al momento.</p>
-                <p className="text-sm mt-2">Controlla più tardi o pubblica tu una richiesta!</p>
-              </div>
-            ) : (
-              <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
-                {othersRequests.map((request) => (
-                  <Card key={request.id} className="border hover:border-primary/50 transition-colors">
-                    <CardContent className="p-4">
-                      <div className="flex justify-between items-start mb-3">
-                        <div>
-                          <h4 className="font-semibold text-lg">
-                            {profiles[request.user_id] || 'Socio Sconosciuto'}
-                          </h4>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Badge variant="outline" className="text-xs">
-                              <Target className="mr-1 h-3 w-3" />
-                              {skillLevelLabels[request.skill_level]}
-                            </Badge>
-                            <Badge variant="outline" className="text-xs">
-                              {matchTypeLabels[request.match_type]}
-                            </Badge>
-                          </div>
-                        </div>
-                        <Button
-                          onClick={() => handleAcceptRequest(request)}
-                          className="bg-green-600 hover:bg-green-700 text-white"
-                          size="sm"
-                        >
-                          <CheckCircle2 className="mr-2 h-4 w-4" />
-                          Accetta
-                        </Button>
-                      </div>
+                <CardDescription>Indica la tua disponibilità per trovare un compagno di gioco</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleSubmitRequest} className="space-y-4">
+                  <div>
+                    <Label htmlFor="requestedDate">Data preferita <span className="text-red-500">*</span></Label>
+                    <Input
+                      id="requestedDate"
+                      type="date"
+                      className="mt-1"
+                      value={requestedDate}
+                      onChange={(e) => setRequestedDate(e.target.value)}
+                      required
+                      min={new Date().toISOString().split('T')[0]}
+                    />
+                  </div>
 
-                      <div className="space-y-2 text-sm text-gray-600">
-                        <div className="flex items-center">
-                          <Calendar className="mr-2 h-4 w-4 text-club-orange" />
-                          <span className="font-medium">Data:</span>
-                          <span className="ml-2">
-                            {format(parseISO(request.requested_date + 'T00:00:00'), 'dd/MM/yyyy', { locale: it })}
-                          </span>
-                        </div>
-                        <div className="flex items-center">
-                          <Clock className="mr-2 h-4 w-4 text-club-orange" />
-                          <span className="font-medium">Disponibilità:</span>
-                          <span className="ml-2">{request.preferred_time_start} - {request.preferred_time_end}</span>
-                        </div>
-                      </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label>Ora inizio preferita <span className="text-red-500">*</span></Label>
+                      <Select value={preferredTimeStart} onValueChange={setPreferredTimeStart}>
+                        <SelectTrigger className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {timeSlots.map((time) => (
+                            <SelectItem key={time} value={time}>
+                              {time}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                      {request.notes && (
-                        <p className="text-sm text-gray-700 mt-3 border-t pt-3">
-                          <span className="font-medium">Note: </span>
-                          {request.notes}
-                        </p>
-                      )}
+                    <div>
+                      <Label>Ora fine preferita <span className="text-red-500">*</span></Label>
+                      <Select value={preferredTimeEnd} onValueChange={setPreferredTimeEnd}>
+                        <SelectTrigger className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {timeSlots.map((time) => (
+                            <SelectItem key={time} value={time}>
+                              {time}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
 
-                      <div className="mt-3 pt-3 border-t text-xs text-gray-500">
-                        <div className="flex items-center">
-                          <AlertCircle className="mr-1 h-3 w-3" />
-                          Accettando, potrai selezionare un orario preciso nella fascia indicata
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label>Livello skill <span className="text-red-500">*</span></Label>
+                      <Select value={skillLevel} onValueChange={(v) => setSkillLevel(v as SkillLevel)}>
+                        <SelectTrigger className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="principiante">Principiante</SelectItem>
+                          <SelectItem value="intermedio">Intermedio</SelectItem>
+                          <SelectItem value="avanzato">Avanzato</SelectItem>
+                          <SelectItem value="agonista">Agonista</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-        {/* Right Column: Le mie Richieste */}
-        <Card className="shadow-lg rounded-lg">
-          <CardHeader>
-            <div className="flex justify-between items-center">
-              <div>
-                <CardTitle className="text-primary flex items-center">
-                  <Target className="mr-2 h-5 w-5" /> Le mie Richieste
-                </CardTitle>
-                <CardDescription>
-                  {loading ? "Caricamento..." : `${myRequests.length} richieste pubblicate`}
-                </CardDescription>
-              </div>
-              <Badge variant="secondary" className="text-lg px-3 py-1">
-                {myRequests.length}
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="text-center py-8">
-                <p className="text-gray-600">Caricamento...</p>
-              </div>
-            ) : myRequests.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Target className="mx-auto h-12 w-12 mb-4 opacity-50" />
-                <p>Non hai pubblicato nessuna richiesta.</p>
-                <p className="text-sm mt-2">Pubblica una richiesta per trovare un compagno di gioco!</p>
-              </div>
-            ) : (
-              <Tabs defaultValue="open" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="open">Aperte</TabsTrigger>
-                  <TabsTrigger value="all">Tutte</TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="open" className="space-y-4 max-h-[400px] overflow-y-auto pr-2 mt-4">
-                  {myRequests.filter(r => r.status === 'open').map((request) => (
-                    <Card key={request.id} className="border">
-                      <CardContent className="p-4">
-                        <div className="flex justify-between items-start mb-2">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              {getStatusBadge(request.status)}
-                              <Badge variant="outline" className="text-xs">
-                                {matchTypeLabels[request.match_type]}
-                              </Badge>
+                    <div>
+                      <Label>Tipo di partita <span className="text-red-500">*</span></Label>
+                      <Select value={matchType} onValueChange={(v) => setMatchType(v as MatchType)}>
+                        <SelectTrigger className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="singolare">Singolare</SelectItem>
+                          <SelectItem value="doppio">Doppio</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label>Note (opzionali)</Label>
+                    <Textarea
+                      className="mt-1"
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder="Es. Preferisco giocare al campo centrale, disponibile solo al mattino..."
+                      rows={3}
+                    />
+                  </div>
+
+                  <Button
+                    type="submit"
+                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                    disabled={submitting || !requestedDate || !preferredTimeStart || !preferredTimeEnd}
+                  >
+                    {submitting ? "Pubblicazione in corso..." : "Pubblica Richiesta"}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Tab Content: Richieste di Altri */}
+          <TabsContent value="others" className="space-y-6">
+            <Card className="shadow-lg rounded-lg">
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle className="text-primary flex items-center">
+                      <Users className="mr-2 h-5 w-5" /> Richieste di Partita Disponibili
+                    </CardTitle>
+                    <CardDescription>
+                      {loading ? "Caricamento..." : `${othersRequests.length} richieste disponibili`}
+                    </CardDescription>
+                  </div>
+                  <Badge variant="secondary" className="text-lg px-3 py-1">
+                    {othersRequests.length}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="text-center py-8">
+                    <p className="text-gray-600">Caricamento richieste...</p>
+                  </div>
+                ) : othersRequests.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Users className="mx-auto h-12 w-12 mb-4 opacity-50" />
+                    <p>Nessuna richiesta disponibile al momento.</p>
+                    <p className="text-sm mt-2">Controlla più tardi o pubblica tu una richiesta!</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
+                    {othersRequests.map((request) => (
+                      <Card key={request.id} className="border hover:border-primary/50 transition-colors">
+                        <CardContent className="p-4">
+                          <div className="flex justify-between items-start mb-3">
+                            <div>
+                              <h4 className="font-semibold text-lg">
+                                {profiles[request.user_id] || 'Socio Sconosciuto'}
+                              </h4>
+                              <div className="flex items-center gap-2 mt-1">
+                                <Badge variant="outline" className="text-xs">
+                                  <Target className="mr-1 h-3 w-3" />
+                                  {skillLevelLabels[request.skill_level]}
+                                </Badge>
+                                <Badge variant="outline" className="text-xs">
+                                  {matchTypeLabels[request.match_type]}
+                                </Badge>
+                              </div>
                             </div>
-                            <h4 className="font-semibold mt-2">
-                              {format(parseISO(request.requested_date + 'T00:00:00'), 'dd/MM/yyyy', { locale: it })}
-                            </h4>
-                          </div>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => handleCancelRequest(request.id)}
-                          >
-                            <XCircle className="mr-2 h-4 w-4" />
-                            Cancella
-                          </Button>
-                        </div>
-
-                        <div className="space-y-1 text-sm text-gray-600">
-                          <div className="flex items-center">
-                            <Clock className="mr-2 h-4 w-4 text-club-orange" />
-                            <span>{request.preferred_time_start} - {request.preferred_time_end}</span>
-                          </div>
-                          <div className="flex items-center">
-                            <Target className="mr-2 h-4 w-4 text-club-orange" />
-                            <span>{skillLevelLabels[request.skill_level]}</span>
-                          </div>
-                        </div>
-
-                        {request.notes && (
-                          <p className="text-sm text-gray-700 mt-2 border-t pt-2">
-                            <span className="font-medium">Note: </span>
-                            {request.notes}
-                          </p>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
-                </TabsContent>
-
-                <TabsContent value="all" className="space-y-4 max-h-[400px] overflow-y-auto pr-2 mt-4">
-                  {myRequests.map((request) => (
-                    <Card key={request.id} className="border">
-                      <CardContent className="p-4">
-                        <div className="flex justify-between items-start mb-2">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              {getStatusBadge(request.status)}
-                              <Badge variant="outline" className="text-xs">
-                                {matchTypeLabels[request.match_type]}
-                              </Badge>
-                            </div>
-                            <h4 className="font-semibold mt-2">
-                              {format(parseISO(request.requested_date + 'T00:00:00'), 'dd/MM/yyyy', { locale: it })}
-                            </h4>
-                          </div>
-                          {request.status === 'open' && (
                             <Button
-                              variant="destructive"
+                              onClick={() => handleAcceptRequest(request)}
+                              className="bg-green-600 hover:bg-green-700 text-white"
                               size="sm"
-                              onClick={() => handleCancelRequest(request.id)}
                             >
-                              <XCircle className="mr-2 h-4 w-4" />
-                              Cancella
+                              <CheckCircle2 className="mr-2 h-4 w-4" />
+                              Accetta
                             </Button>
-                          )}
-                        </div>
-
-                        <div className="space-y-1 text-sm text-gray-600">
-                          <div className="flex items-center">
-                            <Clock className="mr-2 h-4 w-4 text-club-orange" />
-                            <span>{request.preferred_time_start} - {request.preferred_time_end}</span>
                           </div>
-                          <div className="flex items-center">
-                            <Target className="mr-2 h-4 w-4 text-club-orange" />
-                            <span>{skillLevelLabels[request.skill_level]}</span>
-                          </div>
-                        </div>
 
-                        {request.status === 'matched' && request.matched_with_user_id && (
-                          <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
-                            <p className="text-sm font-medium text-blue-800">
-                              <CheckCircle2 className="inline mr-1 h-4 w-4" />
-                              Accoppiata con {profiles[request.matched_with_user_id] || 'altro socio'}
+                          <div className="space-y-2 text-sm text-gray-600">
+                            <div className="flex items-center">
+                              <Calendar className="mr-2 h-4 w-4 text-club-orange" />
+                              <span className="font-medium">Data:</span>
+                              <span className="ml-2">
+                                {format(parseISO(request.requested_date + 'T00:00:00'), 'dd/MM/yyyy', { locale: it })}
+                              </span>
+                            </div>
+                            <div className="flex items-center">
+                              <Clock className="mr-2 h-4 w-4 text-club-orange" />
+                              <span className="font-medium">Disponibilità:</span>
+                              <span className="ml-2">{request.preferred_time_start} - {request.preferred_time_end}</span>
+                            </div>
+                          </div>
+
+                          {request.notes && (
+                            <p className="text-sm text-gray-700 mt-3 border-t pt-3">
+                              <span className="font-medium">Note: </span>
+                              {request.notes}
                             </p>
+                          )}
+
+                          <div className="mt-3 pt-3 border-t text-xs text-gray-500">
+                            <div className="flex items-center">
+                              <AlertCircle className="mr-1 h-3 w-3" />
+                              Accettando, potrai selezionare un orario preciso nella fascia indicata
+                            </div>
                           </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
-                </TabsContent>
-              </Tabs>
-            )}
-          </CardContent>
-        </Card>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Tab Content: Le mie Richieste */}
+          <TabsContent value="my" className="space-y-6">
+            <Card className="shadow-lg rounded-lg">
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle className="text-primary flex items-center">
+                      <Target className="mr-2 h-5 w-5" /> Le mie Richieste di Partita
+                    </CardTitle>
+                    <CardDescription>
+                      {loading ? "Caricamento..." : `${myRequests.length} richieste totali`}
+                    </CardDescription>
+                  </div>
+                  <Badge variant="secondary" className="text-lg px-3 py-1">
+                    {myRequests.filter(r => r.status === 'open').length} aperte
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="text-center py-8">
+                    <p className="text-gray-600">Caricamento...</p>
+                  </div>
+                ) : myRequests.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Target className="mx-auto h-12 w-12 mb-4 opacity-50" />
+                    <p>Non hai pubblicato nessuna richiesta.</p>
+                    <p className="text-sm mt-2">Pubblica una richiesta per trovare un compagno di gioco!</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
+                    {myRequests.map((request) => (
+                      <Card key={request.id} className="border">
+                        <CardContent className="p-4">
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                {getStatusBadge(request.status)}
+                                <Badge variant="outline" className="text-xs">
+                                  {matchTypeLabels[request.match_type]}
+                                </Badge>
+                              </div>
+                              <h4 className="font-semibold mt-2">
+                                {format(parseISO(request.requested_date + 'T00:00:00'), 'dd/MM/yyyy', { locale: it })}
+                              </h4>
+                            </div>
+                            {request.status === 'open' && (
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleCancelRequest(request.id)}
+                              >
+                                <XCircle className="mr-2 h-4 w-4" />
+                                Cancella
+                              </Button>
+                            )}
+                          </div>
+
+                          <div className="space-y-1 text-sm text-gray-600">
+                            <div className="flex items-center">
+                              <Clock className="mr-2 h-4 w-4 text-club-orange" />
+                              <span>{request.preferred_time_start} - {request.preferred_time_end}</span>
+                            </div>
+                            <div className="flex items-center">
+                              <Target className="mr-2 h-4 w-4 text-club-orange" />
+                              <span>{skillLevelLabels[request.skill_level]}</span>
+                            </div>
+                          </div>
+
+                          {request.notes && (
+                            <p className="text-sm text-gray-700 mt-2 border-t pt-2">
+                              <span className="font-medium">Note: </span>
+                              {request.notes}
+                            </p>
+                          )}
+
+                          {request.status === 'matched' && request.matched_with_user_id && (
+                            <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
+                              <p className="text-sm font-medium text-blue-800">
+                                <CheckCircle2 className="inline mr-1 h-4 w-4" />
+                                Accoppiata con {profiles[request.matched_with_user_id] || 'altro socio'}
+                              </p>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
