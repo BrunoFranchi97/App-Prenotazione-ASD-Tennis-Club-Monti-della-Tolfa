@@ -303,7 +303,6 @@ const EditBookingGroup = () => {
               notes: notes.trim() || null,
               booked_for_first_name: bookedForFirstName.trim() || null,
               booked_for_last_name: bookedForLastName.trim() || null,
-              updated_at: new Date().toISOString()
             })
             .eq('id', reservation.id);
 
@@ -514,7 +513,9 @@ const EditBookingGroup = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Nome (conto terzi)</Label>
-                  <Input
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 border rounded-md"
                     value={bookedForFirstName}
                     onChange={(e) => setBookedForFirstName(e.target.value)}
                     placeholder="Nome"
@@ -522,7 +523,9 @@ const EditBookingGroup = () => {
                 </div>
                 <div>
                   <Label>Cognome (conto terzi)</Label>
-                  <Input
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 border rounded-md"
                     value={bookedForLastName}
                     onChange={(e) => setBookedForLastName(e.target.value)}
                     placeholder="Cognome"
