@@ -44,6 +44,7 @@ interface ReservationGroup {
   status: string;
   bookedForName: string;
   notes?: string;
+  bookingType?: string;
   isExpanded: boolean;
 }
 
@@ -151,6 +152,7 @@ const BookingHistory = () => {
           status: reservation.status,
           bookedForName,
           notes: reservation.notes || undefined,
+          bookingType: reservation.booking_type,
           isExpanded: expandedGroups.has(reservation.id),
         };
       } else {
@@ -195,6 +197,7 @@ const BookingHistory = () => {
             status: reservation.status,
             bookedForName,
             notes: reservation.notes || undefined,
+            bookingType: reservation.booking_type,
             isExpanded: expandedGroups.has(reservation.id),
           };
         }
@@ -246,14 +249,21 @@ const BookingHistory = () => {
     }
   };
 
+  // Nuova funzione per navigare alla pagina di modifica
   const handleEditGroup = (group: ReservationGroup) => {
-    // Per ora reindirizziamo alla pagina di prenotazione standard
-    // In futuro potremmo creare una pagina di modifica specifica
-    showInfo("Funzionalità di modifica in sviluppo. Al momento, puoi annullare e ri-prenotare.");
+    navigate('/edit-booking', { state: { group } });
+  };
+
+  const isEditable = (group: ReservationGroup): boolean => {
+    // Controlla se almeno una prenotazione nel gruppo è nel futuro
+    return group.reservations.some(reservation => {
+      const reservationStartTime = parseISO(reservation.starts_at);
+      return isBefore(new Date(), reservationStartTime);
+    });
   };
 
   const isCancellable = (group: ReservationGroup): boolean => {
-    // Controlla se almeno una prenotazione nel gruppo è cancellabile
+    // Controlla se almeno una prenotazione nel gruppo è cancellabile (oltre 1 ora dal presente)
     return group.reservations.some(reservation => {
       const reservationStartTime = parseISO(reservation.starts_at);
       const oneHourFromNow = addHours(new Date(), 1);
@@ -279,11 +289,6 @@ const BookingHistory = () => {
       case 'mixed': return 'bg-blue-100 text-blue-800';
       default: return 'bg-gray-100 text-gray-800';
     }
-  };
-
-  const showInfo = (message: string) => {
-    // Potremmo usare un toast o un alert
-    alert(message);
   };
 
   if (loading) {
@@ -430,14 +435,15 @@ const BookingHistory = () => {
                 )}
 
                 <div className="pt-6 flex flex-col sm:flex-row gap-2">
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => handleEditGroup(group)}
-                    disabled={!isCancellable(group)}
-                  >
-                    <Edit className="mr-2 h-4 w-4" /> Modifica
-                  </Button>
+                  {isEditable(group) && (
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => handleEditGroup(group)}
+                    >
+                      <Edit className="mr-2 h-4 w-4" /> Modifica Slot
+                    </Button>
+                  )}
 
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
