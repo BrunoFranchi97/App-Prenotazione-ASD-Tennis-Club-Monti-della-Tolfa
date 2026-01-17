@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { format, parseISO, isBefore } from 'date-fns';
@@ -7,7 +5,6 @@ import { it } from 'date-fns/locale';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowLeft, LogOut, CalendarDays, Clock, MapPin, Edit, Users, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
@@ -218,107 +215,123 @@ const BookingHistory = () => {
         </Button>
       </header>
 
-      <Card className="shadow-lg rounded-lg">
-        <CardHeader>
-          <CardTitle className="text-primary">Le tue prenotazioni</CardTitle>
-          <CardDescription>
-            Visualizza tutte le tue prenotazioni passate e future. Puoi modificare o eliminare quelle future.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {groupedReservations.length === 0 ? (
-            <div className="text-center py-10 text-muted-foreground">
-              <CalendarDays className="mx-auto h-12 w-12 mb-4 opacity-50" />
-              <p>Nessuna prenotazione trovata.</p>
-              <p className="text-sm mt-2">Effettua la tua prima prenotazione per vederla qui.</p>
-              <Link to="/book">
-                <Button className="mt-4 bg-primary hover:bg-primary/90 text-primary-foreground">
-                  Prenota un Campo
-                </Button>
-              </Link>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Campo</TableHead>
-                    <TableHead>Orario</TableHead>
-                    <TableHead>Durata</TableHead>
-                    <TableHead>Prenotato per</TableHead>
-                    <TableHead>Stato</TableHead>
-                    <TableHead className="text-right">Azioni</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {groupedReservations.map((group) => {
-                    const isFuture = isBefore(new Date(), group.date);
-                    const isEditable = isFuture && group.status === 'confirmed';
-                    
-                    return (
-                      <TableRow key={group.id}>
-                        <TableCell className="font-medium">
-                          {format(group.date, 'dd/MM/yyyy', { locale: it })}
-                        </TableCell>
-                        <TableCell>{group.courtName}</TableCell>
-                        <TableCell>
-                          {group.startTime} - {group.endTime}
-                        </TableCell>
-                        <TableCell>{group.totalHours}h</TableCell>
-                        <TableCell>{group.bookedForName}</TableCell>
-                        <TableCell>
-                          {getStatusBadge(group.status)}
-                          {group.notes?.includes('[MATCH]') && (
-                            <Badge variant="secondary" className="ml-2 bg-purple-100 text-purple-800">
-                              <Users className="mr-1 h-3 w-3" /> Match
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            {isEditable && (
-                              <>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleEdit(group)}
-                                  disabled={deletingGroupId !== null}
-                                >
-                                  <Edit className="mr-2 h-4 w-4" /> Modifica
-                                </Button>
-                                <Button
-                                  variant="destructive"
-                                  size="sm"
-                                  onClick={() => handleDelete(group)}
-                                  disabled={deletingGroupId === group.id}
-                                >
-                                  {deletingGroupId === group.id ? (
-                                    "Eliminazione..."
-                                  ) : (
-                                    <>
-                                      <Trash2 className="mr-2 h-4 w-4" /> Elimina
-                                    </>
-                                  )}
-                                </Button>
-                              </>
-                            )}
-                            {!isEditable && (
-                              <span className="text-sm text-muted-foreground">
-                                {isFuture ? "Non modificabile" : "Passata"}
-                              </span>
-                            )}
+      <div className="space-y-6">
+        <Card className="shadow-lg rounded-lg">
+          <CardHeader>
+            <CardTitle className="text-primary">Le tue prenotazioni</CardTitle>
+            <CardDescription>
+              Visualizza tutte le tue prenotazioni passate e future. Puoi modificare o eliminare quelle future.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {groupedReservations.length === 0 ? (
+              <div className="text-center py-10 text-muted-foreground">
+                <CalendarDays className="mx-auto h-12 w-12 mb-4 opacity-50" />
+                <p>Nessuna prenotazione trovata.</p>
+                <p className="text-sm mt-2">Effettua la tua prima prenotazione per vederla qui.</p>
+                <Link to="/book">
+                  <Button className="mt-4 bg-primary hover:bg-primary/90 text-primary-foreground">
+                    Prenota un Campo
+                  </Button>
+                </Link>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {groupedReservations.map((group) => {
+                  const isFuture = isBefore(new Date(), group.date);
+                  const isEditable = isFuture && group.status === 'confirmed';
+                  
+                  return (
+                    <Card key={group.id} className="border hover:shadow-md transition-shadow">
+                      <CardContent className="p-4">
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <div className="flex items-center gap-2 mb-2">
+                              {getStatusBadge(group.status)}
+                              {group.notes?.includes('[MATCH]') && (
+                                <Badge variant="secondary" className="bg-purple-100 text-purple-800">
+                                  <Users className="mr-1 h-3 w-3" /> Match
+                                </Badge>
+                              )}
+                            </div>
+                            <h3 className="font-bold text-lg">
+                              {group.courtName}
+                            </h3>
+                            <p className="text-sm text-gray-600">
+                              {format(group.date, 'dd/MM/yyyy', { locale: it })}
+                            </p>
                           </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                        </div>
+
+                        <div className="space-y-2 mb-4">
+                          <div className="flex items-center text-sm">
+                            <Clock className="mr-2 h-4 w-4 text-club-orange" />
+                            <span className="font-medium">Orario:</span>
+                            <span className="ml-2">{group.startTime} - {group.endTime}</span>
+                          </div>
+                          <div className="flex items-center text-sm">
+                            <CalendarDays className="mr-2 h-4 w-4 text-club-orange" />
+                            <span className="font-medium">Durata:</span>
+                            <span className="ml-2">{group.totalHours}h</span>
+                          </div>
+                          <div className="flex items-center text-sm">
+                            <Users className="mr-2 h-4 w-4 text-club-orange" />
+                            <span className="font-medium">Per:</span>
+                            <span className="ml-2">{group.bookedForName}</span>
+                          </div>
+                          {group.notes && (
+                            <div className="text-sm text-gray-700 pt-2 border-t">
+                              <p className="font-medium">Note:</p>
+                              <p className="text-xs mt-1 line-clamp-2">{group.notes}</p>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="pt-3 border-t">
+                          {isEditable ? (
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleEdit(group)}
+                                disabled={deletingGroupId !== null}
+                                className="flex-1"
+                              >
+                                <Edit className="mr-2 h-4 w-4" /> Modifica
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleDelete(group)}
+                                disabled={deletingGroupId === group.id}
+                                className="flex-1"
+                              >
+                                {deletingGroupId === group.id ? (
+                                  "Eliminazione..."
+                                ) : (
+                                  <>
+                                    <Trash2 className="mr-2 h-4 w-4" /> Elimina
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="text-center">
+                              <span className="text-sm text-muted-foreground">
+                                {isFuture ? "Non modificabile" : "Prenotazione passata"}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };
