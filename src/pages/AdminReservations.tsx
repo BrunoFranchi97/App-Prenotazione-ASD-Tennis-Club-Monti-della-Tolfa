@@ -2,12 +2,13 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { format, parseISO, isBefore } from "date-fns";
+import { format, parseISO, isBefore, isAfter, isEqual, addHours } from "date-fns";
 import { it } from "date-fns/locale";
-import { ArrowLeft, Eye, LogOut, PlusCircle, RefreshCw, Search, Trash2, Edit, CalendarDays, Clock, MapPin, Users, AlertCircle } from "lucide-react";
+import { ArrowLeft, Eye, LogOut, PlusCircle, RefreshCw, Search, Trash2, Edit, CalendarDays, Clock, MapPin, Users, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
+import { cleanReservationNotes } from "@/utils/noteCleaner"; // Import the cleaner utility
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +27,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 import ReservationFormDialog from "@/components/admin/ReservationFormDialog";
 import ReservationDetailsDialog from "@/components/admin/ReservationDetailsDialog";
@@ -40,6 +46,24 @@ type ReservationRow = Reservation & {
   bookedForName: string;
 };
 
+interface ReservationGroup {
+  id: string;
+  user_id: string;
+  court_id: number;
+  date: Date;
+  reservations: ReservationRow[];
+  startTime: string;
+  endTime: string;
+  totalHours: number;
+  status: string;
+  bookedByName: string;
+  bookedForName: string;
+  court?: Court;
+  notes?: string;
+  bookingType?: string;
+  isExpanded?: boolean;
+}
+
 function statusLabel(s: Reservation["status"]) {
   if (s === "confirmed") return "Confermata";
   if (s === "pending") return "In attesa";
@@ -50,6 +74,106 @@ function statusBadgeClasses(s: Reservation["status"]) {
   if (s === "confirmed") return "bg-green-100 text-green-800";
   if (s === "pending") return "bg-yellow-100 text-yellow-800";
   return "bg-red-100 text-red-800";
+}
+
+// Function to group consecutive reservations by same user, same court, same day
+function groupReservations(reservations: ReservationRow[]): ReservationGroup[] {
+  if (reservations.length === 0) return [];
+
+  // Sort by user, court, and start time
+  const sorted = [...reservations].sort((a, b) => {
+    if (a.user_id !== b.user_id) return a.user_id.localeCompare(b.user_id);
+    if (a.court_id !== b.court_id) return a.court_id - b.court_id;
+    
+    const aDate = parseISO(a.starts_at);
+    const bDate = parseISO(b.starts_at);
+    const aDateOnly = new Date(aDate.getFullYear(), aDate.getMonth(), aDate.getDate());
+    const bDateOnly = new Date(bDate.getFullYear(), bDate.getMonth(), bDate.getDate());
+    
+    if (aDateOnly.getTime() !== bDateOnly.getTime()) {
+      return aDateOnly.getTime() - bDateOnly.getTime();
+    }
+    
+    return aDate.getTime() - bDate.getTime();
+  });
+
+  const groups: ReservationGroup[] = [];
+  let currentGroup: ReservationGroup | null = null;
+
+  for (const reservation of sorted) {
+    const startDate = parseISO(reservation.starts_at);
+    const endDate = parseISO(reservation.ends_at);
+    const dateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+
+    if (!currentGroup) {
+      // Start a new group
+      currentGroup = {
+        id: `group_${reservation.id}`,
+        user_id: reservation.user_id,
+        court_id: reservation.court_id,
+        date: dateOnly,
+        reservations: [reservation],
+        startTime: format(startDate, 'HH:mm'),
+        endTime: format(endDate, 'HH:mm'),
+        totalHours: 1,
+        status: reservation.status,
+        bookedByName: reservation.bookedByName,
+        bookedForName: reservation.bookedForName,
+        court: reservation.court,
+        notes: cleanReservationNotes(reservation.notes),
+        bookingType: reservation.booking_type,
+        isExpanded: false
+      };
+      groups.push(currentGroup);
+      continue;
+    }
+
+    // Check if same user, court, and same day
+    const isSameUser = currentGroup.user_id === reservation.user_id;
+    const isSameCourt = currentGroup.court_id === reservation.court_id;
+    const isSameDay = currentGroup.date.getTime() === dateOnly.getTime();
+    
+    // Check if consecutive (current group's end time equals this reservation's start time)
+    const lastReservation = currentGroup.reservations[currentGroup.reservations.length - 1];
+    const lastEnd = parseISO(lastReservation.ends_at);
+    const isConsecutive = isEqual(lastEnd, startDate);
+
+    if (isSameUser && isSameCourt && isSameDay && isConsecutive) {
+      // Add to current group
+      currentGroup.reservations.push(reservation);
+      currentGroup.endTime = format(endDate, 'HH:mm');
+      currentGroup.totalHours = currentGroup.reservations.length;
+      
+      // Update status if this reservation has a different status
+      if (reservation.status === 'cancelled' && currentGroup.status !== 'cancelled') {
+        currentGroup.status = 'cancelled';
+      }
+      
+      // Use notes from first reservation (already cleaned)
+    } else {
+      // Start a new group
+      currentGroup = {
+        id: `group_${reservation.id}`,
+        user_id: reservation.user_id,
+        court_id: reservation.court_id,
+        date: dateOnly,
+        reservations: [reservation],
+        startTime: format(startDate, 'HH:mm'),
+        endTime: format(endDate, 'HH:mm'),
+        totalHours: 1,
+        status: reservation.status,
+        bookedByName: reservation.bookedByName,
+        bookedForName: reservation.bookedForName,
+        court: reservation.court,
+        notes: cleanReservationNotes(reservation.notes),
+        bookingType: reservation.booking_type,
+        isExpanded: false
+      };
+      groups.push(currentGroup);
+    }
+  }
+
+  return groups;
 }
 
 export default function AdminReservations() {
@@ -206,32 +330,35 @@ export default function AdminReservations() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Group reservations
+  const groups = useMemo(() => groupReservations(reservations), [reservations]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return reservations.filter((r) => {
-      if (filterCourtId !== "all" && String(r.court_id) !== filterCourtId) return false;
-      if (filterStatus !== "all" && r.status !== filterStatus) return false;
+    return groups.filter((group) => {
+      if (filterCourtId !== "all" && String(group.court_id) !== filterCourtId) return false;
+      if (filterStatus !== "all" && group.status !== filterStatus) return false;
 
       if (filterDay) {
-        const day = format(parseISO(r.starts_at), "dd/MM/yyyy", { locale: it });
+        const day = format(group.date, "dd/MM/yyyy", { locale: it });
         if (day !== filterDay) return false;
       }
 
       if (!q) return true;
 
       const hay = [
-        r.court?.name || "",
-        r.bookedByName,
-        r.bookedForName,
-        r.notes || "",
-        statusLabel(r.status),
+        group.court?.name || "",
+        group.bookedByName,
+        group.bookedForName,
+        group.notes || "",
+        statusLabel(group.status as Reservation["status"]),
       ]
         .join(" ")
         .toLowerCase();
 
       return hay.includes(q);
     });
-  }, [reservations, filterCourtId, filterStatus, filterDay, search]);
+  }, [groups, filterCourtId, filterStatus, filterDay, search]);
 
   const openCreate = () => {
     setFormMode("create");
@@ -320,7 +447,7 @@ export default function AdminReservations() {
             booked_for_first_name: values.booked_for_first_name ?? null,
             booked_for_last_name: values.booked_for_last_name ?? null,
             notes: values.notes ?? null,
-            updated_at: new Date().toISOString() // AGGIUNTO: aggiorna il timestamp di modifica
+            updated_at: new Date().toISOString()
           })
           .eq("id", values.id);
 
@@ -338,6 +465,25 @@ export default function AdminReservations() {
       setFormSaving(false);
     }
   };
+
+  const toggleGroupExpanded = (groupId: string) => {
+    const updatedGroups = groups.map(group => {
+      if (group.id === groupId) {
+        return { ...group, isExpanded: !group.isExpanded };
+      }
+      return group;
+    });
+    
+    // We can't update groups directly since it's derived from reservations
+    // Instead, we'll manage expanded state in local state
+    setGroupsState(prev => ({
+      ...prev,
+      [groupId]: !prev[groupId]
+    }));
+  };
+
+  // Local state for expanded groups
+  const [expandedGroups, setGroupsState] = useState<Record<string, boolean>>({});
 
   if (!isAdmin && !loading) return null;
 
@@ -439,7 +585,7 @@ export default function AdminReservations() {
         <CardHeader>
           <CardTitle className="text-primary">Elenco prenotazioni</CardTitle>
           <CardDescription>
-            {loading ? "Caricamento..." : `${filtered.length} prenotazioni trovate`}
+            {loading ? "Caricamento..." : `${filtered.length} gruppi di prenotazioni trovati`}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -451,18 +597,23 @@ export default function AdminReservations() {
               <p>Nessuna prenotazione trovata con i filtri attuali.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filtered.map((r) => {
-                const isFuture = isBefore(new Date(), parseISO(r.starts_at));
+            <div className="space-y-4">
+              {filtered.map((group) => {
+                const isFuture = isBefore(new Date(), group.date);
+                const isExpanded = expandedGroups[group.id] || false;
                 
                 return (
-                  <Card key={r.id} className="border hover:shadow-md transition-shadow">
+                  <Card key={group.id} className="border hover:shadow-md transition-shadow">
                     <CardContent className="p-4">
+                      {/* Group Header */}
                       <div className="flex justify-between items-start mb-3">
                         <div>
                           <div className="flex items-center gap-2 mb-2">
-                            <Badge className={`${statusBadgeClasses(r.status)}`}>
-                              {statusLabel(r.status)}
+                            <Badge className={`${statusBadgeClasses(group.status as Reservation["status"])}`}>
+                              {statusLabel(group.status as Reservation["status"])}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {group.reservations.length} slot
                             </Badge>
                             {!isFuture && (
                               <Badge variant="outline" className="text-xs">
@@ -471,87 +622,140 @@ export default function AdminReservations() {
                             )}
                           </div>
                           <h3 className="font-bold text-lg">
-                            {r.court?.name || `Campo #${r.court_id}`}
+                            {group.court?.name || `Campo #${group.court_id}`}
                           </h3>
                           <p className="text-sm text-gray-600">
-                            {format(parseISO(r.starts_at), "dd/MM/yyyy", { locale: it })}
+                            {format(group.date, "dd/MM/yyyy", { locale: it })}
                           </p>
                         </div>
+                        
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => toggleGroupExpanded(group.id)}
+                        >
+                          {isExpanded ? (
+                            <ChevronUp className="h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4" />
+                          )}
+                        </Button>
                       </div>
 
+                      {/* Group Summary */}
                       <div className="space-y-2 mb-4">
                         <div className="flex items-center text-sm">
                           <Clock className="mr-2 h-4 w-4 text-club-orange" />
                           <span className="font-medium">Orario:</span>
                           <span className="ml-2">
-                            {format(parseISO(r.starts_at), "HH:mm")} - {format(parseISO(r.ends_at), "HH:mm")}
+                            {group.startTime} - {group.endTime} ({group.totalHours}h)
                           </span>
                         </div>
                         
                         <div className="flex items-center text-sm">
                           <Users className="mr-2 h-4 w-4 text-club-orange" />
                           <span className="font-medium">Prenotato da:</span>
-                          <span className="ml-2 truncate" title={r.bookedByName}>{r.bookedByName}</span>
+                          <span className="ml-2 truncate" title={group.bookedByName}>{group.bookedByName}</span>
                         </div>
 
                         <div className="flex items-center text-sm">
                           <Users className="mr-2 h-4 w-4 text-club-orange" />
                           <span className="font-medium">Prenotato per:</span>
-                          <span className="ml-2 truncate" title={r.bookedForName}>{r.bookedForName}</span>
+                          <span className="ml-2 truncate" title={group.bookedForName}>{group.bookedForName}</span>
                         </div>
 
-                        {r.notes && (
+                        {group.notes && (
                           <div className="text-sm text-gray-700 pt-2 border-t">
                             <p className="font-medium">Note:</p>
-                            <p className="text-xs mt-1 line-clamp-2">{r.notes}</p>
+                            <p className="text-xs mt-1 line-clamp-2">{group.notes}</p>
                           </div>
                         )}
                       </div>
 
-                      <div className="pt-3 border-t">
-                        <div className="flex flex-col sm:flex-row gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setDetailsReservationId(r.id);
-                              setDetailsOpen(true);
-                            }}
-                            className="flex-1"
-                          >
-                            <Eye className="mr-2 h-4 w-4" /> Dettagli
-                          </Button>
-                          
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => openEdit(r)}
-                            className="flex-1"
-                          >
-                            <Edit className="mr-2 h-4 w-4" /> Modifica
-                          </Button>
+                      {/* Collapsible Content */}
+                      <Collapsible open={isExpanded} onOpenChange={() => toggleGroupExpanded(group.id)}>
+                        <CollapsibleContent className="pt-4 border-t">
+                          <div className="space-y-3">
+                            {group.reservations.map((reservation) => (
+                              <div key={reservation.id} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                <div className="flex justify-between items-start mb-2">
+                                  <div>
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <Badge className={`text-xs ${statusBadgeClasses(reservation.status)}`}>
+                                        {statusLabel(reservation.status)}
+                                      </Badge>
+                                      <span className="text-sm font-medium">
+                                        {format(parseISO(reservation.starts_at), "HH:mm")} - {format(parseISO(reservation.ends_at), "HH:mm")}
+                                      </span>
+                                    </div>
+                                    {reservation.booking_type && (
+                                      <Badge variant="outline" className="text-xs mr-2">
+                                        {reservation.booking_type === 'singolare' ? 'Singolare' : 
+                                         reservation.booking_type === 'doppio' ? 'Doppio' : 'Lezione'}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  
+                                  <div className="flex gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => {
+                                        setDetailsReservationId(reservation.id);
+                                        setDetailsOpen(true);
+                                      }}
+                                      title="Dettagli"
+                                    >
+                                      <Eye className="h-4 w-4" />
+                                    </Button>
+                                    
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => openEdit(reservation)}
+                                      title="Modifica"
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
 
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="destructive" size="sm" className="flex-1">
-                                <Trash2 className="mr-2 h-4 w-4" /> Elimina
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Eliminare la prenotazione?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Questa azione è irreversibile. Verrà rimossa la prenotazione selezionata.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Annulla</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDelete(r.id)}>Conferma</AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      </div>
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <Button variant="ghost" size="icon" title="Elimina">
+                                          <Trash2 className="h-4 w-4 text-destructive" />
+                                        </Button>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>Eliminare la prenotazione?</AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                            Questa azione è irreversibile. Verrà rimossa la prenotazione selezionata.
+                                            {group.reservations.length > 1 && (
+                                              <span className="block mt-2 font-medium text-amber-600">
+                                                Attenzione: Questa prenotazione fa parte di un gruppo di {group.reservations.length} slot consecutivi.
+                                              </span>
+                                            )}
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel>Annulla</AlertDialogCancel>
+                                          <AlertDialogAction onClick={() => handleDelete(reservation.id)}>Conferma</AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
+                                  </div>
+                                </div>
+
+                                {reservation.notes && (
+                                  <div className="text-xs text-gray-600 mt-2">
+                                    <p className="font-medium">Note originali:</p>
+                                    <p className="mt-1 line-clamp-2">{cleanReservationNotes(reservation.notes)}</p>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
                     </CardContent>
                   </Card>
                 );
