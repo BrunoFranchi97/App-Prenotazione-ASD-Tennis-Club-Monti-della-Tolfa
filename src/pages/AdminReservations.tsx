@@ -320,6 +320,7 @@ export default function AdminReservations() {
             booked_for_first_name: values.booked_for_first_name ?? null,
             booked_for_last_name: values.booked_for_last_name ?? null,
             notes: values.notes ?? null,
+            updated_at: new Date().toISOString() // AGGIUNTO: aggiorna il timestamp di modifica
           })
           .eq("id", values.id);
 

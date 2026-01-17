@@ -303,6 +303,7 @@ const EditBookingGroup = () => {
               notes: notes.trim() || null,
               booked_for_first_name: bookedForFirstName.trim() || null,
               booked_for_last_name: bookedForLastName.trim() || null,
+              updated_at: new Date().toISOString() // AGGIUNTO: aggiorna il timestamp
             })
             .eq('id', reservation.id);
 
