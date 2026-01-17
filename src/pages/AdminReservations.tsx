@@ -2,9 +2,9 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, isBefore } from "date-fns";
 import { it } from "date-fns/locale";
-import { ArrowLeft, Eye, LogOut, PlusCircle, RefreshCw, Search, Trash2 } from "lucide-react";
+import { ArrowLeft, Eye, LogOut, PlusCircle, RefreshCw, Search, Trash2, Edit, CalendarDays, Clock, MapPin, Users, AlertCircle } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
@@ -14,7 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -438,62 +438,103 @@ export default function AdminReservations() {
       <Card className="shadow-lg rounded-lg">
         <CardHeader>
           <CardTitle className="text-primary">Elenco prenotazioni</CardTitle>
-          <CardDescription>Su mobile scorri orizzontalmente.</CardDescription>
+          <CardDescription>
+            {loading ? "Caricamento..." : `${filtered.length} prenotazioni trovate`}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="py-10 text-center text-muted-foreground">Caricamento...</div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground">
+              <AlertCircle className="mx-auto h-12 w-12 mb-4 opacity-50" />
+              <p>Nessuna prenotazione trovata con i filtri attuali.</p>
+            </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Campo</TableHead>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Orario</TableHead>
-                    <TableHead>Prenotato da</TableHead>
-                    <TableHead>Prenotato per</TableHead>
-                    <TableHead>Stato</TableHead>
-                    <TableHead className="text-right">Azioni</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.map((r) => (
-                    <TableRow key={r.id}>
-                      <TableCell className="font-medium">{r.court?.name || `Campo #${r.court_id}`}</TableCell>
-                      <TableCell>{format(parseISO(r.starts_at), "dd/MM/yyyy", { locale: it })}</TableCell>
-                      <TableCell>
-                        {format(parseISO(r.starts_at), "HH:mm")} - {format(parseISO(r.ends_at), "HH:mm")}
-                      </TableCell>
-                      <TableCell className="min-w-[180px]">{r.bookedByName}</TableCell>
-                      <TableCell className="min-w-[160px]">{r.bookedForName}</TableCell>
-                      <TableCell>
-                        <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${statusBadgeClasses(r.status)}`}>
-                          {statusLabel(r.status)}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filtered.map((r) => {
+                const isFuture = isBefore(new Date(), parseISO(r.starts_at));
+                
+                return (
+                  <Card key={r.id} className="border hover:shadow-md transition-shadow">
+                    <CardContent className="p-4">
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <Badge className={`${statusBadgeClasses(r.status)}`}>
+                              {statusLabel(r.status)}
+                            </Badge>
+                            {!isFuture && (
+                              <Badge variant="outline" className="text-xs">
+                                Passata
+                              </Badge>
+                            )}
+                          </div>
+                          <h3 className="font-bold text-lg">
+                            {r.court?.name || `Campo #${r.court_id}`}
+                          </h3>
+                          <p className="text-sm text-gray-600">
+                            {format(parseISO(r.starts_at), "dd/MM/yyyy", { locale: it })}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 mb-4">
+                        <div className="flex items-center text-sm">
+                          <Clock className="mr-2 h-4 w-4 text-club-orange" />
+                          <span className="font-medium">Orario:</span>
+                          <span className="ml-2">
+                            {format(parseISO(r.starts_at), "HH:mm")} - {format(parseISO(r.ends_at), "HH:mm")}
+                          </span>
+                        </div>
+                        
+                        <div className="flex items-center text-sm">
+                          <Users className="mr-2 h-4 w-4 text-club-orange" />
+                          <span className="font-medium">Prenotato da:</span>
+                          <span className="ml-2 truncate" title={r.bookedByName}>{r.bookedByName}</span>
+                        </div>
+
+                        <div className="flex items-center text-sm">
+                          <Users className="mr-2 h-4 w-4 text-club-orange" />
+                          <span className="font-medium">Prenotato per:</span>
+                          <span className="ml-2 truncate" title={r.bookedForName}>{r.bookedForName}</span>
+                        </div>
+
+                        {r.notes && (
+                          <div className="text-sm text-gray-700 pt-2 border-t">
+                            <p className="font-medium">Note:</p>
+                            <p className="text-xs mt-1 line-clamp-2">{r.notes}</p>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="pt-3 border-t">
+                        <div className="flex flex-col sm:flex-row gap-2">
                           <Button
                             variant="outline"
-                            size="icon"
+                            size="sm"
                             onClick={() => {
                               setDetailsReservationId(r.id);
                               setDetailsOpen(true);
                             }}
-                            title="Dettagli"
+                            className="flex-1"
                           >
-                            <Eye className="h-4 w-4" />
+                            <Eye className="mr-2 h-4 w-4" /> Dettagli
                           </Button>
-
-                          <Button variant="outline" onClick={() => openEdit(r)} className="hidden sm:inline-flex">
-                            Modifica
+                          
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openEdit(r)}
+                            className="flex-1"
+                          >
+                            <Edit className="mr-2 h-4 w-4" /> Modifica
                           </Button>
 
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button variant="destructive" size="icon" title="Elimina">
-                                <Trash2 className="h-4 w-4" />
+                              <Button variant="destructive" size="sm" className="flex-1">
+                                <Trash2 className="mr-2 h-4 w-4" /> Elimina
                               </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
@@ -510,25 +551,11 @@ export default function AdminReservations() {
                             </AlertDialogContent>
                           </AlertDialog>
                         </div>
-
-                        <div className="mt-2 flex justify-end sm:hidden">
-                          <Button variant="outline" size="sm" onClick={() => openEdit(r)}>
-                            Modifica
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-
-                  {filtered.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
-                        Nessuna prenotazione trovata con i filtri attuali.
-                      </TableCell>
-                    </TableRow>
-                  ) : null}
-                </TableBody>
-              </Table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </CardContent>
