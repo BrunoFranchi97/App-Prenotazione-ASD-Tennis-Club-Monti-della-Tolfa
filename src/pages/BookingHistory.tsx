@@ -365,9 +365,7 @@ const BookingHistory = () => {
                         </span>
                       )}
                     </CardTitle>
-                    <CardDescription className="text-gray-600 text-sm mt-1">
-                      Superficie: {group.courtSurface}
-                    </CardDescription>
+                    {/* Rimosso: CardDescription con Superficie */}
                   </div>
                   <Button
                     variant="ghost"
@@ -395,7 +393,9 @@ const BookingHistory = () => {
                   <div className="flex items-center text-gray-700">
                     <Clock className="mr-2 h-4 w-4 text-club-orange" />
                     <span>Orario: <span className="font-semibold">{group.startTime} - {group.endTime}</span></span>
-                    <span className="ml-2 text-sm text-gray-500">({group.totalHours.toFixed(1)} ore)</span>
+                    <span className="ml-2 text-sm text-gray-500">
+                      ({group.totalHours % 1 === 0 ? group.totalHours.toFixed(0) : group.totalHours.toFixed(1)}h)
+                    </span>
                   </div>
                   {group.notes && (
                     <div className="flex items-start text-gray-700">
