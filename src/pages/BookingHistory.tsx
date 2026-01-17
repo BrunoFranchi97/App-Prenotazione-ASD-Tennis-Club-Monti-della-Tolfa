@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, LogOut, CalendarDays, Clock, MapPin, Edit, Users, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
+import { cleanReservationNotes } from '@/utils/noteCleaner'; // Import the new utility
 import type { Court, Reservation } from '@/types/supabase';
 
 interface ReservationGroup {
@@ -123,7 +124,7 @@ const BookingHistory = () => {
           bookedForName: reservation.booked_for_first_name && reservation.booked_for_last_name 
             ? `${reservation.booked_for_first_name} ${reservation.booked_for_last_name}`
             : "Te stesso",
-          notes: reservation.notes || undefined,
+          notes: cleanReservationNotes(reservation.notes), // Use cleaned notes here
           bookingType: reservation.booking_type
         });
       } else {
