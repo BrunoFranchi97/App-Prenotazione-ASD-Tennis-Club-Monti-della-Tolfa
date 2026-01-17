@@ -19,9 +19,9 @@ serve(async (req) => {
   }
 
   try {
-    const { userEmail, userName, courtName, reservations, bookedForFirstName, bookedForLastName } = await req.json();
+    const { userEmail, userName, courtName, reservations, bookedForFirstName, bookedForLastName, matchDetails } = await req.json();
 
-    console.log("[send-booking-confirmation] Received request to send email:", { userEmail, userName, courtName, reservations, bookedForFirstName, bookedForLastName });
+    console.log("[send-booking-confirmation] Received request to send email:", { userEmail, userName, courtName, reservations, bookedForFirstName, bookedForLastName, matchDetails });
 
     // Sort reservations to get correct start and end times
     const sortedReservations = [...reservations].sort((a: any, b: any) => parseISO(a.starts_at).getTime() - parseISO(b.starts_at).getTime());
@@ -33,32 +33,54 @@ serve(async (req) => {
     const bookingEndTime = format(parseISO(lastReservation.ends_at), 'HH:mm');
 
     let emailSubject = 'Conferma Prenotazione Campo da Tennis';
-    let emailBody = `
-      <h1>Ciao ${userName},</h1>
-      <p>La tua prenotazione per il campo da tennis è stata confermata!</p>
-    `;
+    let emailBody = '';
 
-    if (bookedForFirstName && bookedForLastName) {
+    if (matchDetails) {
+      // Email per match
+      emailSubject = `Conferma Partita - ${courtName}`;
+      emailBody = `
+        <h1>Ciao ${userName},</h1>
+        <p>La tua partita è stata confermata!</p>
+        <p><strong>Dettagli partita:</strong></p>
+        <ul>
+          <li><strong>Campo:</strong> ${courtName}</li>
+          <li><strong>Data:</strong> ${bookingDate}</li>
+          <li><strong>Orario:</strong> ${bookingStartTime} - ${bookingEndTime}</li>
+          <li><strong>Avversario:</strong> ${matchDetails.opponentName}</li>
+          <li><strong>Tipo partita:</strong> ${matchDetails.matchType === 'doppio' ? 'Doppio' : 'Singolare'}</li>
+          <li><strong>Livello:</strong> ${matchDetails.skillLevel}</li>
+        </ul>
+        <p>Ricordati di contattare il tuo avversario via WhatsApp per confermare tutti i dettagli.</p>
+        <p>Buona partita!</p>
+      `;
+    } else if (bookedForFirstName && bookedForLastName) {
+      // Email per conto terzi
       emailSubject = `Conferma Prenotazione Campo per ${bookedForFirstName} ${bookedForLastName}`;
       emailBody = `
         <h1>Ciao ${userName},</h1>
         <p>Hai effettuato una prenotazione per conto di <strong>${bookedForFirstName} ${bookedForLastName}</strong>.</p>
         <p>I dettagli della prenotazione sono:</p>
+        <ul>
+          <li><strong>Campo:</strong> ${courtName}</li>
+          <li><strong>Data:</strong> ${bookingDate}</li>
+          <li><strong>Orario:</strong> ${bookingStartTime} - ${bookingEndTime}</li>
+        </ul>
+        <p>Grazie per aver prenotato con noi!</p>
       `;
     } else {
+      // Email normale
       emailBody = `
         <h1>Ciao ${userName},</h1>
         <p>La tua prenotazione per il campo da tennis è stata confermata!</p>
         <p>I dettagli della prenotazione sono:</p>
+        <ul>
+          <li><strong>Campo:</strong> ${courtName}</li>
+          <li><strong>Data:</strong> ${bookingDate}</li>
+          <li><strong>Orario:</strong> ${bookingStartTime} - ${bookingEndTime}</li>
+        </ul>
+        <p>Grazie per aver prenotato con noi!</p>
       `;
     }
-
-    emailBody += `
-      <p><strong>Campo:</strong> ${courtName}</p>
-      <p><strong>Data:</strong> ${bookingDate}</p>
-      <p><strong>Orario:</strong> ${bookingStartTime} - ${bookingEndTime}</p>
-      <p>Grazie per aver prenotato con noi!</p>
-    `;
 
     // --- Email Sending Logic using Resend ---
     const { data: resendData, error: resendError } = await resend.emails.send({

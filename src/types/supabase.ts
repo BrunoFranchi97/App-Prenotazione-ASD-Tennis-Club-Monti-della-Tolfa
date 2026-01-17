@@ -19,6 +19,7 @@ export interface Reservation {
   created_at: string;
   booked_for_first_name?: string | null;
   booked_for_last_name?: string | null;
+  updated_at?: string; // Aggiunto campo updated_at
 }
 
 export type SkillLevel = 'principiante' | 'intermedio' | 'avanzato' | 'agonista';
@@ -65,4 +66,20 @@ export interface Profile {
   approved_at?: string | null;
   skill_level: SkillLevel;
   created_at: string;
+}
+
+// Tipi utili per le utility
+export interface ReservationGroup {
+  id: string;
+  courtId: number;
+  courtName: string;
+  date: Date;
+  reservations: Reservation[];
+  startTime: string;
+  endTime: string;
+  totalHours: number;
+  status: string;
+  bookedForName: string;
+  notes?: string;
+  bookingType?: BookingType;
 }
