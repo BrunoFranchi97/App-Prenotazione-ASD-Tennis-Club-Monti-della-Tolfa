@@ -4,10 +4,10 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-import { ArrowLeft, LogOut, CalendarDays, Clock, MapPin, Info, Trash2, User } from 'lucide-react';
+import { ArrowLeft, LogOut, CalendarDays, Clock, MapPin, Info, Trash2, User, Edit, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
-import { format, parseISO, isBefore, addHours } from 'date-fns';
+import { format, parseISO, isBefore, addHours, isSameDay, differenceInMinutes } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { Reservation } from '@/types/supabase';
 import {
@@ -22,7 +22,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-
 // Estendi l'interfaccia Reservation per includere i dettagli del campo
 interface DetailedReservation extends Reservation {
   courts: {
@@ -31,12 +30,30 @@ interface DetailedReservation extends Reservation {
   } | null;
 }
 
+// Interfaccia per gruppi di prenotazioni consecutive
+interface ReservationGroup {
+  id: string; // ID unico per il gruppo (basato sulla prima prenotazione)
+  courtId: number;
+  courtName: string;
+  courtSurface: string;
+  date: Date;
+  reservations: DetailedReservation[];
+  startTime: string;
+  endTime: string;
+  totalHours: number;
+  status: string;
+  bookedForName: string;
+  notes?: string;
+  isExpanded: boolean;
+}
+
 const BookingHistory = () => {
   const navigate = useNavigate();
   const [reservations, setReservations] = useState<DetailedReservation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isCancelling, setIsCancelling] = useState<string | null>(null); // Stores the ID of the reservation being cancelled
+  const [isCancelling, setIsCancelling] = useState<string | null>(null); // ID del gruppo in cancellazione
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set()); // Gruppi espansi
 
   const handleLogout = async () => {
     try {
@@ -73,7 +90,7 @@ const BookingHistory = () => {
           )
         `)
         .eq('user_id', user.id)
-        .order('starts_at', { ascending: false }); // Ordina dalla più recente alla meno recente
+        .order('starts_at', { ascending: false });
 
       if (error) {
         throw new Error(error.message);
@@ -93,18 +110,133 @@ const BookingHistory = () => {
     fetchUserReservations();
   }, [navigate]);
 
-  const handleCancelReservation = async (reservationId: string) => {
-    setIsCancelling(reservationId);
+  // Funzione per raggruppare le prenotazioni consecutive dello stesso giorno
+  const groupConsecutiveReservations = (reservationsList: DetailedReservation[]): ReservationGroup[] => {
+    const groups: ReservationGroup[] = [];
+    
+    if (reservationsList.length === 0) {
+      return groups;
+    }
+
+    // Ordina per data e ora
+    const sortedReservations = [...reservationsList].sort((a, b) => {
+      return parseISO(a.starts_at).getTime() - parseISO(b.starts_at).getTime();
+    });
+
+    let currentGroup: ReservationGroup | null = null;
+
+    for (const reservation of sortedReservations) {
+      const startTime = parseISO(reservation.starts_at);
+      const endTime = parseISO(reservation.ends_at);
+      const reservationDate = new Date(startTime.getFullYear(), startTime.getMonth(), startTime.getDate());
+      const courtName = reservation.courts?.name || `Campo #${reservation.court_id}`;
+      const courtSurface = reservation.courts?.surface || 'N/D';
+      
+      const bookedForName = reservation.booked_for_first_name && reservation.booked_for_last_name
+        ? `${reservation.booked_for_first_name} ${reservation.booked_for_last_name}`
+        : "Te stesso";
+
+      if (!currentGroup) {
+        // Crea un nuovo gruppo
+        currentGroup = {
+          id: reservation.id,
+          courtId: reservation.court_id,
+          courtName,
+          courtSurface,
+          date: reservationDate,
+          reservations: [reservation],
+          startTime: format(startTime, 'HH:mm'),
+          endTime: format(endTime, 'HH:mm'),
+          totalHours: differenceInMinutes(endTime, startTime) / 60,
+          status: reservation.status,
+          bookedForName,
+          notes: reservation.notes || undefined,
+          isExpanded: expandedGroups.has(reservation.id),
+        };
+      } else {
+        const currentGroupEndTime = parseISO(currentGroup.reservations[currentGroup.reservations.length - 1].ends_at);
+        
+        // Controlla se la prenotazione è consecutiva allo stesso campo e giorno
+        const isSameCourt = reservation.court_id === currentGroup.courtId;
+        const isSameDate = isSameDay(startTime, currentGroup.date);
+        const isConsecutive = differenceInMinutes(startTime, currentGroupEndTime) === 0;
+        
+        if (isSameCourt && isSameDate && isConsecutive) {
+          // Aggiungi al gruppo esistente
+          currentGroup.reservations.push(reservation);
+          currentGroup.endTime = format(endTime, 'HH:mm');
+          currentGroup.totalHours += differenceInMinutes(endTime, startTime) / 60;
+          
+          // Se le note sono diverse, combinale
+          if (reservation.notes && reservation.notes !== currentGroup.notes) {
+            currentGroup.notes = currentGroup.notes 
+              ? `${currentGroup.notes}; ${reservation.notes}`
+              : reservation.notes;
+          }
+          
+          // Aggiorna lo stato se cambia
+          if (reservation.status !== currentGroup.status) {
+            currentGroup.status = 'mixed';
+          }
+        } else {
+          // Chiudi il gruppo corrente e creane uno nuovo
+          groups.push(currentGroup);
+          
+          currentGroup = {
+            id: reservation.id,
+            courtId: reservation.court_id,
+            courtName,
+            courtSurface,
+            date: reservationDate,
+            reservations: [reservation],
+            startTime: format(startTime, 'HH:mm'),
+            endTime: format(endTime, 'HH:mm'),
+            totalHours: differenceInMinutes(endTime, startTime) / 60,
+            status: reservation.status,
+            bookedForName,
+            notes: reservation.notes || undefined,
+            isExpanded: expandedGroups.has(reservation.id),
+          };
+        }
+      }
+    }
+
+    // Aggiungi l'ultimo gruppo
+    if (currentGroup) {
+      groups.push(currentGroup);
+    }
+
+    // Ordina i gruppi dalla più recente alla più vecchia
+    return groups.sort((a, b) => b.date.getTime() - a.date.getTime());
+  };
+
+  const groupedReservations = groupConsecutiveReservations(reservations);
+
+  const toggleGroupExpansion = (groupId: string) => {
+    const newExpandedGroups = new Set(expandedGroups);
+    if (newExpandedGroups.has(groupId)) {
+      newExpandedGroups.delete(groupId);
+    } else {
+      newExpandedGroups.add(groupId);
+    }
+    setExpandedGroups(newExpandedGroups);
+  };
+
+  const handleCancelGroup = async (group: ReservationGroup) => {
+    setIsCancelling(group.id);
     try {
+      // Elimina tutte le prenotazioni nel gruppo
+      const reservationIds = group.reservations.map(r => r.id);
+      
       const { error } = await supabase
         .from('reservations')
         .delete()
-        .eq('id', reservationId);
+        .in('id', reservationIds);
 
       if (error) {
         showError("Errore durante l'annullamento della prenotazione: " + error.message);
       } else {
-        showSuccess("Prenotazione annullata con successo!");
+        showSuccess(`Prenotazione${group.reservations.length > 1 ? 'i' : ''} annullata${group.reservations.length > 1 ? 'e' : ''} con successo!`);
         fetchUserReservations(); // Refresh the list
       }
     } catch (err: any) {
@@ -114,10 +246,44 @@ const BookingHistory = () => {
     }
   };
 
-  const isCancellable = (startsAt: string): boolean => {
-    const reservationStartTime = parseISO(startsAt);
-    const oneHourFromNow = addHours(new Date(), 1);
-    return isBefore(oneHourFromNow, reservationStartTime);
+  const handleEditGroup = (group: ReservationGroup) => {
+    // Per ora reindirizziamo alla pagina di prenotazione standard
+    // In futuro potremmo creare una pagina di modifica specifica
+    showInfo("Funzionalità di modifica in sviluppo. Al momento, puoi annullare e ri-prenotare.");
+  };
+
+  const isCancellable = (group: ReservationGroup): boolean => {
+    // Controlla se almeno una prenotazione nel gruppo è cancellabile
+    return group.reservations.some(reservation => {
+      const reservationStartTime = parseISO(reservation.starts_at);
+      const oneHourFromNow = addHours(new Date(), 1);
+      return isBefore(oneHourFromNow, reservationStartTime);
+    });
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'confirmed': return 'Confermata';
+      case 'pending': return 'In Attesa';
+      case 'cancelled': return 'Annullata';
+      case 'mixed': return 'Parziale';
+      default: return status;
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'confirmed': return 'bg-green-100 text-green-800';
+      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'cancelled': return 'bg-red-100 text-red-800';
+      case 'mixed': return 'bg-blue-100 text-blue-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const showInfo = (message: string) => {
+    // Potremmo usare un toast o un alert
+    alert(message);
   };
 
   if (loading) {
@@ -168,7 +334,7 @@ const BookingHistory = () => {
       </header>
 
       <div className="space-y-6">
-        {reservations.length === 0 ? (
+        {groupedReservations.length === 0 ? (
           <Card className="shadow-lg rounded-lg text-center p-8">
             <Info className="mx-auto h-12 w-12 text-gray-500 mb-4" />
             <CardTitle className="text-2xl font-bold text-gray-700">Nessuna prenotazione trovata</CardTitle>
@@ -182,61 +348,105 @@ const BookingHistory = () => {
             </Link>
           </Card>
         ) : (
-          reservations.map((res) => (
-            <Card key={res.id} className="shadow-lg rounded-lg p-6">
-              <CardHeader className="p-0 mb-4">
-                <CardTitle className="text-xl font-bold text-primary flex items-center">
-                  <MapPin className="mr-2 h-5 w-5 text-club-orange" />
-                  {res.courts?.name || 'Campo Sconosciuto'}
-                  <span className={`ml-auto px-3 py-1 rounded-full text-sm font-semibold ${
-                    res.status === 'confirmed' ? 'bg-green-100 text-green-800' :
-                    res.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-red-100 text-red-800'
-                  }`}>
-                    {res.status === 'confirmed' ? 'Confermata' :
-                     res.status === 'pending' ? 'In Attesa' :
-                     'Annullata'}
-                  </span>
-                </CardTitle>
-                <CardDescription className="text-gray-600 text-sm mt-1">
-                  Superficie: {res.courts?.surface || 'N/D'}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-0 space-y-2">
-                {res.booked_for_first_name && res.booked_for_last_name ? (
+          groupedReservations.map((group) => (
+            <Card key={group.id} className="shadow-lg rounded-lg overflow-hidden">
+              <div className="p-6">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex-1">
+                    <CardTitle className="text-xl font-bold text-primary flex items-center">
+                      <MapPin className="mr-2 h-5 w-5 text-club-orange" />
+                      {group.courtName}
+                      <span className={`ml-3 px-3 py-1 rounded-full text-sm font-semibold ${getStatusColor(group.status)}`}>
+                        {getStatusLabel(group.status)}
+                      </span>
+                      {group.reservations.length > 1 && (
+                        <span className="ml-2 px-2 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">
+                          {group.reservations.length} slot
+                        </span>
+                      )}
+                    </CardTitle>
+                    <CardDescription className="text-gray-600 text-sm mt-1">
+                      Superficie: {group.courtSurface}
+                    </CardDescription>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => toggleGroupExpansion(group.id)}
+                    className="ml-2"
+                  >
+                    {expandedGroups.has(group.id) ? (
+                      <ChevronUp className="h-4 w-4" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+
+                <div className="space-y-2">
                   <div className="flex items-center text-gray-700">
                     <User className="mr-2 h-4 w-4 text-club-orange" />
-                    <span>Prenotato per: <span className="font-semibold">{res.booked_for_first_name} {res.booked_for_last_name}</span></span>
+                    <span>Prenotato per: <span className="font-semibold">{group.bookedForName}</span></span>
                   </div>
-                ) : (
                   <div className="flex items-center text-gray-700">
-                    <User className="mr-2 h-4 w-4 text-club-orange" />
-                    <span>Prenotato da: <span className="font-semibold">Te stesso</span></span>
+                    <CalendarDays className="mr-2 h-4 w-4 text-club-orange" />
+                    <span>Data: <span className="font-semibold capitalize">{format(group.date, 'EEEE, dd MMMM yyyy', { locale: it })}</span></span>
+                  </div>
+                  <div className="flex items-center text-gray-700">
+                    <Clock className="mr-2 h-4 w-4 text-club-orange" />
+                    <span>Orario: <span className="font-semibold">{group.startTime} - {group.endTime}</span></span>
+                    <span className="ml-2 text-sm text-gray-500">({group.totalHours.toFixed(1)} ore)</span>
+                  </div>
+                  {group.notes && (
+                    <div className="flex items-start text-gray-700">
+                      <Info className="mr-2 h-4 w-4 text-club-orange mt-1" />
+                      <span>Note: <span className="font-medium">{group.notes}</span></span>
+                    </div>
+                  )}
+                </div>
+
+                {expandedGroups.has(group.id) && group.reservations.length > 1 && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <h4 className="font-medium text-gray-700 mb-2">Slot dettagliati:</h4>
+                    <div className="space-y-2">
+                      {group.reservations.map((reservation, index) => (
+                        <div key={reservation.id} className="flex items-center justify-between text-sm bg-gray-50 p-2 rounded">
+                          <div>
+                            <span className="font-medium">Slot {index + 1}:</span>
+                            <span className="ml-2">
+                              {format(parseISO(reservation.starts_at), 'HH:mm')} - {format(parseISO(reservation.ends_at), 'HH:mm')}
+                            </span>
+                            {reservation.notes && reservation.notes !== group.notes && (
+                              <span className="ml-2 text-gray-500 italic">({reservation.notes})</span>
+                            )}
+                          </div>
+                          <span className={`px-2 py-1 rounded text-xs ${getStatusColor(reservation.status)}`}>
+                            {getStatusLabel(reservation.status)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
-                <div className="flex items-center text-gray-700">
-                  <CalendarDays className="mr-2 h-4 w-4 text-club-orange" />
-                  <span>Data: <span className="font-semibold capitalize">{format(parseISO(res.starts_at), 'EEEE, dd MMMM yyyy', { locale: it })}</span></span>
-                </div>
-                <div className="flex items-center text-gray-700">
-                  <Clock className="mr-2 h-4 w-4 text-club-orange" />
-                  <span>Orario: <span className="font-semibold">{format(parseISO(res.starts_at), 'HH:mm')} - {format(parseISO(res.ends_at), 'HH:mm')}</span></span>
-                </div>
-                {res.notes && (
-                  <div className="flex items-start text-gray-700">
-                    <Info className="mr-2 h-4 w-4 text-club-orange mt-1" />
-                    <span>Note: <span className="font-medium">{res.notes}</span></span>
-                  </div>
-                )}
-                <div className="pt-4">
+
+                <div className="pt-6 flex flex-col sm:flex-row gap-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => handleEditGroup(group)}
+                    disabled={!isCancellable(group)}
+                  >
+                    <Edit className="mr-2 h-4 w-4" /> Modifica
+                  </Button>
+
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button
                         variant="destructive"
-                        className="w-full"
-                        disabled={!isCancellable(res.starts_at) || isCancelling === res.id}
+                        className="flex-1"
+                        disabled={!isCancellable(group) || isCancelling === group.id}
                       >
-                        {isCancelling === res.id ? "Annullamento..." : "Annulla Prenotazione"}
+                        {isCancelling === group.id ? "Annullamento..." : "Annulla Prenotazione"}
                         <Trash2 className="ml-2 h-4 w-4" />
                       </Button>
                     </AlertDialogTrigger>
@@ -244,28 +454,29 @@ const BookingHistory = () => {
                       <AlertDialogHeader>
                         <AlertDialogTitle>Sei assolutamente sicuro?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          Questa azione non può essere annullata. Verrà eliminata la tua prenotazione per il campo{" "}
-                          <span className="font-semibold">{res.courts?.name || 'sconosciuto'}</span> il{" "}
-                          <span className="font-semibold capitalize">{format(parseISO(res.starts_at), 'EEEE, dd MMMM yyyy', { locale: it })}</span> dalle{" "}
-                          <span className="font-semibold">{format(parseISO(res.starts_at), 'HH:mm')}</span> alle{" "}
-                          <span className="font-semibold">{format(parseISO(res.ends_at), 'HH:mm')}</span>.
+                          Questa azione non può essere annullata. Verranno eliminate {group.reservations.length > 1 ? 'le tue prenotazioni' : 'la tua prenotazione'} per il campo{" "}
+                          <span className="font-semibold">{group.courtName}</span> il{" "}
+                          <span className="font-semibold capitalize">{format(group.date, 'EEEE, dd MMMM yyyy', { locale: it })}</span> dalle{" "}
+                          <span className="font-semibold">{group.startTime}</span> alle{" "}
+                          <span className="font-semibold">{group.endTime}</span>.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
                         <AlertDialogCancel>Annulla</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => handleCancelReservation(res.id)}>
+                        <AlertDialogAction onClick={() => handleCancelGroup(group)}>
                           Conferma Annullamento
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
-                  {!isCancellable(res.starts_at) && (
-                    <p className="text-sm text-red-500 mt-2">
-                      Non è possibile annullare prenotazioni che iniziano entro 1 ora.
-                    </p>
-                  )}
                 </div>
-              </CardContent>
+                
+                {!isCancellable(group) && (
+                  <p className="text-sm text-red-500 mt-2">
+                    Non è possibile modificare o annullare prenotazioni che iniziano entro 1 ora.
+                  </p>
+                )}
+              </div>
             </Card>
           ))
         )}
