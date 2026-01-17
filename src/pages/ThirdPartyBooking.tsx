@@ -237,7 +237,25 @@ const ThirdPartyBooking = () => {
       }
 
       const courtIdNum = parseInt(selectedCourtId);
-      const reservationsToInsert = selectedSlots.sort().map((slotTime, index) => {
+      const sortedSlots = selectedSlots.sort();
+      
+      // Calcola l'orario di inizio del primo slot e di fine dell'ultimo slot
+      const firstSlotTime = sortedSlots[0];
+      const lastSlotTime = sortedSlots[sortedSlots.length - 1];
+      
+      let firstSlotStart = setMinutes(setHours(date, parseInt(firstSlotTime.split(':')[0])), parseInt(firstSlotTime.split(':')[1]));
+      firstSlotStart = setSeconds(firstSlotStart, 0);
+      firstSlotStart = setMilliseconds(firstSlotStart, 0);
+      
+      let lastSlotEnd = setMinutes(setHours(date, parseInt(lastSlotTime.split(':')[0])), parseInt(lastSlotTime.split(':')[1]));
+      lastSlotEnd = setSeconds(lastSlotEnd, 0);
+      lastSlotEnd = setMilliseconds(lastSlotEnd, 0);
+      lastSlotEnd = addHours(lastSlotEnd, 1);
+      
+      // Crea una nota unica per tutte le prenotazioni consecutive
+      const uniqueNote = `Prenotazione per ${bookedForFirstName} ${bookedForLastName} (effettuata da ${bookerFullName || 'Socio Sconosciuto'}) dalle ${format(firstSlotStart, 'HH:mm')} alle ${format(lastSlotEnd, 'HH:mm')}`;
+      
+      const reservationsToInsert = sortedSlots.map((slotTime, index) => {
         let slotStart = setMinutes(setHours(date, parseInt(slotTime.split(':')[0])), parseInt(slotTime.split(':')[1]));
         slotStart = setSeconds(slotStart, 0);
         slotStart = setMilliseconds(slotStart, 0);
@@ -249,7 +267,7 @@ const ThirdPartyBooking = () => {
           starts_at: slotStart.toISOString(),
           ends_at: slotEnd.toISOString(),
           status: 'confirmed',
-          notes: `Prenotazione per ${bookedForFirstName} ${bookedForLastName} (effettuata da ${bookerFullName || 'Socio Sconosciuto'}) dalle ${format(slotStart, 'HH:mm')} alle ${format(slotEnd, 'HH:mm')}`,
+          notes: uniqueNote, // Usa la nota unica per tutte le prenotazioni
           booked_for_first_name: bookedForFirstName,
           booked_for_last_name: bookedForLastName,
         };
