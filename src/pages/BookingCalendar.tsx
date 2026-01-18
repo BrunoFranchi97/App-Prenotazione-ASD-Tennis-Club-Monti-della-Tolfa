@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, LogOut } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
-import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, isEqual, setSeconds, setMilliseconds } from 'date-fns';
+import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, isEqual, setSeconds, setMilliseconds, addDays } from 'date-fns';
 import { it } from 'date-fns/locale'; // Import Italian locale
 import { useApprovalCheck } from '@/hooks/use-approval-check'; // Import the new hook
 
@@ -40,6 +40,9 @@ const BookingCalendar = () => {
   const selectedCourt = useMemo(() => {
     return courts.find(court => court.id.toString() === selectedCourtId);
   }, [courts, selectedCourtId]);
+
+  // Calcola la data massima prenotabile (2 settimane da oggi)
+  const maxDate = useMemo(() => addDays(new Date(), 14), []);
 
   const handleLogout = async () => {
     try {
@@ -397,7 +400,7 @@ const BookingCalendar = () => {
               initialFocus
               locale={it}
               className="rounded-xl border-0 shadow-sm bg-white p-4 w-full max-w-md"
-              disabled={(date) => isBefore(date, new Date())}
+              disabled={(date) => isBefore(date, new Date()) || isAfter(date, maxDate)}
             />
           </CardContent>
         </Card>

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { format, setHours, setMinutes, setSeconds, setMilliseconds, addHours } from "date-fns";
+import { format, setHours, setMinutes, setSeconds, setMilliseconds, addHours, addDays, isBefore, isAfter } from "date-fns";
 import { it } from "date-fns/locale";
 
 import { Button } from "@/components/ui/button";
@@ -76,6 +76,9 @@ export default function ReservationFormDialog(props: {
       .sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""));
   }, [profiles]);
 
+  // Calcola la data massima prenotabile (2 settimane da oggi)
+  const maxDate = useMemo(() => addDays(new Date(), 14), []);
+
   useEffect(() => {
     if (!open) return;
 
@@ -141,6 +144,8 @@ export default function ReservationFormDialog(props: {
           <DialogTitle>{mode === "create" ? "Crea Prenotazione" : "Modifica Prenotazione"}</DialogTitle>
           <DialogDescription>
             Seleziona socio, campo e fascia oraria. La durata è in ore (max 3) e gli orari sono “sull’ora”.
+            <br />
+            <span className="text-amber-600 font-medium">Nota: è possibile prenotare solo fino a 2 settimane dalla data odierna.</span>
           </DialogDescription>
         </DialogHeader>
 
@@ -182,7 +187,14 @@ export default function ReservationFormDialog(props: {
             <div className="grid gap-2">
               <Label>Data</Label>
               <div className="rounded-md border bg-white">
-                <Calendar mode="single" selected={date} onSelect={setDate} locale={it} initialFocus />
+                <Calendar 
+                  mode="single" 
+                  selected={date} 
+                  onSelect={setDate} 
+                  locale={it} 
+                  initialFocus
+                  disabled={(date) => isBefore(date, new Date()) || isAfter(date, maxDate)}
+                />
               </div>
             </div>
 
