@@ -5,7 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { CalendarDays, History, LogOut, Users, Settings, Search, FileText, AlertTriangle } from 'lucide-react';
+import { CalendarDays, History, LogOut, Users, Settings, Search, FileText, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import Footer from '@/components/Footer';
@@ -69,12 +69,12 @@ const MemberDashboard = () => {
     { path: "/medical-certificates", title: "Certificato Medico", icon: FileText, description: "Gestisci il tuo certificato medico e le scadenze." },
   ];
 
-  const renderCard = (item: typeof bookingRoutes[0] | typeof nonBookingRoutes[0], disabled: boolean) => {
+  const renderCard = (item: any, disabled: boolean, specialVariant: boolean = false) => {
     const Icon = item.icon;
     return (
-      <Card key={item.path} className={`shadow-lg rounded-lg ${disabled ? 'opacity-60' : ''}`}>
+      <Card key={item.path} className={`shadow-lg rounded-lg ${disabled ? 'opacity-60' : ''} ${specialVariant ? 'border-2 border-club-orange/20' : ''}`}>
         <CardHeader>
-          <CardTitle className="text-primary flex items-center">
+          <CardTitle className={`${specialVariant ? 'text-club-orange' : 'text-primary'} flex items-center`}>
             <Icon className="mr-2 h-5 w-5" /> {item.title}
           </CardTitle>
         </CardHeader>
@@ -82,11 +82,11 @@ const MemberDashboard = () => {
           <p className="text-gray-700 mb-4">{item.description}</p>
           <Link to={item.path} onClick={(e) => disabled && e.preventDefault()}>
             <Button 
-              className={`w-full ${item.path === '/book' ? 'bg-primary hover:bg-primary/90 text-primary-foreground' : 'text-primary border-primary hover:bg-secondary hover:text-primary'}`}
+              className={`w-full ${item.path === '/book' ? 'bg-primary hover:bg-primary/90 text-primary-foreground' : specialVariant ? 'bg-club-orange hover:bg-club-orange/90 text-white' : 'text-primary border-primary hover:bg-secondary hover:text-primary'}`}
               disabled={disabled}
-              variant={item.path === '/book' ? 'default' : 'outline'}
+              variant={item.path === '/book' || specialVariant ? 'default' : 'outline'}
             >
-              {item.path === '/book' ? 'Vai al Calendario' : item.title.includes('Storico') ? 'Vedi Storico' : item.title.includes('Prenota') ? 'Prenota per Terzi' : item.title.includes('Certificato') ? 'Gestisci Documenti' : 'Cerca Partita'}
+              {item.path === '/admin' ? 'Accedi al Pannello' : item.path === '/book' ? 'Vai al Calendario' : 'Visualizza'}
             </Button>
           </Link>
         </CardContent>
@@ -114,6 +114,13 @@ const MemberDashboard = () => {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {isAdmin && renderCard({ 
+            path: "/admin", 
+            title: "Pannello Admin", 
+            icon: ShieldCheck, 
+            description: "Gestisci prenotazioni, soci, campi e visualizza le statistiche del club." 
+          }, false, true)}
+          
           {bookingRoutes.map(item => renderCard(item, !isApproved))}
           {nonBookingRoutes.map(item => renderCard(item, false))}
         </div>
