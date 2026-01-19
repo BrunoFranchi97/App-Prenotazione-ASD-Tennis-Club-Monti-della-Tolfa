@@ -3,15 +3,16 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowLeft, LogOut, User, Camera, Save, Lock, Smartphone, CreditCard, Loader2 } from 'lucide-react';
+import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, User, Camera, Save, Lock, Smartphone, CreditCard, Loader2, Target } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
-import type { Profile, SkillLevel } from '@/types/supabase';
+import type { SkillLevel } from '@/types/supabase';
 
 const MyProfile = () => {
   const navigate = useNavigate();
@@ -73,7 +74,6 @@ const MyProfile = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate size (2MB)
     if (file.size > 2 * 1024 * 1024) {
       showError("Immagine troppo grande. Massimo 2MB.");
       return;
@@ -87,7 +87,6 @@ const MyProfile = () => {
       const fileExt = file.name.split('.').pop();
       const filePath = `${user.id}/avatar.${fileExt}`;
 
-      // Upload to public storage (must be configured in Supabase)
       const { error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(filePath, file, { upsert: true });
@@ -98,7 +97,6 @@ const MyProfile = () => {
         .from('avatars')
         .getPublicUrl(filePath);
 
-      // Update profile
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ avatar_url: publicUrl })
@@ -187,7 +185,6 @@ const MyProfile = () => {
       </header>
 
       <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
-        {/* Left Column: Avatar & Summary */}
         <div className="space-y-6">
           <Card className="shadow-lg text-center p-6">
             <div className="relative inline-block mx-auto mb-4 group">
@@ -242,7 +239,6 @@ const MyProfile = () => {
           </Card>
         </div>
 
-        {/* Right Column: Forms */}
         <div className="md:col-span-2 space-y-6">
           <Card className="shadow-lg">
             <CardHeader>
@@ -306,7 +302,7 @@ const MyProfile = () => {
 
                 <Button type="submit" disabled={saving} className="w-full bg-primary hover:bg-primary/90">
                   {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                  Salva Modifiche Profilo
+                  <span className="ml-2">Salva Modifiche Profilo</span>
                 </Button>
               </form>
             </CardContent>
