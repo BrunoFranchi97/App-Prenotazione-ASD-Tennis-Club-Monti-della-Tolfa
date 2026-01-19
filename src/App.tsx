@@ -24,7 +24,8 @@ import MedicalCertificates from "./pages/MedicalCertificates";
 import AdminApprovals from "./pages/AdminApprovals";
 import EmailVerificationHandler from "./components/EmailVerificationHandler";
 import EditBookingGroup from "./pages/EditBookingGroup";
-import MatchBooking from "./pages/MatchBooking"; // Nuovo import
+import MatchBooking from "./pages/MatchBooking";
+import MyProfile from "./pages/MyProfile"; // Nuovo import
 
 const queryClient = new QueryClient();
 
@@ -41,6 +42,7 @@ const App = () => (
             <Route path="/register" element={<Register />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/dashboard" element={<MemberDashboard />} />
+            <Route path="/profile" element={<MyProfile />} /> {/* Nuova route */}
             <Route path="/book" element={<BookingCalendar />} />
             <Route path="/booking-confirmation" element={<BookingConfirmation />} />
             <Route path="/history" element={<BookingHistory />} />
@@ -53,10 +55,9 @@ const App = () => (
             <Route path="/admin/usage-stats" element={<AdminUsageStats />} />
             <Route path="/admin/approvals" element={<AdminApprovals />} />
             <Route path="/find-match" element={<FindMatch />} />
-            <Route path="/match-booking" element={<MatchBooking />} /> {/* Nuova route */}
+            <Route path="/match-booking" element={<MatchBooking />} />
             <Route path="/medical-certificates" element={<MedicalCertificates />} />
             <Route path="/auth/verify" element={<EmailVerificationHandler />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthLayout>

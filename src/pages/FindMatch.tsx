@@ -16,6 +16,7 @@ import { showSuccess, showError } from '@/utils/toast';
 import { format, parseISO, isAfter, startOfDay } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { useApprovalCheck } from '@/hooks/use-approval-check';
+import UserNav from '@/components/UserNav';
 
 // Import types
 import type { MatchRequest, SkillLevel, MatchType } from '@/types/supabase';
@@ -41,7 +42,7 @@ const FindMatch = () => {
   const [allMatchRequests, setAllMatchRequests] = useState<MatchRequest[]>([]);
   const [myRequests, setMyRequests] = useState<MatchRequest[]>([]);
   const [othersRequests, setOthersRequests] = useState<MatchRequest[]>([]);
-  const [profiles, setProfiles] = useState<{ [key: string]: string }>({}); // Map user_id to full_name
+  const [profiles, setProfiles] = useState<{ [key: string]: string }>({}); 
   
   // Form state
   const [requestedDate, setRequestedDate] = useState('');
@@ -56,20 +57,6 @@ const FindMatch = () => {
     "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00"
   ];
 
-  const handleLogout = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        showError(error.message);
-      } else {
-        showSuccess("Disconnessione effettuata con successo!");
-        navigate('/login');
-      }
-    } catch (error: any) {
-      showError(error.message || "Errore durante la disconnessione.");
-    }
-  };
-
   const fetchData = async () => {
     if (!isApproved) return;
 
@@ -79,6 +66,17 @@ const FindMatch = () => {
       if (!user) {
         navigate('/login');
         return;
+      }
+
+      // Prendi il livello skill del profilo per impostarlo come default nel form
+      const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('skill_level')
+        .eq('id', user.id)
+        .single();
+      
+      if (userProfile?.skill_level) {
+        setSkillLevel(userProfile.skill_level);
       }
 
       // Fetch all match requests (open and matched)
@@ -92,10 +90,8 @@ const FindMatch = () => {
       const requests = (requestsData || []) as MatchRequest[];
       setAllMatchRequests(requests);
 
-      // Separate my requests (showing open and matched, excluding cancelled)
       const my = requests.filter(req => req.user_id === user.id && req.status !== 'cancelled');
       
-      // Separate others' requests (strictly showing only OPEN requests in the future)
       const others = requests.filter(req => 
         req.user_id !== user.id && 
         req.status === 'open' && 
@@ -105,7 +101,6 @@ const FindMatch = () => {
       setMyRequests(my);
       setOthersRequests(others);
 
-      // Fetch profiles for user names
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
         .select('id, full_name');
@@ -169,16 +164,8 @@ const FindMatch = () => {
       if (error) throw error;
 
       showSuccess("Richiesta di partita pubblicata con successo!");
-      
-      // Reset form
       setRequestedDate('');
-      setPreferredTimeStart('08:00');
-      setPreferredTimeEnd('20:00');
-      setSkillLevel('intermedio');
-      setMatchType('singolare');
       setNotes('');
-      
-      // Refresh data
       await fetchData();
 
     } catch (err: any) {
@@ -188,7 +175,6 @@ const FindMatch = () => {
     }
   };
 
-  // Funzione modificata per eliminare fisicamente la richiesta
   const handleCancelRequest = async (requestId: string) => {
     try {
       const { error } = await supabase
@@ -197,17 +183,14 @@ const FindMatch = () => {
         .eq('id', requestId);
 
       if (error) throw error;
-
       showSuccess("Richiesta eliminata con successo!");
       await fetchData();
-
     } catch (err: any) {
       showError("Errore durante l'eliminazione: " + err.message);
     }
   };
 
   const handleAcceptRequest = (request: MatchRequest) => {
-    // Navigate to booking form with match request details
     navigate('/match-booking', { 
       state: { 
         matchRequest: request,
@@ -251,7 +234,7 @@ const FindMatch = () => {
       <header className="flex justify-between items-center mb-8">
         <div className="flex items-center">
           <Link to="/dashboard" className="mr-4">
-            <Button variant="outline" size="icon" className="text-primary border-primary hover:bg-secondary">
+            <Button variant="outline" size="icon" className="text-primary border-primary">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
@@ -259,12 +242,9 @@ const FindMatch = () => {
             <Users className="mr-2 h-7 w-7" /> Cerco Partita
           </h1>
         </div>
-        <Button variant="outline" className="text-primary border-primary hover:bg-secondary" onClick={handleLogout}>
-          <LogOut className="mr-2 h-4 w-4" /> Esci
-        </Button>
+        <UserNav />
       </header>
 
-      {/* Tab Navigation */}
       <div className="mb-8">
         <Tabs defaultValue="publish" className="w-full">
           <TabsList className="grid w-full grid-cols-3 mb-6">
@@ -281,22 +261,16 @@ const FindMatch = () => {
             </TabsTrigger>
             <TabsTrigger value="my" className="flex items-center gap-2">
               <Target className="h-4 w-4" /> Le mie Richieste
-              {myRequests.filter(r => r.status === 'open').length > 0 && (
-                <Badge variant="secondary" className="ml-1 text-xs">
-                  {myRequests.filter(r => r.status === 'open').length}
-                </Badge>
-              )}
             </TabsTrigger>
           </TabsList>
 
-          {/* Tab Content: Pubblica Richiesta */}
           <TabsContent value="publish" className="space-y-6">
             <Card className="shadow-lg rounded-lg">
               <CardHeader>
                 <CardTitle className="text-primary flex items-center">
                   <UserPlus className="mr-2 h-5 w-5" /> Pubblica una Nuova Richiesta
                 </CardTitle>
-                <CardDescription>Indica la tua disponibilità per trovare un compagno di gioco</CardDescription>
+                <CardDescription>Indica la tua disponibilità. Il tuo livello è preimpostato dal profilo.</CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmitRequest} className="space-y-4">
@@ -349,7 +323,7 @@ const FindMatch = () => {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <Label>Livello skill <span className="text-red-500">*</span></Label>
+                      <Label>Livello skill (prelevato dal profilo)</Label>
                       <Select value={skillLevel} onValueChange={(v) => setSkillLevel(v as SkillLevel)}>
                         <SelectTrigger className="mt-1">
                           <SelectValue />
@@ -383,7 +357,7 @@ const FindMatch = () => {
                       className="mt-1"
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
-                      placeholder="Es. Preferisco giocare al campo centrale, disponibile solo al mattino..."
+                      placeholder="Es. Preferisco giocare al campo centrale..."
                       rows={3}
                     />
                   </div>
@@ -391,7 +365,7 @@ const FindMatch = () => {
                   <Button
                     type="submit"
                     className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-                    disabled={submitting || !requestedDate || !preferredTimeStart || !preferredTimeEnd}
+                    disabled={submitting || !requestedDate}
                   >
                     {submitting ? "Pubblicazione in corso..." : "Pubblica Richiesta"}
                   </Button>
@@ -400,53 +374,40 @@ const FindMatch = () => {
             </Card>
           </TabsContent>
 
-          {/* Tab Content: Richieste di Altri */}
           <TabsContent value="others" className="space-y-6">
             <Card className="shadow-lg rounded-lg">
               <CardHeader>
                 <div className="flex justify-between items-center">
                   <div>
                     <CardTitle className="text-primary flex items-center">
-                      <Users className="mr-2 h-5 w-5" /> Richieste di Partita Disponibili
+                      <Users className="mr-2 h-5 w-5" /> Richieste Disponibili
                     </CardTitle>
-                    <CardDescription>
-                      {loading ? "Caricamento..." : `${othersRequests.length} richieste disponibili`}
-                    </CardDescription>
+                    <CardDescription>{othersRequests.length} soci cercano un avversario</CardDescription>
                   </div>
-                  <Badge variant="secondary" className="text-lg px-3 py-1">
-                    {othersRequests.length}
-                  </Badge>
                 </div>
               </CardHeader>
               <CardContent>
                 {loading ? (
-                  <div className="text-center py-8">
-                    <p className="text-gray-600">Caricamento richieste...</p>
-                  </div>
+                  <div className="text-center py-8">Caricamento...</div>
                 ) : othersRequests.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <Users className="mx-auto h-12 w-12 mb-4 opacity-50" />
-                    <p>Nessuna richiesta disponibile al momento.</p>
-                    <p className="text-sm mt-2">Controlla più tardi o pubblica tu una richiesta!</p>
+                    <p>Nessuna richiesta disponibile.</p>
                   </div>
                 ) : (
-                  <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
+                  <div className="space-y-4">
                     {othersRequests.map((request) => (
                       <Card key={request.id} className="border hover:border-primary/50 transition-colors">
                         <CardContent className="p-4">
                           <div className="flex justify-between items-start mb-3">
                             <div>
-                              <h4 className="font-semibold text-lg">
-                                {profiles[request.user_id] || 'Socio Sconosciuto'}
-                              </h4>
+                              <h4 className="font-semibold text-lg">{profiles[request.user_id] || 'Socio'}</h4>
                               <div className="flex items-center gap-2 mt-1">
                                 <Badge variant="outline" className="text-xs">
                                   <Target className="mr-1 h-3 w-3" />
                                   {skillLevelLabels[request.skill_level]}
                                 </Badge>
-                                <Badge variant="outline" className="text-xs">
-                                  {matchTypeLabels[request.match_type]}
-                                </Badge>
+                                <Badge variant="outline" className="text-xs">{matchTypeLabels[request.match_type]}</Badge>
                               </div>
                             </div>
                             <Button
@@ -454,37 +415,17 @@ const FindMatch = () => {
                               className="bg-green-600 hover:bg-green-700 text-white"
                               size="sm"
                             >
-                              <CheckCircle2 className="mr-2 h-4 w-4" />
                               Accetta
                             </Button>
                           </div>
-
                           <div className="space-y-2 text-sm text-gray-600">
                             <div className="flex items-center">
                               <Calendar className="mr-2 h-4 w-4 text-club-orange" />
-                              <span className="font-medium">Data:</span>
-                              <span className="ml-2">
-                                {format(parseISO(request.requested_date + 'T00:00:00'), 'dd/MM/yyyy', { locale: it })}
-                              </span>
+                              <span>{format(parseISO(request.requested_date + 'T00:00:00'), 'dd/MM/yyyy', { locale: it })}</span>
                             </div>
                             <div className="flex items-center">
                               <Clock className="mr-2 h-4 w-4 text-club-orange" />
-                              <span className="font-medium">Disponibilità:</span>
-                              <span className="ml-2">{request.preferred_time_start} - {request.preferred_time_end}</span>
-                            </div>
-                          </div>
-
-                          {request.notes && (
-                            <p className="text-sm text-gray-700 mt-3 border-t pt-3">
-                              <span className="font-medium">Note: </span>
-                              {request.notes}
-                            </p>
-                          )}
-
-                          <div className="mt-3 pt-3 border-t text-xs text-gray-500">
-                            <div className="flex items-center">
-                              <AlertCircle className="mr-1 h-3 w-3" />
-                              Accettando, potrai selezionare un orario preciso nella fascia indicata
+                              <span>{request.preferred_time_start} - {request.preferred_time_end}</span>
                             </div>
                           </div>
                         </CardContent>
@@ -496,88 +437,41 @@ const FindMatch = () => {
             </Card>
           </TabsContent>
 
-          {/* Tab Content: Le mie Richieste */}
           <TabsContent value="my" className="space-y-6">
             <Card className="shadow-lg rounded-lg">
               <CardHeader>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <CardTitle className="text-primary flex items-center">
-                      <Target className="mr-2 h-5 w-5" /> Le mie Richieste di Partita
-                    </CardTitle>
-                    <CardDescription>
-                      {loading ? "Caricamento..." : `${myRequests.length} richieste totali`}
-                    </CardDescription>
-                  </div>
-                  <Badge variant="secondary" className="text-lg px-3 py-1">
-                    {myRequests.filter(r => r.status === 'open').length} aperte
-                  </Badge>
-                </div>
+                <CardTitle className="text-primary flex items-center">
+                  <Target className="mr-2 h-5 w-5" /> Le mie Richieste
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                {loading ? (
-                  <div className="text-center py-8">
-                    <p className="text-gray-600">Caricamento...</p>
-                  </div>
-                ) : myRequests.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Target className="mx-auto h-12 w-12 mb-4 opacity-50" />
-                    <p>Non hai pubblicato nessuna richiesta attiva.</p>
-                    <p className="text-sm mt-2">Pubblica una richiesta per trovare un compagno di gioco!</p>
-                  </div>
+                {myRequests.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">Nessuna richiesta pubblicata.</div>
                 ) : (
-                  <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
+                  <div className="space-y-4">
                     {myRequests.map((request) => (
                       <Card key={request.id} className="border">
                         <CardContent className="p-4">
-                          <div className="flex justify-between items-start mb-2">
+                          <div className="flex justify-between items-start">
                             <div>
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 mb-2">
                                 {getStatusBadge(request.status)}
-                                <Badge variant="outline" className="text-xs">
-                                  {matchTypeLabels[request.match_type]}
-                                </Badge>
+                                <Badge variant="outline" className="text-xs">{matchTypeLabels[request.match_type]}</Badge>
                               </div>
-                              <h4 className="font-semibold mt-2">
+                              <h4 className="font-semibold">
                                 {format(parseISO(request.requested_date + 'T00:00:00'), 'dd/MM/yyyy', { locale: it })}
                               </h4>
+                              <p className="text-sm text-gray-600">{request.preferred_time_start} - {request.preferred_time_end}</p>
                             </div>
                             {request.status === 'open' && (
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => handleCancelRequest(request.id)}
-                              >
-                                <XCircle className="mr-2 h-4 w-4" />
+                              <Button variant="destructive" size="sm" onClick={() => handleCancelRequest(request.id)}>
                                 Elimina
                               </Button>
                             )}
                           </div>
-
-                          <div className="space-y-1 text-sm text-gray-600">
-                            <div className="flex items-center">
-                              <Clock className="mr-2 h-4 w-4 text-club-orange" />
-                              <span>{request.preferred_time_start} - {request.preferred_time_end}</span>
-                            </div>
-                            <div className="flex items-center">
-                              <Target className="mr-2 h-4 w-4 text-club-orange" />
-                              <span>{skillLevelLabels[request.skill_level]}</span>
-                            </div>
-                          </div>
-
-                          {request.notes && (
-                            <p className="text-sm text-gray-700 mt-2 border-t pt-2">
-                              <span className="font-medium">Note: </span>
-                              {request.notes}
-                            </p>
-                          )}
-
                           {request.status === 'matched' && request.matched_with_user_id && (
-                            <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
-                              <p className="text-sm font-medium text-blue-800">
-                                <CheckCircle2 className="inline mr-1 h-4 w-4" />
-                                Accoppiata con {profiles[request.matched_with_user_id] || 'altro socio'}
-                              </p>
+                            <div className="mt-3 p-2 bg-blue-50 rounded border border-blue-200 text-sm">
+                              Accoppiata con <strong>{profiles[request.matched_with_user_id]}</strong>
                             </div>
                           )}
                         </CardContent>

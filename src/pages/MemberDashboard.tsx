@@ -9,12 +9,13 @@ import { CalendarDays, History, LogOut, Users, Settings, Search, FileText, Alert
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import Footer from '@/components/Footer';
+import UserNav from '@/components/UserNav';
 
 const MemberDashboard = () => {
   const navigate = useNavigate();
   const [fullName, setFullName] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [isApproved, setIsApproved] = useState(true); // Nuovo stato per l'approvazione
+  const [isApproved, setIsApproved] = useState(true);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -34,7 +35,7 @@ const MemberDashboard = () => {
         } else if (profile) {
           setFullName(profile.full_name);
           setIsAdmin(profile.is_admin);
-          setIsApproved(profile.approved); // Imposta lo stato di approvazione
+          setIsApproved(profile.approved);
         } else {
           setFullName(user.email);
         }
@@ -45,20 +46,6 @@ const MemberDashboard = () => {
     };
     fetchUserProfile();
   }, []);
-
-  const handleLogout = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        showError(error.message);
-      } else {
-        showSuccess("Disconnessione effettuata con successo!");
-        navigate('/login');
-      }
-    } catch (error: any) {
-      showError(error.message || "Errore durante la disconnessione.");
-    }
-  };
 
   if (loading) {
     return (
@@ -71,7 +58,6 @@ const MemberDashboard = () => {
     );
   }
 
-  // Definisci le rotte di prenotazione che richiedono approvazione
   const bookingRoutes = [
     { path: "/book", title: "Prenota un Campo", icon: CalendarDays, description: "Scegli la data e l'orario per la tua prossima partita." },
     { path: "/book-for-third-party", title: "Prenota per un Socio", icon: Users, description: "Effettua una prenotazione per un altro socio." },
@@ -113,9 +99,7 @@ const MemberDashboard = () => {
       <div className="flex-grow p-4 sm:p-6 lg:p-8">
         <header className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-primary">Benvenuto, {fullName}!</h1>
-          <Button variant="outline" className="text-primary border-primary hover:bg-secondary hover:text-primary" onClick={handleLogout}>
-            <LogOut className="mr-2 h-4 w-4" /> Esci
-          </Button>
+          <UserNav />
         </header>
 
         {!isApproved && (
@@ -124,34 +108,14 @@ const MemberDashboard = () => {
             <AlertTitle className="text-club-orange">Accesso Limitato</AlertTitle>
             <AlertDescription className="text-club-orange/90">
               Il tuo account è in attesa di approvazione da parte di un amministratore. 
-              Fino all'approvazione, non potrai effettuare prenotazioni o cercare partite. 
-              Riceverai una notifica non appena il tuo account sarà attivo.
+              Fino all'approvazione, non potrai effettuare prenotazioni o cercare partite.
             </AlertDescription>
           </Alert>
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Booking Routes (Disabled if not approved) */}
           {bookingRoutes.map(item => renderCard(item, !isApproved))}
-
-          {/* Non-Booking Routes (Always enabled) */}
           {nonBookingRoutes.map(item => renderCard(item, false))}
-
-          {isAdmin && (
-            <Card className="shadow-lg rounded-lg border-2 border-club-orange">
-              <CardHeader>
-                <CardTitle className="text-club-orange flex items-center">
-                  <Settings className="mr-2 h-5 w-5" /> Pannello Amministrativo
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-700 mb-4">Accedi alle funzionalità di gestione per gli amministratori.</p>
-                <Link to="/admin">
-                  <Button className="w-full bg-club-orange hover:bg-club-orange/80 text-club-orange-foreground">Vai al Pannello Admin</Button>
-                </Link>
-              </CardContent>
-            </Card>
-          )}
         </div>
       </div>
       <Footer />
