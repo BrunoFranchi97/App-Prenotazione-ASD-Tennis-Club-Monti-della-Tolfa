@@ -59,14 +59,44 @@ const MemberDashboard = () => {
   }
 
   const bookingRoutes = [
-    { path: "/book", title: "Prenota un Campo", icon: CalendarDays, description: "Scegli la data e l'orario per la tua prossima partita." },
-    { path: "/book-for-third-party", title: "Prenota per un Socio", icon: Users, description: "Effettua una prenotazione per un altro socio." },
-    { path: "/find-match", title: "Cerco Partita", icon: Search, description: "Trova compagni di gioco del tuo livello." },
+    { 
+      path: "/book", 
+      title: "Prenota un Campo", 
+      icon: CalendarDays, 
+      description: "Scegli la data e l'orario per la tua prossima partita.",
+      buttonText: "Prenota Ora"
+    },
+    { 
+      path: "/book-for-third-party", 
+      title: "Prenota per un Socio", 
+      icon: Users, 
+      description: "Effettua una prenotazione per un altro socio.",
+      buttonText: "Effettua Prenotazione"
+    },
+    { 
+      path: "/find-match", 
+      title: "Cerco Partita", 
+      icon: Search, 
+      description: "Trova compagni di gioco del tuo livello.",
+      buttonText: "Cerca Avversari"
+    },
   ];
 
   const nonBookingRoutes = [
-    { path: "/history", title: "Storico Prenotazioni", icon: History, description: "Visualizza le tue prenotazioni passate e future." },
-    { path: "/medical-certificates", title: "Certificato Medico", icon: FileText, description: "Gestisci il tuo certificato medico e le scadenze." },
+    { 
+      path: "/history", 
+      title: "Storico Prenotazioni", 
+      icon: History, 
+      description: "Visualizza le tue prenotazioni passate e future.",
+      buttonText: "Vedi i miei Campi"
+    },
+    { 
+      path: "/medical-certificates", 
+      title: "Certificato Medico", 
+      icon: FileText, 
+      description: "Gestisci il tuo certificato medico e le scadenze.",
+      buttonText: "Gestisci Documenti"
+    },
   ];
 
   const renderCard = (item: any, disabled: boolean, specialVariant: boolean = false) => {
@@ -86,7 +116,7 @@ const MemberDashboard = () => {
               disabled={disabled}
               variant={item.path === '/book' || specialVariant ? 'default' : 'outline'}
             >
-              {item.path === '/admin' ? 'Accedi al Pannello' : item.path === '/book' ? 'Vai al Calendario' : 'Visualizza'}
+              {item.buttonText || "Visualizza"}
             </Button>
           </Link>
         </CardContent>
@@ -121,7 +151,8 @@ const MemberDashboard = () => {
             path: "/admin", 
             title: "Pannello Admin", 
             icon: ShieldCheck, 
-            description: "Gestisci prenotazioni, soci, campi e visualizza le statistiche del club." 
+            description: "Gestisci prenotazioni, soci, campi e visualizza le statistiche del club.",
+            buttonText: "Accedi al Pannello"
           }, false, true)}
         </div>
       </div>
