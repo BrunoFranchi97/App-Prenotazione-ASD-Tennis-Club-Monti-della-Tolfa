@@ -290,12 +290,12 @@ const MyProfile = () => {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="membership">Numero Tessera FITP (opzionale)</Label>
+                    <Label htmlFor="membership">Numero Tessera (opzionale)</Label>
                     <Input 
                       id="membership" 
                       value={membershipNumber} 
                       onChange={(e) => setMembershipNumber(e.target.value)} 
-                      placeholder="1234567"
+                      placeholder="Codice tessera"
                     />
                   </div>
                 </div>
