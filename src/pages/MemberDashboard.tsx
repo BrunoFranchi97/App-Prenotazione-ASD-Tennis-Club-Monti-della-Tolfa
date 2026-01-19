@@ -114,15 +114,15 @@ const MemberDashboard = () => {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {bookingRoutes.map(item => renderCard(item, !isApproved))}
+          {nonBookingRoutes.map(item => renderCard(item, false))}
+          
           {isAdmin && renderCard({ 
             path: "/admin", 
             title: "Pannello Admin", 
             icon: ShieldCheck, 
             description: "Gestisci prenotazioni, soci, campi e visualizza le statistiche del club." 
           }, false, true)}
-          
-          {bookingRoutes.map(item => renderCard(item, !isApproved))}
-          {nonBookingRoutes.map(item => renderCard(item, false))}
         </div>
       </div>
       <Footer />
