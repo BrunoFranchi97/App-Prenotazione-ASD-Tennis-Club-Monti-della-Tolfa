@@ -89,15 +89,17 @@ const FindMatch = () => {
 
       if (requestsError) throw requestsError;
       
-      const requests = requestsData || [];
+      const requests = (requestsData || []) as MatchRequest[];
       setAllMatchRequests(requests);
 
-      // Separate my requests from others
-      const my = requests.filter(req => req.user_id === user.id);
+      // Separate my requests (showing open and matched, excluding cancelled)
+      const my = requests.filter(req => req.user_id === user.id && req.status !== 'cancelled');
+      
+      // Separate others' requests (strictly showing only OPEN requests in the future)
       const others = requests.filter(req => 
         req.user_id !== user.id && 
         req.status === 'open' && 
-        (!req.requested_date || isAfter(parseISO(req.requested_date + 'T00:00:00'), startOfDay(new Date())))
+        (!req.requested_date || isAfter(parseISO(req.requested_date + 'T23:59:59'), new Date()))
       );
       
       setMyRequests(my);
@@ -186,20 +188,21 @@ const FindMatch = () => {
     }
   };
 
+  // Funzione modificata per eliminare fisicamente la richiesta
   const handleCancelRequest = async (requestId: string) => {
     try {
       const { error } = await supabase
         .from('match_requests')
-        .update({ status: 'cancelled' })
+        .delete()
         .eq('id', requestId);
 
       if (error) throw error;
 
-      showSuccess("Richiesta cancellata con successo!");
+      showSuccess("Richiesta eliminata con successo!");
       await fetchData();
 
     } catch (err: any) {
-      showError("Errore durante la cancellazione: " + err.message);
+      showError("Errore durante l'eliminazione: " + err.message);
     }
   };
 
@@ -278,7 +281,7 @@ const FindMatch = () => {
             </TabsTrigger>
             <TabsTrigger value="my" className="flex items-center gap-2">
               <Target className="h-4 w-4" /> Le mie Richieste
-              {myRequests.length > 0 && (
+              {myRequests.filter(r => r.status === 'open').length > 0 && (
                 <Badge variant="secondary" className="ml-1 text-xs">
                   {myRequests.filter(r => r.status === 'open').length}
                 </Badge>
@@ -519,7 +522,7 @@ const FindMatch = () => {
                 ) : myRequests.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <Target className="mx-auto h-12 w-12 mb-4 opacity-50" />
-                    <p>Non hai pubblicato nessuna richiesta.</p>
+                    <p>Non hai pubblicato nessuna richiesta attiva.</p>
                     <p className="text-sm mt-2">Pubblica una richiesta per trovare un compagno di gioco!</p>
                   </div>
                 ) : (
@@ -546,7 +549,7 @@ const FindMatch = () => {
                                 onClick={() => handleCancelRequest(request.id)}
                               >
                                 <XCircle className="mr-2 h-4 w-4" />
-                                Cancella
+                                Elimina
                               </Button>
                             )}
                           </div>
