@@ -79,7 +79,7 @@ const FindMatch = () => {
         setSkillLevel(userProfile.skill_level);
       }
 
-      // Fetch all match requests (open and matched)
+      // Fetch all match requests
       const { data: requestsData, error: requestsError } = await supabase
         .from('match_requests')
         .select('*')
@@ -428,6 +428,14 @@ const FindMatch = () => {
                               <span>{request.preferred_time_start} - {request.preferred_time_end}</span>
                             </div>
                           </div>
+                          
+                          {/* Note visibili qui */}
+                          {request.notes && (
+                            <div className="mt-4 p-3 bg-gray-50 rounded-md border border-gray-100 text-sm text-gray-700">
+                              <p className="font-medium text-xs text-gray-500 uppercase mb-1">Note del socio:</p>
+                              {request.notes}
+                            </div>
+                          )}
                         </CardContent>
                       </Card>
                     ))}
@@ -469,6 +477,14 @@ const FindMatch = () => {
                               </Button>
                             )}
                           </div>
+                          
+                          {/* Note visibili qui */}
+                          {request.notes && (
+                            <div className="mt-3 text-sm text-gray-600 italic">
+                              "{request.notes}"
+                            </div>
+                          )}
+
                           {request.status === 'matched' && request.matched_with_user_id && (
                             <div className="mt-3 p-2 bg-blue-50 rounded border border-blue-200 text-sm">
                               Accoppiata con <strong>{profiles[request.matched_with_user_id]}</strong>
