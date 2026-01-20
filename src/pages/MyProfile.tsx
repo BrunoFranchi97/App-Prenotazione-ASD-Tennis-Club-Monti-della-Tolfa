@@ -153,9 +153,12 @@ const MyProfile = () => {
     try {
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
-      showSuccess("Password aggiornata con successo!");
-      setNewPassword('');
-      setConfirmPassword('');
+      
+      showSuccess("Password aggiornata! Per sicurezza, effettua nuovamente l'accesso.");
+      
+      // Logout per forzare il rientro con le nuove credenziali
+      await supabase.auth.signOut();
+      navigate('/login');
     } catch (err: any) {
       showError("Errore nel cambio password: " + err.message);
     } finally {
@@ -341,6 +344,9 @@ const MyProfile = () => {
                 <Button type="submit" variant="outline" disabled={saving || !newPassword} className="w-full border-primary text-primary">
                   Aggiorna Password
                 </Button>
+                <p className="text-xs text-muted-foreground text-center">
+                  Nota: verrai disconnesso per confermare la nuova password.
+                </p>
               </form>
             </CardContent>
           </Card>
