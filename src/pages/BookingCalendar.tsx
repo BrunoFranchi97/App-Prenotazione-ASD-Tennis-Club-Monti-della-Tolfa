@@ -222,12 +222,26 @@ const BookingCalendar = () => {
   if (approvalLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 sm:p-6 lg:p-8">
-        <div className="max-w-4xl mx-auto space-y-6">
-          <Skeleton className="h-12 w-3/4 mb-8" />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Skeleton className="h-80 w-full" />
-            <Skeleton className="h-80 w-full" />
+        <header className="flex justify-between items-center mb-8">
+          <div className="flex items-center">
+            <Skeleton className="h-10 w-10 mr-4" />
+            <Skeleton className="h-10 w-64" />
           </div>
+          <Skeleton className="h-10 w-24" />
+        </header>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="shadow-lg rounded-lg">
+            <CardHeader><Skeleton className="h-6 w-32" /></CardHeader>
+            <CardContent className="flex justify-center h-[320px]"><Skeleton className="h-full w-full max-w-[300px]" /></CardContent>
+          </Card>
+          <Card className="shadow-lg rounded-lg">
+            <CardHeader><Skeleton className="h-6 w-32" /></CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2"><Skeleton className="h-5 w-24" /><Skeleton className="h-10 w-full" /></div>
+              <div className="space-y-2"><Skeleton className="h-5 w-24" /><Skeleton className="h-10 w-full" /></div>
+              <div className="space-y-2"><Skeleton className="h-5 w-24" /><div className="grid grid-cols-2 gap-2"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div></div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
