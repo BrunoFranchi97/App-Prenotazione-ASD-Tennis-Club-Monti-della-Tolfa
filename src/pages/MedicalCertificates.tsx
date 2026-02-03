@@ -107,7 +107,7 @@ const MedicalCertificates = () => {
         <DialogContent>
           <DialogHeader><DialogTitle>Carica Certificato</DialogTitle></DialogHeader>
           <div className="space-y-4">
-            <div><Label>Data Rilascio (No date future)</Label><Input type="date" value={issueDate} onChange={e => setIssueDate(e.target.value)} max={new Date().toISOString().split('T')[0]} /></div>
+            <div><Label>Data Rilascio</Label><Input type="date" value={issueDate} onChange={e => setIssueDate(e.target.value)} max={new Date().toISOString().split('T')[0]} /></div>
             <div><Label>Data Scadenza</Label><Input type="date" value={expiryDate} onChange={e => setExpiryDate(e.target.value)} /></div>
             <div><Label>File (PDF/JPG)</Label><Input type="file" onChange={e => setSelectedFile(e.target.files?.[0] || null)} /></div>
             <div>
