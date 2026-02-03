@@ -10,10 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Calendar, Clock, Target, Users, MapPin, Search, PlusCircle, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, Target, Users, MapPin, Search, PlusCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
-import { format, parseISO, isAfter, isBefore, startOfDay } from 'date-fns';
+import { format, parseISO, isAfter, startOfDay } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { useApprovalCheck } from '@/hooks/use-approval-check';
 import UserNav from '@/components/UserNav';
@@ -60,15 +60,17 @@ const FindMatch = () => {
 
       const { data: requestsData } = await supabase.from('match_requests').select('*, court:court_id(*)').order('requested_date', { ascending: true });
       const requests = (requestsData || []) as any[];
-      setMyRequests(requests.filter(r => r.user_id === user.id));
       
-      // Filtra sfide aperte di altri utenti che non sono ancora scadute
-      const now = new Date();
-      setOthersRequests(requests.filter(r => 
-        r.user_id !== user.id && 
-        r.status === 'open' && 
-        isAfter(parseISO(r.requested_date + 'T23:59:59'), now)
-      ));
+      const today = startOfDay(new Date());
+
+      // Filtra per mostrare solo sfide da oggi in poi
+      const activeRequests = requests.filter(r => {
+        const reqDate = parseISO(r.requested_date);
+        return isAfter(reqDate, today) || format(reqDate, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd');
+      });
+
+      setMyRequests(activeRequests.filter(r => r.user_id === user.id));
+      setOthersRequests(activeRequests.filter(r => r.user_id !== user.id && r.status === 'open'));
 
       const { data: profilesData } = await supabase.from('profiles').select('id, full_name');
       const profileMap: { [key: string]: string } = {};
