@@ -18,7 +18,6 @@ const Register = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
-  const navigate = useNavigate();
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,7 +30,6 @@ const Register = () => {
     }
 
     try {
-      // Usa l'URL di redirect determinato dinamicamente
       const redirectTo = getAuthRedirectTo();
 
       const { data, error } = await supabase.auth.signUp({
@@ -46,12 +44,21 @@ const Register = () => {
       });
 
       if (error) {
-        showError(error.message);
+        // Se l'utente esiste già, Supabase potrebbe non restituire un errore esplicito per sicurezza 
+        // a seconda delle impostazioni del progetto, ma se lo fa, lo mostriamo chiaramente.
+        if (error.message.toLowerCase().includes("already registered") || error.status === 400) {
+          showError("Questa email è già in uso. Effettua il login.");
+        } else {
+          showError(error.message);
+        }
+      } else if (data.user && data.user.identities && data.user.identities.length === 0) {
+        // Tipico comportamento di Supabase quando l'utente esiste già: restituisce successo ma zero identità
+        showError("Email già in uso. Effettua il login o recupera la password.");
       } else if (data.user) {
         setIsRegistered(true);
       }
     } catch (error: any) {
-      showError(error.message || "Errore durante la registrazione.");
+      showError("Errore durante la registrazione. Riprova più tardi.");
     } finally {
       setLoading(false);
     }
@@ -75,9 +82,6 @@ const Register = () => {
             <p className="text-sm text-red-600 font-medium">
               Attenzione: Dopo la verifica, il tuo account dovrà essere approvato da un amministratore prima di poter prenotare.
             </p>
-            <p className="text-xs text-gray-500 mt-4">
-              Se non ricevi l'email entro pochi minuti, controlla la cartella spam.
-            </p>
           </CardContent>
           <CardFooter className="flex flex-col gap-2">
             <Link to="/login" className="w-full">
@@ -85,9 +89,6 @@ const Register = () => {
                 Vai al Login
               </Button>
             </Link>
-            <Button variant="link" onClick={() => setIsRegistered(false)} className="text-primary">
-              <ArrowLeft className="mr-2 h-4 w-4" /> Torna al modulo
-            </Button>
           </CardFooter>
         </Card>
       </div>
@@ -98,30 +99,30 @@ const Register = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-white p-4">
       <Card className="w-full max-w-md shadow-lg rounded-lg">
         <CardHeader className="text-center">
-          <img src="/logo.png" alt="ASD Tennis Club Monti della Tolfa Logo" className="mx-auto h-20 w-20 mb-4" />
+          <img src="/logo.png" alt="Logo" className="mx-auto h-20 w-20 mb-4" />
           <CardTitle className="text-3xl font-bold text-primary">Registrati</CardTitle>
-          <CardDescription className="text-gray-600 mt-2">Crea il tuo account per iniziare a prenotare.</CardDescription>
+          <CardDescription className="text-gray-600 mt-2">Crea il tuo account socio.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <form onSubmit={handleRegister} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">Nome Completo</Label>
-              <Input id="name" type="text" placeholder="Inserisci il tuo nome" value={name} onChange={(e) => setName(e.target.value)} required />
+              <Input id="name" type="text" placeholder="Nome e Cognome" value={name} onChange={(e) => setName(e.target.value)} required />
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="Inserisci la tua email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <Input id="email" type="email" placeholder="email@esempio.it" value={email} onChange={(e) => setEmail(e.target.value)} required />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" placeholder="Crea una password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+              <Input id="password" type="password" placeholder="Min. 6 caratteri" value={password} onChange={(e) => setPassword(e.target.value)} required />
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirm-password">Conferma Password</Label>
-              <Input id="confirm-password" type="password" placeholder="Conferma la password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
+              <Input id="confirm-password" type="password" placeholder="Ripeti password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
             </div>
             <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" disabled={loading}>
-              {loading ? "Registrazione in corso..." : "Registrati"}
+              {loading ? "Registrazione..." : "Registrati"}
             </Button>
           </form>
         </CardContent>
