@@ -10,10 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, LogOut, Calendar, Clock, Target, Users, UserPlus, MapPin, Search, PlusCircle } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, Target, Users, MapPin, Search, PlusCircle, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
-import { format, parseISO, isAfter } from 'date-fns';
+import { format, parseISO, isAfter, isBefore, startOfDay } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { useApprovalCheck } from '@/hooks/use-approval-check';
 import UserNav from '@/components/UserNav';
@@ -58,10 +58,17 @@ const FindMatch = () => {
       setCourts(courtsData || []);
       if (courtsData?.length && !selectedCourtId) setSelectedCourtId(courtsData[0].id.toString());
 
-      const { data: requestsData } = await supabase.from('match_requests').select('*, court:court_id(*)').order('created_at', { ascending: false });
+      const { data: requestsData } = await supabase.from('match_requests').select('*, court:court_id(*)').order('requested_date', { ascending: true });
       const requests = (requestsData || []) as any[];
       setMyRequests(requests.filter(r => r.user_id === user.id));
-      setOthersRequests(requests.filter(r => r.user_id !== user.id && r.status === 'open' && isAfter(parseISO(r.requested_date + 'T23:59:59'), new Date())));
+      
+      // Filtra sfide aperte di altri utenti che non sono ancora scadute
+      const now = new Date();
+      setOthersRequests(requests.filter(r => 
+        r.user_id !== user.id && 
+        r.status === 'open' && 
+        isAfter(parseISO(r.requested_date + 'T23:59:59'), now)
+      ));
 
       const { data: profilesData } = await supabase.from('profiles').select('id, full_name');
       const profileMap: { [key: string]: string } = {};
@@ -84,6 +91,28 @@ const FindMatch = () => {
     setSubmitting(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      
+      // --- CONTROLLO CONFLITTI ---
+      const startISO = `${requestedDate}T${preferredTimeStart}:00.000Z`;
+      const endISO = `${requestedDate}T${preferredTimeEnd}:00.000Z`;
+
+      const { data: conflicts, error: conflictErr } = await supabase
+        .from('reservations')
+        .select('id')
+        .eq('court_id', parseInt(selectedCourtId))
+        .lt('starts_at', endISO)
+        .gt('ends_at', startISO)
+        .neq('status', 'cancelled');
+
+      if (conflictErr) throw conflictErr;
+
+      if (conflicts && conflicts.length > 0) {
+        showError("Spiacente, questo campo è già prenotato in questa fascia oraria. Scegli un altro orario o un altro campo.");
+        setSubmitting(false);
+        return;
+      }
+      // ----------------------------
+
       const { error } = await supabase.from('match_requests').insert({
         user_id: user?.id,
         requested_date: requestedDate,
@@ -95,8 +124,10 @@ const FindMatch = () => {
         notes: notes.trim() || null,
         status: 'open'
       });
+      
       if (error) throw error;
-      showSuccess("Richiesta pubblicata!");
+      
+      showSuccess("Sfida pubblicata con successo!");
       setRequestedDate('');
       setNotes('');
       fetchData();
@@ -120,7 +151,7 @@ const FindMatch = () => {
             </Button>
           </Link>
           <h1 className="text-3xl font-bold text-primary flex items-center">
-            <Search className="mr-2 h-7 w-7" /> Cerco Partita
+            <Search className="mr-2 h-7 w-7" /> Bacheca Sfide
           </h1>
         </div>
         <UserNav />
@@ -137,9 +168,9 @@ const FindMatch = () => {
           <Card className="shadow-lg rounded-lg max-w-2xl mx-auto">
             <CardHeader>
               <CardTitle className="text-primary flex items-center">
-                <PlusCircle className="mr-2 h-5 w-5" /> Nuova Sfida
+                <PlusCircle className="mr-2 h-5 w-5" /> Proponi una Partita
               </CardTitle>
-              <CardDescription>Inserisci i dettagli per trovare un avversario.</CardDescription>
+              <CardDescription>Definisci i dettagli. Il sistema verificherà la disponibilità del campo prima di pubblicare.</CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmitRequest} className="space-y-6">
@@ -211,11 +242,11 @@ const FindMatch = () => {
 
                 <div className="space-y-2">
                   <Label>Note / Messaggio</Label>
-                  <Textarea placeholder="Es: Cerco qualcuno per un'ora di allenamento intenso..." value={notes} onChange={e => setNotes(e.target.value)} />
+                  <Textarea placeholder="Es: Cerco qualcuno per un allenamento intenso..." value={notes} onChange={e => setNotes(e.target.value)} />
                 </div>
 
-                <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={submitting}>
-                  {submitting ? "Pubblicazione..." : "Pubblica Sfida"}
+                <Button type="submit" className="w-full bg-primary hover:bg-primary/90 h-12 text-lg" disabled={submitting}>
+                  {submitting ? "Verifica e pubblicazione..." : "Pubblica Sfida"}
                 </Button>
               </form>
             </CardContent>
@@ -225,35 +256,58 @@ const FindMatch = () => {
         <TabsContent value="others">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {othersRequests.length === 0 ? (
-              <div className="col-span-full text-center py-12 text-muted-foreground">
-                <Users className="mx-auto h-12 w-12 mb-4 opacity-20" />
-                <p>Nessuna sfida aperta al momento. Pubblicane una tu!</p>
+              <div className="col-span-full text-center py-16 text-muted-foreground">
+                <Users className="mx-auto h-16 w-16 mb-4 opacity-10" />
+                <p className="text-xl font-medium">Nessuna sfida aperta</p>
+                <p className="text-sm">Sii il primo a proporne una nella sezione "Pubblica Sfida"!</p>
               </div>
             ) : (
               othersRequests.map(r => (
-                <Card key={r.id} className="shadow-lg border-l-4 border-l-club-orange hover:shadow-xl transition-shadow">
-                  <CardHeader className="pb-2">
-                    <div className="flex justify-between items-start">
-                      <div className="flex items-center">
-                        <Badge className="bg-primary/10 text-primary border-none mr-2 capitalize">{r.match_type}</Badge>
-                        <Badge variant="outline" className="text-xs">{skillLevelLabels[r.skill_level as SkillLevel]}</Badge>
+                <Card key={r.id} className="border hover:shadow-md transition-shadow">
+                  <CardContent className="p-5">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Badge className="bg-primary/10 text-primary border-none capitalize">{r.match_type}</Badge>
+                          <Badge variant="outline" className="text-xs">{skillLevelLabels[r.skill_level as SkillLevel]}</Badge>
+                        </div>
+                        <h3 className="font-bold text-xl text-gray-900">
+                          {profiles[r.user_id]}
+                        </h3>
+                        <p className="text-sm text-gray-500">Socio del club</p>
                       </div>
                     </div>
-                    <CardTitle className="text-lg mt-2">{profiles[r.user_id]}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2 text-sm text-gray-600">
-                      <div className="flex items-center"><Calendar className="mr-2 h-4 w-4 text-club-orange" /> {format(parseISO(r.requested_date), 'EEEE dd MMMM', { locale: it })}</div>
-                      <div className="flex items-center"><Clock className="mr-2 h-4 w-4 text-club-orange" /> {r.preferred_time_start} - {r.preferred_time_end}</div>
-                      <div className="flex items-center font-medium text-primary"><MapPin className="mr-2 h-4 w-4" /> {r.court?.name}</div>
-                    </div>
-                    {r.notes && (
-                      <div className="p-2 bg-gray-50 rounded text-xs italic text-gray-500 line-clamp-2">
-                        "{r.notes}"
+
+                    <div className="space-y-3 mb-6">
+                      <div className="flex items-center text-sm">
+                        <Calendar className="mr-3 h-4 w-4 text-club-orange" />
+                        <span className="font-medium text-gray-700 capitalize">
+                          {format(parseISO(r.requested_date), 'EEEE dd MMMM', { locale: it })}
+                        </span>
                       </div>
-                    )}
+                      <div className="flex items-center text-sm">
+                        <Clock className="mr-3 h-4 w-4 text-club-orange" />
+                        <span className="font-medium text-gray-700">
+                          {r.preferred_time_start} - {r.preferred_time_end}
+                        </span>
+                      </div>
+                      <div className="flex items-center text-sm">
+                        <MapPin className="mr-3 h-4 w-4 text-club-orange" />
+                        <span className="font-medium text-primary">
+                          {r.court?.name || 'Campo'}
+                        </span>
+                      </div>
+                      
+                      {r.notes && (
+                        <div className="pt-3 border-t mt-3">
+                          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Messaggio:</p>
+                          <p className="text-sm text-gray-600 italic leading-relaxed">"{r.notes}"</p>
+                        </div>
+                      )}
+                    </div>
+
                     <Button 
-                      className="w-full bg-primary hover:bg-primary/90"
+                      className="w-full bg-primary hover:bg-primary/90 font-semibold"
                       onClick={() => navigate('/match-booking', { state: { matchRequest: r, opponentName: profiles[r.user_id] } })}
                     >
                       Accetta Sfida
@@ -268,25 +322,26 @@ const FindMatch = () => {
         <TabsContent value="my">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {myRequests.length === 0 ? (
-              <div className="col-span-full text-center py-12 text-muted-foreground">
-                <Calendar className="mx-auto h-12 w-12 mb-4 opacity-20" />
-                <p>Non hai ancora pubblicato nessuna sfida.</p>
+              <div className="col-span-full text-center py-16 text-muted-foreground">
+                <Calendar className="mx-auto h-16 w-16 mb-4 opacity-10" />
+                <p className="text-lg font-medium">Non hai pubblicato sfide</p>
               </div>
             ) : (
               myRequests.map(r => (
-                <Card key={r.id} className="shadow-md opacity-90">
-                  <CardHeader className="pb-2">
-                    <div className="flex justify-between items-center">
-                      <Badge variant={r.status === 'open' ? 'default' : 'secondary'}>
-                        {r.status === 'open' ? 'Aperta' : 'Completata'}
+                <Card key={r.id} className="border opacity-90">
+                  <CardContent className="p-5">
+                    <div className="flex justify-between items-center mb-3">
+                      <Badge variant={r.status === 'open' ? 'default' : 'secondary'} className={r.status === 'open' ? 'bg-green-100 text-green-800' : ''}>
+                        {r.status === 'open' ? 'Aperta' : 'Abbinata'}
                       </Badge>
-                      <span className="text-xs text-gray-400">{format(parseISO(r.created_at), 'dd/MM/yy')}</span>
+                      <span className="text-xs text-gray-400">Creata il {format(parseISO(r.created_at), 'dd/MM/yy')}</span>
                     </div>
-                  </CardHeader>
-                  <CardContent className="space-y-3 text-sm">
-                    <div className="flex items-center"><Calendar className="mr-2 h-4 w-4 text-club-orange" /> {format(parseISO(r.requested_date), 'dd/MM/yyyy')}</div>
-                    <div className="flex items-center font-medium"><MapPin className="mr-2 h-4 w-4 text-primary" /> {r.court?.name || 'Campo'}</div>
-                    <div className="text-xs text-gray-500 uppercase font-bold tracking-wider">{r.match_type} • {skillLevelLabels[r.skill_level as SkillLevel]}</div>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center"><Calendar className="mr-2 h-4 w-4 text-club-orange" /> {format(parseISO(r.requested_date), 'dd/MM/yyyy')}</div>
+                      <div className="flex items-center"><Clock className="mr-2 h-4 w-4 text-club-orange" /> {r.preferred_time_start} - {r.preferred_time_end}</div>
+                      <div className="flex items-center font-medium"><MapPin className="mr-2 h-4 w-4 text-primary" /> {r.court?.name || 'Campo'}</div>
+                      <div className="text-xs text-gray-500 font-bold tracking-wider pt-1">{r.match_type.toUpperCase()} • {skillLevelLabels[r.skill_level as SkillLevel].toUpperCase()}</div>
+                    </div>
                   </CardContent>
                 </Card>
               ))
