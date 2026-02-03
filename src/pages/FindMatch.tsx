@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Calendar, Clock, Target, Users, UserPlus, MapPin } from 'lucide-react';
+import { ArrowLeft, LogOut, Calendar, Clock, Target, Users, UserPlus, MapPin, Search, PlusCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { format, parseISO, isAfter } from 'date-fns';
@@ -56,7 +56,7 @@ const FindMatch = () => {
 
       const { data: courtsData } = await supabase.from('courts').select('*').eq('is_active', true);
       setCourts(courtsData || []);
-      if (courtsData?.length) setSelectedCourtId(courtsData[0].id.toString());
+      if (courtsData?.length && !selectedCourtId) setSelectedCourtId(courtsData[0].id.toString());
 
       const { data: requestsData } = await supabase.from('match_requests').select('*, court:court_id(*)').order('created_at', { ascending: false });
       const requests = (requestsData || []) as any[];
@@ -97,6 +97,8 @@ const FindMatch = () => {
       });
       if (error) throw error;
       showSuccess("Richiesta pubblicata!");
+      setRequestedDate('');
+      setNotes('');
       fetchData();
     } catch (err: any) {
       showError(err.message);
@@ -109,46 +111,187 @@ const FindMatch = () => {
   if (!isApproved) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 sm:p-8">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 sm:p-6 lg:p-8">
       <header className="flex justify-between items-center mb-8">
         <div className="flex items-center">
-          <Link to="/dashboard" className="mr-4"><Button variant="outline" size="icon"><ArrowLeft className="h-4 w-4" /></Button></Link>
-          <h1 className="text-3xl font-bold text-primary">Cerco Partita</h1>
+          <Link to="/dashboard" className="mr-4">
+            <Button variant="outline" size="icon" className="text-primary border-primary hover:bg-secondary">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
+          <h1 className="text-3xl font-bold text-primary flex items-center">
+            <Search className="mr-2 h-7 w-7" /> Cerco Partita
+          </h1>
         </div>
         <UserNav />
       </header>
-      <Tabs defaultValue="others">
-        <TabsList className="w-full mb-6">
-          <TabsTrigger value="publish" className="flex-1">Pubblica</TabsTrigger>
-          <TabsTrigger value="others" className="flex-1">Richieste</TabsTrigger>
-          <TabsTrigger value="my" className="flex-1">Le mie</TabsTrigger>
+
+      <Tabs defaultValue="others" className="w-full">
+        <TabsList className="grid w-full grid-cols-3 mb-8">
+          <TabsTrigger value="others">Sfide Aperte</TabsTrigger>
+          <TabsTrigger value="publish">Pubblica Sfida</TabsTrigger>
+          <TabsTrigger value="my">Le mie Sfide</TabsTrigger>
         </TabsList>
+
         <TabsContent value="publish">
-          <Card><CardHeader><CardTitle>Nuova Sfida</CardTitle></CardHeader>
-            <CardContent><form onSubmit={handleSubmitRequest} className="space-y-4">
-              <Input type="date" value={requestedDate} onChange={e => setRequestedDate(e.target.value)} required min={new Date().toISOString().split('T')[0]} />
-              <div className="grid grid-cols-2 gap-4">
-                <Select value={preferredTimeStart} onValueChange={setPreferredTimeStart}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{timeSlots.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent></Select>
-                <Select value={preferredTimeEnd} onValueChange={setPreferredTimeEnd}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{timeSlots.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent></Select>
-              </div>
-              <Select value={selectedCourtId} onValueChange={setSelectedCourtId}><SelectTrigger><SelectValue placeholder="Scegli Campo" /></SelectTrigger><SelectContent>{courts.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}</SelectContent></Select>
-              <Select value={matchType} onValueChange={v => setMatchType(v as MatchType)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="singolare">Singolare</SelectItem><SelectItem value="doppio">Doppio</SelectItem></SelectContent></Select>
-              <Textarea placeholder="Note..." value={notes} onChange={e => setNotes(e.target.value)} />
-              <Button type="submit" className="w-full" disabled={submitting}>Pubblica Sfida</Button>
-            </form></CardContent>
+          <Card className="shadow-lg rounded-lg max-w-2xl mx-auto">
+            <CardHeader>
+              <CardTitle className="text-primary flex items-center">
+                <PlusCircle className="mr-2 h-5 w-5" /> Nuova Sfida
+              </CardTitle>
+              <CardDescription>Inserisci i dettagli per trovare un avversario.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmitRequest} className="space-y-6">
+                <div className="space-y-2">
+                  <Label className="flex items-center"><Calendar className="mr-2 h-4 w-4 text-club-orange" /> Data</Label>
+                  <Input 
+                    type="date" 
+                    value={requestedDate} 
+                    onChange={e => setRequestedDate(e.target.value)} 
+                    required 
+                    min={new Date().toISOString().split('T')[0]} 
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="flex items-center"><Clock className="mr-2 h-4 w-4 text-club-orange" /> Ora Inizio</Label>
+                    <Select value={preferredTimeStart} onValueChange={setPreferredTimeStart}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {timeSlots.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="flex items-center"><Clock className="mr-2 h-4 w-4 text-club-orange" /> Ora Fine</Label>
+                    <Select value={preferredTimeEnd} onValueChange={setPreferredTimeEnd}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {timeSlots.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="flex items-center"><MapPin className="mr-2 h-4 w-4 text-club-orange" /> Campo</Label>
+                  <Select value={selectedCourtId} onValueChange={setSelectedCourtId}>
+                    <SelectTrigger><SelectValue placeholder="Scegli Campo" /></SelectTrigger>
+                    <SelectContent>
+                      {courts.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="flex items-center"><Users className="mr-2 h-4 w-4 text-club-orange" /> Tipo Partita</Label>
+                    <Select value={matchType} onValueChange={v => setMatchType(v as MatchType)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="singolare">Singolare</SelectItem>
+                        <SelectItem value="doppio">Doppio</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="flex items-center"><Target className="mr-2 h-4 w-4 text-club-orange" /> Livello Minimo</Label>
+                    <Select value={skillLevel} onValueChange={v => setSkillLevel(v as SkillLevel)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(skillLevelLabels).map(([val, label]) => (
+                          <SelectItem key={val} value={val}>{label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Note / Messaggio</Label>
+                  <Textarea placeholder="Es: Cerco qualcuno per un'ora di allenamento intenso..." value={notes} onChange={e => setNotes(e.target.value)} />
+                </div>
+
+                <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={submitting}>
+                  {submitting ? "Pubblicazione..." : "Pubblica Sfida"}
+                </Button>
+              </form>
+            </CardContent>
           </Card>
         </TabsContent>
+
         <TabsContent value="others">
-          <div className="grid gap-4">{othersRequests.map(r => (
-            <Card key={r.id}><CardContent className="p-4 flex justify-between items-center">
-              <div>
-                <h4 className="font-bold">{profiles[r.user_id]}</h4>
-                <p className="text-sm text-gray-500">{format(parseISO(r.requested_date), 'dd/MM/yyyy')} | {r.preferred_time_start}-{r.preferred_time_end}</p>
-                <div className="flex items-center gap-1 text-xs text-primary font-medium mt-1"><MapPin className="h-3 w-3"/> {r.court?.name}</div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {othersRequests.length === 0 ? (
+              <div className="col-span-full text-center py-12 text-muted-foreground">
+                <Users className="mx-auto h-12 w-12 mb-4 opacity-20" />
+                <p>Nessuna sfida aperta al momento. Pubblicane una tu!</p>
               </div>
-              <Button onClick={() => navigate('/match-booking', { state: { matchRequest: r, opponentName: profiles[r.user_id] } })}>Accetta</Button>
-            </CardContent></Card>
-          ))}</div>
+            ) : (
+              othersRequests.map(r => (
+                <Card key={r.id} className="shadow-lg border-l-4 border-l-club-orange hover:shadow-xl transition-shadow">
+                  <CardHeader className="pb-2">
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center">
+                        <Badge className="bg-primary/10 text-primary border-none mr-2 capitalize">{r.match_type}</Badge>
+                        <Badge variant="outline" className="text-xs">{skillLevelLabels[r.skill_level as SkillLevel]}</Badge>
+                      </div>
+                    </div>
+                    <CardTitle className="text-lg mt-2">{profiles[r.user_id]}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2 text-sm text-gray-600">
+                      <div className="flex items-center"><Calendar className="mr-2 h-4 w-4 text-club-orange" /> {format(parseISO(r.requested_date), 'EEEE dd MMMM', { locale: it })}</div>
+                      <div className="flex items-center"><Clock className="mr-2 h-4 w-4 text-club-orange" /> {r.preferred_time_start} - {r.preferred_time_end}</div>
+                      <div className="flex items-center font-medium text-primary"><MapPin className="mr-2 h-4 w-4" /> {r.court?.name}</div>
+                    </div>
+                    {r.notes && (
+                      <div className="p-2 bg-gray-50 rounded text-xs italic text-gray-500 line-clamp-2">
+                        "{r.notes}"
+                      </div>
+                    )}
+                    <Button 
+                      className="w-full bg-primary hover:bg-primary/90"
+                      onClick={() => navigate('/match-booking', { state: { matchRequest: r, opponentName: profiles[r.user_id] } })}
+                    >
+                      Accetta Sfida
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="my">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {myRequests.length === 0 ? (
+              <div className="col-span-full text-center py-12 text-muted-foreground">
+                <Calendar className="mx-auto h-12 w-12 mb-4 opacity-20" />
+                <p>Non hai ancora pubblicato nessuna sfida.</p>
+              </div>
+            ) : (
+              myRequests.map(r => (
+                <Card key={r.id} className="shadow-md opacity-90">
+                  <CardHeader className="pb-2">
+                    <div className="flex justify-between items-center">
+                      <Badge variant={r.status === 'open' ? 'default' : 'secondary'}>
+                        {r.status === 'open' ? 'Aperta' : 'Completata'}
+                      </Badge>
+                      <span className="text-xs text-gray-400">{format(parseISO(r.created_at), 'dd/MM/yy')}</span>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    <div className="flex items-center"><Calendar className="mr-2 h-4 w-4 text-club-orange" /> {format(parseISO(r.requested_date), 'dd/MM/yyyy')}</div>
+                    <div className="flex items-center font-medium"><MapPin className="mr-2 h-4 w-4 text-primary" /> {r.court?.name || 'Campo'}</div>
+                    <div className="text-xs text-gray-500 uppercase font-bold tracking-wider">{r.match_type} • {skillLevelLabels[r.skill_level as SkillLevel]}</div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
         </TabsContent>
       </Tabs>
     </div>
