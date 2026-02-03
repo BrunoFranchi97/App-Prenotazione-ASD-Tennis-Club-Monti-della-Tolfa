@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, LogOut } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
-import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, isEqual, setSeconds, setMilliseconds, addDays } from 'date-fns';
+import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, isEqual, setSeconds, setMilliseconds, addDays, startOfDay } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { useApprovalCheck } from '@/hooks/use-approval-check';
 import { Court, Reservation, BookingType } from '@/types/supabase';
@@ -66,9 +66,9 @@ const BookingCalendar = () => {
     if (!isApproved || !date || !selectedCourtId) return;
     const fetchReservations = async () => {
       setFetchingData(true);
-      const startOfDay = format(date, "yyyy-MM-dd'T'00:00:00.000'Z'");
-      const endOfDay = format(date, "yyyy-MM-dd'T'23:59:59.999'Z'");
-      const { data } = await supabase.from('reservations').select('*').eq('court_id', parseInt(selectedCourtId)).gte('starts_at', startOfDay).lte('ends_at', endOfDay);
+      const startOfDayStr = format(date, "yyyy-MM-dd'T'00:00:00.000'Z'");
+      const endOfDayStr = format(date, "yyyy-MM-dd'T'23:59:59.999'Z'");
+      const { data } = await supabase.from('reservations').select('*').eq('court_id', parseInt(selectedCourtId)).gte('starts_at', startOfDayStr).lte('ends_at', endOfDayStr);
       if (data) setExistingReservations(data);
       setFetchingData(false);
     };
@@ -103,7 +103,6 @@ const BookingCalendar = () => {
 
     const newSelected = [...selectedSlots];
     if (newSelected.includes(slotTime)) {
-      // Per deselezionare, permettiamo solo se è un'estremità per mantenere la consecutività
       const sorted = [...newSelected].sort();
       if (slotTime !== sorted[0] && slotTime !== sorted[sorted.length - 1]) {
         showError("Deseleziona prima gli slot alle estremità per mantenere la consecutività.");
@@ -123,7 +122,6 @@ const BookingCalendar = () => {
           return;
         }
 
-        // Verifica che tutti gli slot nel range siano disponibili e consecutivi
         const range: string[] = [];
         for (let i = firstIdx; i <= lastIdx; i++) {
           if (!isSlotAvailable(allTimeSlots[i]) && !newSelected.includes(allTimeSlots[i])) {
@@ -143,7 +141,6 @@ const BookingCalendar = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Utente non autenticato.");
 
-      // Check for user's existing bookings at the same time (Bug 3)
       const sortedSlots = selectedSlots.sort();
       const firstStart = setSeconds(setMilliseconds(setMinutes(setHours(date!, parseInt(sortedSlots[0].split(':')[0])), 0), 0), 0).toISOString();
       const lastEnd = addHours(setSeconds(setMilliseconds(setMinutes(setHours(date!, parseInt(sortedSlots[sortedSlots.length - 1].split(':')[0])), 0), 0), 0), 1).toISOString();
@@ -187,6 +184,8 @@ const BookingCalendar = () => {
     }
   };
 
+  if (approvalLoading) return <div className="p-8 text-center">Caricamento...</div>;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 sm:p-6">
       <header className="flex justify-between items-center mb-8">
@@ -196,7 +195,15 @@ const BookingCalendar = () => {
         </div>
       </header>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card><CardContent className="p-6"><Calendar mode="single" selected={date} onSelect={setDate} locale={it} disabled={(d) => isBefore(d, startOfDay(new Date())) || isAfter(d, maxDate)} /></CardContent></Card>
+        <Card><CardContent className="p-6">
+          <Calendar 
+            mode="single" 
+            selected={date} 
+            onSelect={setDate} 
+            locale={it} 
+            disabled={(d) => isBefore(d, startOfDay(new Date())) || isAfter(d, maxDate)} 
+          />
+        </CardContent></Card>
         <Card><CardHeader><CardTitle>Dettagli</CardTitle></CardHeader>
           <CardContent className="space-y-6">
             <Select onValueChange={setSelectedCourtId} value={selectedCourtId}><SelectTrigger><SelectValue placeholder="Campo" /></SelectTrigger><SelectContent>{courts.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}</SelectContent></Select>
