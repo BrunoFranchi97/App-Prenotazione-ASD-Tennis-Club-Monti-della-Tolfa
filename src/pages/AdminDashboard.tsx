@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { CalendarPlus, Lock, BarChart2, LogOut, BookOpen, ArrowLeft, Users, CheckCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
@@ -84,37 +85,46 @@ const AdminDashboard = () => {
     };
     
     initialize();
-    
-    // Funzione per aggiornare il conteggio quando la finestra torna in focus
-    const handleFocus = () => {
-      // Esegui il fetch solo se l'utente è già stato identificato come admin
-      if (isAdmin) {
-        fetchUnapprovedCount();
-      }
-    };
 
-    window.addEventListener('focus', handleFocus);
+    // Realtime subscription for unapproved users count
+    const channel = supabase
+      .channel('schema-profiles-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'profiles'
+        },
+        () => {
+          fetchUnapprovedCount();
+        }
+      )
+      .subscribe();
 
     return () => {
       isMounted = false;
-      window.removeEventListener('focus', handleFocus);
+      supabase.removeChannel(channel);
     };
-  }, [navigate, location.pathname, isAdmin]); // Manteniamo location.pathname e isAdmin per robustezza
+  }, [navigate]);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold mb-4 text-primary">Caricamento...</h1>
-          <p className="text-xl text-gray-600">Verifica permessi amministrativi.</p>
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-white flex flex-col">
+        <div className="flex-grow p-4 sm:p-6 lg:p-8">
+          <header className="flex justify-between items-center mb-8">
+            <Skeleton className="h-10 w-64" />
+            <Skeleton className="h-10 w-24" />
+          </header>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="h-48 w-full" />)}
+          </div>
         </div>
       </div>
     );
   }
 
-  if (!isAdmin) {
-    return null; 
-  }
+  if (!isAdmin) return null;
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-green-50 to-white">
@@ -134,7 +144,6 @@ const AdminDashboard = () => {
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* New: Manage Approvals Card */}
           <Card className={`shadow-lg rounded-lg ${unapprovedCount > 0 ? 'border-2 border-red-500' : ''}`}>
             <CardHeader>
               <CardTitle className="text-primary flex items-center">

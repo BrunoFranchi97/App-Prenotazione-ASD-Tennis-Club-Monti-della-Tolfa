@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, LogOut, CalendarDays, Clock, MapPin, Target } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
@@ -48,6 +49,15 @@ const BookingCalendar = () => {
     fetchBookerProfile();
   }, [isApproved]);
 
+  const fetchReservations = async () => {
+    if (!date || !selectedCourtId) return;
+    const startOfDayStr = format(date, "yyyy-MM-dd'T'00:00:00.000'Z'");
+    const endOfDayStr = format(date, "yyyy-MM-dd'T'23:59:59.999'Z'");
+    const { data } = await supabase.from('reservations').select('*').eq('court_id', parseInt(selectedCourtId)).gte('starts_at', startOfDayStr).lte('ends_at', endOfDayStr);
+    if (data) setExistingReservations(data);
+    setFetchingData(false);
+  };
+
   useEffect(() => {
     if (!isApproved) return;
     const fetchCourts = async () => {
@@ -64,16 +74,29 @@ const BookingCalendar = () => {
 
   useEffect(() => {
     if (!isApproved || !date || !selectedCourtId) return;
-    const fetchReservations = async () => {
-      setFetchingData(true);
-      const startOfDayStr = format(date, "yyyy-MM-dd'T'00:00:00.000'Z'");
-      const endOfDayStr = format(date, "yyyy-MM-dd'T'23:59:59.999'Z'");
-      const { data } = await supabase.from('reservations').select('*').eq('court_id', parseInt(selectedCourtId)).gte('starts_at', startOfDayStr).lte('ends_at', endOfDayStr);
-      if (data) setExistingReservations(data);
-      setFetchingData(false);
-    };
     fetchReservations();
     setSelectedSlots([]);
+
+    // Realtime subscription for reservations
+    const channel = supabase
+      .channel('schema-db-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'reservations',
+          filter: `court_id=eq.${selectedCourtId}`
+        },
+        () => {
+          fetchReservations();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [date, selectedCourtId, isApproved]);
 
   const allTimeSlots = useMemo(() => {
@@ -150,7 +173,8 @@ const BookingCalendar = () => {
         .select('id, starts_at, ends_at')
         .eq('user_id', user.id)
         .lt('starts_at', lastEnd)
-        .gt('ends_at', firstStart);
+        .gt('ends_at', firstStart)
+        .neq('status', 'cancelled');
 
       if (userConflicts && userConflicts.length > 0) {
         showError("Hai già un'altra prenotazione in questa fascia oraria su un altro campo.");
@@ -195,7 +219,19 @@ const BookingCalendar = () => {
     }
   };
 
-  if (approvalLoading) return <div className="p-8 text-center">Caricamento...</div>;
+  if (approvalLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 sm:p-6 lg:p-8">
+        <div className="max-w-4xl mx-auto space-y-6">
+          <Skeleton className="h-12 w-3/4 mb-8" />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Skeleton className="h-80 w-full" />
+            <Skeleton className="h-80 w-full" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 sm:p-6 lg:p-8">
@@ -241,14 +277,16 @@ const BookingCalendar = () => {
               <h3 className="text-lg font-semibold mb-2 flex items-center">
                 <MapPin className="mr-2 h-5 w-5 text-club-orange" /> Campo
               </h3>
-              <Select onValueChange={setSelectedCourtId} value={selectedCourtId}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Seleziona un campo" />
-                </SelectTrigger>
-                <SelectContent>
-                  {courts.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              {fetchingData ? <Skeleton className="h-10 w-full" /> : (
+                <Select onValueChange={setSelectedCourtId} value={selectedCourtId}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Seleziona un campo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {courts.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             <div>
@@ -272,7 +310,9 @@ const BookingCalendar = () => {
                 <Clock className="mr-2 h-5 w-5 text-club-orange" /> Orario (Max 3 ore consecutive)
               </h3>
               {fetchingData ? (
-                <p className="text-gray-500">Caricamento disponibilità...</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-10 w-full" />)}
+                </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto p-2 border rounded-md bg-gray-50">
                   {allTimeSlots.map(t => {

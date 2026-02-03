@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Calendar, Clock, Target, Users, MapPin, Search, PlusCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
@@ -63,7 +64,6 @@ const FindMatch = () => {
       
       const today = startOfDay(new Date());
 
-      // Filtra per mostrare solo sfide da oggi in poi
       const activeRequests = requests.filter(r => {
         const reqDate = parseISO(r.requested_date);
         return isAfter(reqDate, today) || format(reqDate, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd');
@@ -83,7 +83,31 @@ const FindMatch = () => {
     }
   };
 
-  useEffect(() => { if (isApproved) fetchData(); }, [isApproved]);
+  useEffect(() => { 
+    if (isApproved) {
+      fetchData();
+
+      // Realtime subscription for match requests
+      const channel = supabase
+        .channel('schema-match-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'match_requests'
+          },
+          () => {
+            fetchData();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [isApproved]);
 
   const handleSubmitRequest = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,7 +118,6 @@ const FindMatch = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
-      // --- CONTROLLO CONFLITTI ---
       const startISO = `${requestedDate}T${preferredTimeStart}:00.000Z`;
       const endISO = `${requestedDate}T${preferredTimeEnd}:00.000Z`;
 
@@ -113,7 +136,6 @@ const FindMatch = () => {
         setSubmitting(false);
         return;
       }
-      // ----------------------------
 
       const { error } = await supabase.from('match_requests').insert({
         user_id: user?.id,
@@ -132,7 +154,7 @@ const FindMatch = () => {
       showSuccess("Sfida pubblicata con successo!");
       setRequestedDate('');
       setNotes('');
-      fetchData();
+      // No need to manually fetch, Realtime will catch it
     } catch (err: any) {
       showError(err.message);
     } finally {
@@ -140,7 +162,21 @@ const FindMatch = () => {
     }
   };
 
-  if (approvalLoading) return <div className="p-8 text-center">Caricamento...</div>;
+  if (approvalLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 sm:p-6 lg:p-8">
+        <header className="mb-8 flex justify-between">
+          <Skeleton className="h-10 w-48" />
+          <Skeleton className="h-10 w-10 rounded-full" />
+        </header>
+        <Skeleton className="h-12 w-full mb-8" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3].map(i => <Skeleton key={i} className="h-64 w-full" />)}
+        </div>
+      </div>
+    );
+  }
+
   if (!isApproved) return null;
 
   return (
@@ -257,7 +293,9 @@ const FindMatch = () => {
 
         <TabsContent value="others">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {othersRequests.length === 0 ? (
+            {loading ? (
+              [1, 2, 3].map(i => <Skeleton key={i} className="h-64 w-full" />)
+            ) : othersRequests.length === 0 ? (
               <div className="col-span-full text-center py-16 text-muted-foreground">
                 <Users className="mx-auto h-16 w-16 mb-4 opacity-10" />
                 <p className="text-xl font-medium">Nessuna sfida aperta</p>
@@ -323,7 +361,9 @@ const FindMatch = () => {
 
         <TabsContent value="my">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {myRequests.length === 0 ? (
+            {loading ? (
+              [1, 2, 3].map(i => <Skeleton key={i} className="h-48 w-full" />)
+            ) : myRequests.length === 0 ? (
               <div className="col-span-full text-center py-16 text-muted-foreground">
                 <Calendar className="mx-auto h-16 w-16 mb-4 opacity-10" />
                 <p className="text-lg font-medium">Non hai pubblicato sfide</p>
