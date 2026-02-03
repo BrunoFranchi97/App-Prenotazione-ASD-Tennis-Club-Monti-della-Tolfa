@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, LogOut } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, isEqual, setSeconds, setMilliseconds, addDays, startOfDay } from 'date-fns';
@@ -208,9 +208,26 @@ const BookingCalendar = () => {
           <CardContent className="space-y-6">
             <Select onValueChange={setSelectedCourtId} value={selectedCourtId}><SelectTrigger><SelectValue placeholder="Campo" /></SelectTrigger><SelectContent>{courts.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}</SelectContent></Select>
             <Select onValueChange={(v) => setBookingType(v as BookingType)} value={bookingType}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="singolare">Singolare</SelectItem><SelectItem value="doppio">Doppio</SelectItem><SelectItem value="lezione">Lezione</SelectItem></SelectContent></Select>
-            <div className="grid grid-cols-3 gap-2">{allTimeSlots.map(t => (
-              <Button key={t} onClick={() => handleSlotClick(t)} variant={selectedSlots.includes(t) ? "default" : "outline"} className={!isSlotAvailable(t) && !selectedSlots.includes(t) ? "opacity-30" : ""}>{t}</Button>
-            ))}</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {allTimeSlots.map(t => {
+                const [hours, minutes] = t.split(':').map(Number);
+                const endTime = format(setMinutes(setHours(new Date(), hours + 1), minutes), 'HH:mm');
+                const isSelected = selectedSlots.includes(t);
+                const available = isSlotAvailable(t);
+                
+                return (
+                  <Button 
+                    key={t} 
+                    onClick={() => handleSlotClick(t)} 
+                    variant={isSelected ? "default" : "outline"} 
+                    className={!available && !isSelected ? "opacity-30" : ""}
+                    disabled={!available && !isSelected}
+                  >
+                    {t} - {endTime}
+                  </Button>
+                );
+              })}
+            </div>
             <Button onClick={handleBooking} className="w-full" disabled={selectedSlots.length === 0 || loading}>Conferma Prenotazione</Button>
           </CardContent>
         </Card>
