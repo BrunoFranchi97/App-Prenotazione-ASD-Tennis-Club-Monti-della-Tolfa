@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { ArrowLeft, FileText, Plus, AlertTriangle, Clock, Download, Upload, X, File, Calendar, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, FileText, Plus, AlertTriangle, Clock, Download, Upload, X, File, Calendar, ShieldCheck, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import UserNav from '@/components/UserNav';
@@ -23,6 +23,7 @@ const MedicalCertificates = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [certificates, setCertificates] = useState<MedicalCertificate[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   
@@ -86,6 +87,30 @@ const MedicalCertificates = () => {
     }
   };
 
+  const handleDownload = async (certificate: MedicalCertificate) => {
+    if (!certificate.file_url) {
+      showError("File non trovato.");
+      return;
+    }
+
+    setDownloadingId(certificate.id);
+    try {
+      const { data, error } = await supabase.storage
+        .from('medical-certificates')
+        .createSignedUrl(certificate.file_url, 60); // URL valido per 60 secondi
+
+      if (error) throw error;
+
+      if (data?.signedUrl) {
+        window.open(data.signedUrl, '_blank');
+      }
+    } catch (err: any) {
+      showError("Impossibile aprire il documento: " + err.message);
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
   const resetForm = () => {
     setIssueDate("");
     setExpiryDate("");
@@ -132,6 +157,8 @@ const MedicalCertificates = () => {
         ) : (
           certificates.map(c => {
             const isValid = isAfter(parseISO(c.expiry_date), startOfDay(new Date()));
+            const isDownloading = downloadingId === c.id;
+
             return (
               <Card key={c.id} className={`shadow-lg border-t-4 ${isValid ? 'border-t-primary' : 'border-t-destructive'}`}>
                 <CardHeader className="pb-2">
@@ -154,8 +181,19 @@ const MedicalCertificates = () => {
                     {c.notes && <p className="mt-2 italic text-xs">"{c.notes}"</p>}
                   </div>
                   <div className="pt-2 border-t">
-                    <Button variant="ghost" size="sm" className="w-full text-primary hover:text-primary hover:bg-secondary">
-                      <Download className="mr-2 h-4 w-4" /> Vedi Documento
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="w-full text-primary hover:text-primary hover:bg-secondary"
+                      onClick={() => handleDownload(c)}
+                      disabled={isDownloading}
+                    >
+                      {isDownloading ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Download className="mr-2 h-4 w-4" />
+                      )}
+                      {isDownloading ? "Apertura..." : "Vedi Documento"}
                     </Button>
                   </div>
                 </CardContent>
