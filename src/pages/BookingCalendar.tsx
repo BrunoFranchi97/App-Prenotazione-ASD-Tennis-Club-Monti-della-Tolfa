@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, LogOut, CalendarDays, Clock, MapPin, Target } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, isEqual, setSeconds, setMilliseconds, addDays, startOfDay } from 'date-fns';
@@ -184,51 +184,126 @@ const BookingCalendar = () => {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      showSuccess("Disconnessione effettuata!");
+      navigate('/login');
+    } catch (error: any) {
+      showError(error.message);
+    }
+  };
+
   if (approvalLoading) return <div className="p-8 text-center">Caricamento...</div>;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 sm:p-6">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 sm:p-6 lg:p-8">
       <header className="flex justify-between items-center mb-8">
         <div className="flex items-center">
-          <Link to="/dashboard" className="mr-4"><Button variant="outline" size="icon"><ArrowLeft className="h-4 w-4" /></Button></Link>
-          <h1 className="text-3xl font-bold text-primary">Prenota un Campo</h1>
+          <Link to="/dashboard" className="mr-4">
+            <Button variant="outline" size="icon" className="text-primary border-primary hover:bg-secondary">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
+          <h1 className="text-3xl font-bold text-primary flex items-center">
+            <CalendarDays className="mr-2 h-7 w-7" /> Prenota un Campo
+          </h1>
         </div>
+        <Button variant="outline" className="text-primary border-primary hover:bg-secondary" onClick={handleLogout}>
+          <LogOut className="mr-2 h-4 w-4" /> Esci
+        </Button>
       </header>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card><CardContent className="p-6">
-          <Calendar 
-            mode="single" 
-            selected={date} 
-            onSelect={setDate} 
-            locale={it} 
-            disabled={(d) => isBefore(d, startOfDay(new Date())) || isAfter(d, maxDate)} 
-          />
-        </CardContent></Card>
-        <Card><CardHeader><CardTitle>Dettagli</CardTitle></CardHeader>
+        <Card className="shadow-lg rounded-lg">
+          <CardHeader>
+            <CardTitle className="text-primary">Seleziona Data</CardTitle>
+          </CardHeader>
+          <CardContent className="flex justify-center">
+            <Calendar 
+              mode="single" 
+              selected={date} 
+              onSelect={setDate} 
+              locale={it} 
+              className="rounded-md border shadow"
+              disabled={(d) => isBefore(d, startOfDay(new Date())) || isAfter(d, maxDate)} 
+            />
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-lg rounded-lg">
+          <CardHeader>
+            <CardTitle className="text-primary">Dettagli Prenotazione</CardTitle>
+          </CardHeader>
           <CardContent className="space-y-6">
-            <Select onValueChange={setSelectedCourtId} value={selectedCourtId}><SelectTrigger><SelectValue placeholder="Campo" /></SelectTrigger><SelectContent>{courts.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}</SelectContent></Select>
-            <Select onValueChange={(v) => setBookingType(v as BookingType)} value={bookingType}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="singolare">Singolare</SelectItem><SelectItem value="doppio">Doppio</SelectItem><SelectItem value="lezione">Lezione</SelectItem></SelectContent></Select>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {allTimeSlots.map(t => {
-                const [hours, minutes] = t.split(':').map(Number);
-                const endTime = format(setMinutes(setHours(new Date(), hours + 1), minutes), 'HH:mm');
-                const isSelected = selectedSlots.includes(t);
-                const available = isSlotAvailable(t);
-                
-                return (
-                  <Button 
-                    key={t} 
-                    onClick={() => handleSlotClick(t)} 
-                    variant={isSelected ? "default" : "outline"} 
-                    className={!available && !isSelected ? "opacity-30" : ""}
-                    disabled={!available && !isSelected}
-                  >
-                    {t} - {endTime}
-                  </Button>
-                );
-              })}
+            <div>
+              <h3 className="text-lg font-semibold mb-2 flex items-center">
+                <MapPin className="mr-2 h-5 w-5 text-club-orange" /> Campo
+              </h3>
+              <Select onValueChange={setSelectedCourtId} value={selectedCourtId}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Seleziona un campo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {courts.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
-            <Button onClick={handleBooking} className="w-full" disabled={selectedSlots.length === 0 || loading}>Conferma Prenotazione</Button>
+
+            <div>
+              <h3 className="text-lg font-semibold mb-2 flex items-center">
+                <Target className="mr-2 h-5 w-5 text-club-orange" /> Tipo di Prenotazione
+              </h3>
+              <Select onValueChange={(v) => setBookingType(v as BookingType)} value={bookingType}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="singolare">Singolare</SelectItem>
+                  <SelectItem value="doppio">Doppio</SelectItem>
+                  <SelectItem value="lezione">Lezione con Maestro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <h3 className="text-lg font-semibold mb-2 flex items-center">
+                <Clock className="mr-2 h-5 w-5 text-club-orange" /> Orario (Max 3 ore consecutive)
+              </h3>
+              {fetchingData ? (
+                <p className="text-gray-500">Caricamento disponibilità...</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto p-2 border rounded-md bg-gray-50">
+                  {allTimeSlots.map(t => {
+                    const [hours, minutes] = t.split(':').map(Number);
+                    const endTime = format(setMinutes(setHours(new Date(), hours + 1), minutes), 'HH:mm');
+                    const isSelected = selectedSlots.includes(t);
+                    const available = isSlotAvailable(t);
+                    
+                    return (
+                      <Button 
+                        key={t} 
+                        onClick={() => handleSlotClick(t)} 
+                        variant={isSelected ? "default" : "outline"} 
+                        className={`w-full ${isSelected ? 'bg-club-orange text-white hover:bg-club-orange/90' : available ? 'bg-primary text-white hover:bg-primary/90' : 'opacity-30 cursor-not-allowed'}`}
+                        disabled={!available && !isSelected}
+                      >
+                        {t} - {endTime}
+                      </Button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <Button 
+              onClick={handleBooking} 
+              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-12 text-lg" 
+              disabled={selectedSlots.length === 0 || loading || fetchingData}
+            >
+              {loading ? "Prenotazione in corso..." : "Conferma Prenotazione"}
+            </Button>
           </CardContent>
         </Card>
       </div>
