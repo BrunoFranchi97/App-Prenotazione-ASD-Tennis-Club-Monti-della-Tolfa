@@ -5,11 +5,18 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
-import { MailCheck, ArrowLeft } from 'lucide-react';
+import { MailCheck, Info } from 'lucide-react';
 import { getAuthRedirectTo } from '@/utils/authRedirect';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const Register = () => {
   const [name, setName] = useState('');
@@ -19,15 +26,25 @@ const Register = () => {
   const [loading, setLoading] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
 
+  // GDPR Consents
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [personalDataAccepted, setPersonalDataAccepted] = useState(false);
+  const [healthDataAccepted, setHealthDataAccepted] = useState(false);
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    
+    if (!termsAccepted || !personalDataAccepted || !healthDataAccepted) {
+      showError("È necessario accettare tutti i consensi per procedere.");
+      return;
+    }
 
     if (password !== confirmPassword) {
       showError("Le password non corrispondono.");
-      setLoading(false);
       return;
     }
+
+    setLoading(true);
 
     try {
       const redirectTo = getAuthRedirectTo();
@@ -44,15 +61,12 @@ const Register = () => {
       });
 
       if (error) {
-        // Se l'utente esiste già, Supabase potrebbe non restituire un errore esplicito per sicurezza 
-        // a seconda delle impostazioni del progetto, ma se lo fa, lo mostriamo chiaramente.
         if (error.message.toLowerCase().includes("already registered") || error.status === 400) {
           showError("Questa email è già in uso. Effettua il login.");
         } else {
           showError(error.message);
         }
       } else if (data.user && data.user.identities && data.user.identities.length === 0) {
-        // Tipico comportamento di Supabase quando l'utente esiste già: restituisce successo ma zero identità
         showError("Email già in uso. Effettua il login o recupera la password.");
       } else if (data.user) {
         setIsRegistered(true);
@@ -117,11 +131,97 @@ const Register = () => {
               <Label htmlFor="password">Password</Label>
               <Input id="password" type="password" placeholder="Min. 6 caratteri" value={password} onChange={(e) => setPassword(e.target.value)} required />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 mb-6">
               <Label htmlFor="confirm-password">Conferma Password</Label>
               <Input id="confirm-password" type="password" placeholder="Ripeti password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
             </div>
-            <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" disabled={loading}>
+
+            {/* GDPR Checkboxes */}
+            <div className="space-y-4 pt-4 border-t border-gray-100">
+              <div className="flex items-start space-x-3">
+                <Checkbox 
+                  id="terms" 
+                  checked={termsAccepted} 
+                  onCheckedChange={(checked) => setTermsAccepted(!!checked)}
+                  className="mt-1"
+                />
+                <div className="grid gap-1.5 leading-none">
+                  <div className="flex items-center">
+                    <Label htmlFor="terms" className="text-sm font-normal cursor-pointer">
+                      Ho letto e accetto i <Link to="/terms" className="text-primary hover:underline font-medium">Termini</Link> e l'<Link to="/privacy" className="text-primary hover:underline font-medium">Informativa Privacy</Link>
+                    </Label>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-4 w-4 ml-2 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="max-w-xs text-xs">Accettazione dei termini di servizio e delle politiche di riservatezza del club.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-start space-x-3">
+                <Checkbox 
+                  id="personalData" 
+                  checked={personalDataAccepted} 
+                  onCheckedChange={(checked) => setPersonalDataAccepted(!!checked)}
+                  className="mt-1"
+                />
+                <div className="grid gap-1.5 leading-none">
+                  <div className="flex items-center">
+                    <Label htmlFor="personalData" className="text-sm font-normal cursor-pointer">
+                      Trattamento dati personali (nome, cognome, email)
+                    </Label>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-4 w-4 ml-2 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="max-w-xs text-xs">Consenso al trattamento dei dati anagrafici per la gestione del profilo socio e delle prenotazioni.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-start space-x-3">
+                <Checkbox 
+                  id="healthData" 
+                  checked={healthDataAccepted} 
+                  onCheckedChange={(checked) => setHealthDataAccepted(!!checked)}
+                  className="mt-1"
+                />
+                <div className="grid gap-1.5 leading-none">
+                  <div className="flex items-center">
+                    <Label htmlFor="healthData" className="text-sm font-normal cursor-pointer">
+                      Trattamento dati sanitari e accesso amministratori
+                    </Label>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-4 w-4 ml-2 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="max-w-xs text-xs">Consenso necessario per la gestione dei certificati medici e la verifica dell'idoneità sportiva da parte del club.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <Button 
+              type="submit" 
+              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground mt-4" 
+              disabled={loading || !termsAccepted || !personalDataAccepted || !healthDataAccepted}
+            >
               {loading ? "Registrazione..." : "Registrati"}
             </Button>
           </form>
