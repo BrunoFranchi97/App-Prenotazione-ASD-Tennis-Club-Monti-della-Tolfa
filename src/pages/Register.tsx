@@ -49,12 +49,17 @@ const Register = () => {
     try {
       const redirectTo = getAuthRedirectTo();
 
+      // Inviamo i consensi nei metadata dell'utente. 
+      // Il trigger DB handle_new_user li prenderà e li scriverà nella tabella profiles.
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             full_name: name,
+            terms_accepted: termsAccepted,
+            personal_data_accepted: personalDataAccepted,
+            health_data_accepted: healthDataAccepted,
           },
           emailRedirectTo: redirectTo,
         },

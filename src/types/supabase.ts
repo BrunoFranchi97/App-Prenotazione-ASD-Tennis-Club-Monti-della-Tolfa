@@ -66,6 +66,10 @@ export interface Profile {
   approved_at?: string | null;
   skill_level: SkillLevel;
   created_at: string;
+  terms_accepted?: boolean;
+  personal_data_accepted?: boolean;
+  health_data_accepted?: boolean;
+  consent_date?: string;
 }
 
 // Tipi utili per le utility
