@@ -5,7 +5,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CalendarPlus, Lock, BarChart2, LogOut, BookOpen, ArrowLeft, Users, CheckCircle } from 'lucide-react';
+import { CalendarPlus, Lock, BarChart2, LogOut, BookOpen, ArrowLeft, Users, CheckCircle, UserCog } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import Footer from '@/components/Footer';
@@ -120,7 +120,7 @@ const AdminDashboard = () => {
             <Skeleton className="h-10 w-24" />
           </header>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3, 4, 5].map(i => (
+            {[1, 2, 3, 4, 5, 6].map(i => (
               <Card key={i} className="shadow-lg rounded-lg">
                 <CardHeader><Skeleton className="h-6 w-32" /></CardHeader>
                 <CardContent className="space-y-4">
@@ -173,6 +173,20 @@ const AdminDashboard = () => {
                 <Button className="w-full bg-club-orange hover:bg-club-orange/80 text-club-orange-foreground">
                   <Users className="mr-2 h-4 w-4" /> Approva Soci
                 </Button>
+              </Link>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-lg rounded-lg">
+            <CardHeader>
+              <CardTitle className="text-primary flex items-center">
+                <UserCog className="mr-2 h-5 w-5" /> Gestione Soci
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-gray-700 mb-4">Gestisci i ruoli dei soci e promuovi nuovi amministratori.</p>
+              <Link to="/admin/users">
+                <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">Gestisci Ruoli</Button>
               </Link>
             </CardContent>
           </Card>
