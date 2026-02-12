@@ -8,7 +8,18 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, LogOut, Users, Search, ShieldCheck, ShieldAlert, Loader2 } from 'lucide-react';
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { ArrowLeft, LogOut, Users, Search, ShieldCheck, Trash2, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import type { Profile } from '@/types/supabase';
@@ -95,6 +106,32 @@ const AdminUserManagement = () => {
     }
   };
 
+  const handleDeleteUser = async (profileId: string) => {
+    if (profileId === currentAdminId) {
+      showError("Non puoi eliminare il tuo profilo amministratore.");
+      return;
+    }
+
+    setProcessingId(profileId);
+    try {
+      // Eliminiamo il profilo. La cancellazione dell'utente auth richiederebbe privilegi Admin/Edge Function.
+      // Eliminando il profilo, l'utente non potrà più usare l'app correttamente.
+      const { error } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', profileId);
+
+      if (error) throw error;
+
+      showSuccess("Socio eliminato con successo.");
+      setProfiles(prev => prev.filter(p => p.id !== profileId));
+    } catch (err: any) {
+      showError("Errore durante l'eliminazione: " + err.message);
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
   const filteredProfiles = profiles.filter(p => 
     (p.full_name || "").toLowerCase().includes(search.toLowerCase())
   );
@@ -119,7 +156,7 @@ const AdminUserManagement = () => {
             </Button>
           </Link>
           <h1 className="text-3xl font-bold text-primary flex items-center">
-            <Users className="mr-2 h-7 w-7" /> Gestione Ruoli Soci
+            <Users className="mr-2 h-7 w-7" /> Gestione Soci
           </h1>
         </div>
         <Button variant="outline" className="text-primary border-primary hover:bg-secondary" onClick={() => navigate('/login')}>
@@ -130,7 +167,7 @@ const AdminUserManagement = () => {
       <Card className="shadow-lg rounded-lg mb-6">
         <CardHeader className="pb-3">
           <CardTitle className="text-primary">Ricerca Socio</CardTitle>
-          <CardDescription>Cerca un socio per nome per promuoverlo o rimuovere i permessi admin.</CardDescription>
+          <CardDescription>Cerca un socio per nome per gestirne il ruolo o rimuoverlo dal club.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="relative">
@@ -145,64 +182,99 @@ const AdminUserManagement = () => {
         </CardContent>
       </Card>
 
-      <Card className="shadow-lg rounded-lg">
+      <Card className="shadow-lg rounded-lg overflow-hidden">
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Socio</TableHead>
-                <TableHead>Stato</TableHead>
-                <TableHead>Ruolo</TableHead>
-                <TableHead className="text-right">Admin</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredProfiles.length === 0 ? (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center py-10 text-muted-foreground">
-                    Nessun socio trovato.
-                  </TableCell>
+                  <TableHead>Socio</TableHead>
+                  <TableHead>Stato</TableHead>
+                  <TableHead>Ruolo</TableHead>
+                  <TableHead className="text-center">Admin</TableHead>
+                  <TableHead className="text-right">Azioni</TableHead>
                 </TableRow>
-              ) : (
-                filteredProfiles.map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell className="font-medium">
-                      {p.full_name || `ID: ${p.id.substring(0, 8)}...`}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={p.approved ? "secondary" : "outline"} className={p.approved ? "bg-green-100 text-green-800 border-none" : ""}>
-                        {p.approved ? "Approvato" : "In attesa"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center">
-                        {p.is_admin ? (
-                          <Badge className="bg-orange-100 text-orange-800 border-none flex items-center">
-                            <ShieldCheck className="mr-1 h-3 w-3" /> Amministratore
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-gray-500">Socio</Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {processingId === p.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                        ) : (
-                          <Switch 
-                            checked={p.is_admin} 
-                            onCheckedChange={() => handleToggleAdmin(p.id, p.is_admin)}
-                            disabled={p.id === currentAdminId}
-                          />
-                        )}
-                      </div>
+              </TableHeader>
+              <TableBody>
+                {filteredProfiles.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
+                      Nessun socio trovato.
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : (
+                  filteredProfiles.map((p) => (
+                    <TableRow key={p.id}>
+                      <TableCell className="font-medium">
+                        {p.full_name || `ID: ${p.id.substring(0, 8)}...`}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={p.approved ? "secondary" : "outline"} className={p.approved ? "bg-green-100 text-green-800 border-none" : ""}>
+                          {p.approved ? "Approvato" : "In attesa"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center">
+                          {p.is_admin ? (
+                            <Badge className="bg-orange-100 text-orange-800 border-none flex items-center">
+                              <ShieldCheck className="mr-1 h-3 w-3" /> Amministratore
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-gray-500">Socio</Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center">
+                          {processingId === p.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                          ) : (
+                            <Switch 
+                              checked={p.is_admin} 
+                              onCheckedChange={() => handleToggleAdmin(p.id, p.is_admin)}
+                              disabled={p.id === currentAdminId}
+                            />
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                              disabled={p.id === currentAdminId || processingId === p.id}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Sei assolutamente sicuro?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Questa azione eliminerà il profilo di <strong>{p.full_name || 'questo socio'}</strong> dal database. 
+                                Il socio non potrà più accedere alle funzionalità dell'app. Questa operazione non può essere annullata.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Annulla</AlertDialogCancel>
+                              <AlertDialogAction 
+                                onClick={() => handleDeleteUser(p.id)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Elimina Socio
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>
