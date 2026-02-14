@@ -209,11 +209,11 @@ const BookingHistory = () => {
               <div className="mt-4 flex items-center justify-center gap-4 text-xs text-muted-foreground">
                 <div className="flex items-center gap-1">
                   <div className="w-2 h-2 rounded-full bg-club-orange"></div>
-                  <span>Giorno con campi</span>
+                  <span>Giorni con prenotazioni</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <div className="w-2 h-2 rounded-full bg-primary"></div>
-                  <span>Oggi/Selezionato</span>
+                  <span>Selezionato</span>
                 </div>
               </div>
             </CardContent>
