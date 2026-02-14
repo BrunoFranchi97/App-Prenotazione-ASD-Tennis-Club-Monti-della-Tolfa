@@ -7,6 +7,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Label } from "@/components/ui/label";
 import { ArrowLeft, LogOut, CalendarDays, Clock, MapPin, Target, User, Lock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
@@ -58,7 +59,6 @@ const BookingCalendar = () => {
       const startRange = startOfDay(date).toISOString();
       const endRange = endOfDay(date).toISOString();
       
-      // 1. Recupera prenotazioni
       const { data: resData, error: resError } = await supabase
         .from('reservations')
         .select('*')
@@ -70,7 +70,6 @@ const BookingCalendar = () => {
       if (resError) throw resError;
       setExistingReservations(resData || []);
 
-      // 2. Recupera profili per mostrare i nomi
       if (resData && resData.length > 0) {
         const userIds = [...new Set(resData.map(r => r.user_id))];
         const { data: profData } = await supabase
