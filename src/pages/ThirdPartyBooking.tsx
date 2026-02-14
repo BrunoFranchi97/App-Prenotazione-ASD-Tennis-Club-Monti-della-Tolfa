@@ -8,7 +8,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, LogOut, Users, User } from 'lucide-react';
+import { ArrowLeft, LogOut, Users, User, Lock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, isEqual, setSeconds, setMilliseconds, addDays, startOfDay } from 'date-fns';
@@ -67,8 +67,8 @@ const ThirdPartyBooking = () => {
   const fetchReservations = async () => {
     if (!date || !selectedCourtId) return;
     setFetchingData(true);
-    const startOfDayStr = format(date, "yyyy-MM-dd'T'00:00:00.000'Z'");
-    const endOfDayStr = format(date, "yyyy-MM-dd'T'23:59:59.999'Z'");
+    const startOfDayStr = format(startOfDay(date), "yyyy-MM-dd'T'00:00:00.000'Z'");
+    const endOfDayStr = format(startOfDay(date), "yyyy-MM-dd'T'23:59:59.999'Z'");
 
     const { data } = await supabase
       .from('reservations')
@@ -95,7 +95,7 @@ const ThirdPartyBooking = () => {
 
   const getSlotReservation = (slotTime: string) => {
     if (!date || !selectedCourtId) return null;
-    let slotStart = setMinutes(setHours(date, parseInt(slotTime.split(':')[0])), 0);
+    let slotStart = setMinutes(setHours(startOfDay(date), parseInt(slotTime.split(':')[0])), 0);
     slotStart = setSeconds(setMilliseconds(slotStart, 0), 0);
     
     return existingReservations.find(res => {
@@ -106,7 +106,7 @@ const ThirdPartyBooking = () => {
 
   const isSlotAvailable = (slotTime: string): boolean => {
     if (!date || !selectedCourtId) return false;
-    let slotStart = setMinutes(setHours(date, parseInt(slotTime.split(':')[0])), 0);
+    let slotStart = setMinutes(setHours(startOfDay(date), parseInt(slotTime.split(':')[0])), 0);
     slotStart = setSeconds(setMilliseconds(slotStart, 0), 0);
     const slotEnd = addHours(slotStart, 1);
     if (isBefore(slotEnd, new Date())) return false;
@@ -158,11 +158,11 @@ const ThirdPartyBooking = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Autenticazione necessaria.");
 
-      const sortedSlots = selectedSlots.sort();
+      const sortedSlots = [...selectedSlots].sort();
       const courtIdNum = parseInt(selectedCourtId);
       
       const reservationsToInsert = sortedSlots.map(slotTime => {
-        let slotStart = setSeconds(setMilliseconds(setMinutes(setHours(date!, parseInt(slotTime.split(':')[0])), 0), 0), 0);
+        let slotStart = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date!), parseInt(slotTime.split(':')[0])), 0), 0), 0);
         return {
           court_id: courtIdNum,
           user_id: user.id,
@@ -256,13 +256,19 @@ const ThirdPartyBooking = () => {
                   const endTime = format(setMinutes(setHours(new Date(), hours + 1), minutes), 'HH:mm');
                   const isSelected = selectedSlots.includes(t);
                   const reservation = getSlotReservation(t);
-                  const available = !reservation && isBefore(new Date(), addHours(setMinutes(setHours(date!, hours), minutes), 1));
+                  const available = !reservation && isBefore(new Date(), addHours(setMinutes(setHours(startOfDay(date!), hours), minutes), 1));
                   
                   let occupiedBy = "";
+                  let isBlocked = false;
                   if (reservation) {
-                    occupiedBy = reservation.booked_for_first_name && reservation.booked_for_last_name
-                      ? `${reservation.booked_for_first_name} ${reservation.booked_for_last_name}`
-                      : reservation.profiles?.full_name || "Occupato";
+                    if (reservation.booked_for_first_name === 'SLOT' && reservation.booked_for_last_name === 'BLOCCATO') {
+                      occupiedBy = "BLOCCATO";
+                      isBlocked = true;
+                    } else {
+                      occupiedBy = reservation.booked_for_first_name && reservation.booked_for_last_name
+                        ? `${reservation.booked_for_first_name} ${reservation.booked_for_last_name}`
+                        : reservation.profiles?.full_name || "Socio";
+                    }
                   }
 
                   return (
@@ -270,11 +276,24 @@ const ThirdPartyBooking = () => {
                       key={t} 
                       onClick={() => available && handleSlotClick(t)} 
                       variant={isSelected ? "default" : "outline"} 
-                      className={`w-full h-auto py-3 flex flex-col gap-1 ${isSelected ? 'bg-club-orange text-white' : available ? 'bg-primary text-white' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
+                      className={`w-full h-auto py-3 flex flex-col gap-1 ${
+                        isSelected 
+                          ? 'bg-club-orange text-white' 
+                          : available 
+                            ? 'bg-primary text-white' 
+                            : isBlocked
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                      }`}
                       disabled={!available && !isSelected}
                     >
                       <span className="font-bold text-sm">{t} - {endTime}</span>
-                      {!available && occupiedBy && <span className="text-[10px] uppercase truncate w-full px-1"><User className="inline h-2.5 w-2.5 mr-0.5" />{occupiedBy}</span>}
+                      {!available && occupiedBy && (
+                        <span className="text-[10px] uppercase truncate w-full px-1 flex items-center justify-center">
+                          {isBlocked ? <Lock className="inline h-2.5 w-2.5 mr-0.5" /> : <User className="inline h-2.5 w-2.5 mr-0.5" />}
+                          {occupiedBy}
+                        </span>
+                      )}
                     </Button>
                   );
                 })}

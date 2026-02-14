@@ -7,7 +7,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, LogOut, CalendarDays, Clock, MapPin, Target, User } from 'lucide-react';
+import { ArrowLeft, LogOut, CalendarDays, Clock, MapPin, Target, User, Lock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, isEqual, setSeconds, setMilliseconds, addDays, startOfDay } from 'date-fns';
@@ -51,18 +51,22 @@ const BookingCalendar = () => {
 
   const fetchReservations = async () => {
     if (!date || !selectedCourtId) return;
-    const startOfDayStr = format(date, "yyyy-MM-dd'T'00:00:00.000'Z'");
-    const endOfDayStr = format(date, "yyyy-MM-dd'T'23:59:59.999'Z'");
+    setFetchingData(true);
+    const startOfDayStr = format(startOfDay(date), "yyyy-MM-dd'T'00:00:00.000'Z'");
+    const endOfDayStr = format(startOfDay(date), "yyyy-MM-dd'T'23:59:59.999'Z'");
     
-    // Recuperiamo anche le informazioni sul profilo per mostrare chi ha prenotato
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('reservations')
       .select('*, profiles(full_name)')
       .eq('court_id', parseInt(selectedCourtId))
       .gte('starts_at', startOfDayStr)
       .lte('ends_at', endOfDayStr);
       
-    if (data) setExistingReservations(data);
+    if (error) {
+      console.error("Errore recupero prenotazioni:", error);
+    } else {
+      setExistingReservations(data || []);
+    }
     setFetchingData(false);
   };
 
@@ -92,8 +96,7 @@ const BookingCalendar = () => {
         {
           event: '*',
           schema: 'public',
-          table: 'reservations',
-          filter: `court_id=eq.${selectedCourtId}`
+          table: 'reservations'
         },
         () => {
           fetchReservations();
@@ -112,10 +115,9 @@ const BookingCalendar = () => {
     return slots;
   }, []);
 
-  // Funzione che restituisce la prenotazione se lo slot è occupato
   const getSlotReservation = (slotTime: string) => {
     if (!date || !selectedCourtId) return null;
-    let slotStart = setMinutes(setHours(date, parseInt(slotTime.split(':')[0])), 0);
+    let slotStart = setMinutes(setHours(startOfDay(date), parseInt(slotTime.split(':')[0])), 0);
     slotStart = setSeconds(setMilliseconds(slotStart, 0), 0);
     
     return existingReservations.find(res => {
@@ -126,17 +128,19 @@ const BookingCalendar = () => {
 
   const isSlotAvailable = (slotTime: string): boolean => {
     if (!date || !selectedCourtId) return false;
-    let slotStart = setMinutes(setHours(date, parseInt(slotTime.split(':')[0])), 0);
+    let slotStart = setMinutes(setHours(startOfDay(date), parseInt(slotTime.split(':')[0])), 0);
     slotStart = setSeconds(setMilliseconds(slotStart, 0), 0);
     const slotEnd = addHours(slotStart, 1);
+    
     if (isBefore(slotEnd, new Date())) return false;
     
-    return !getSlotReservation(slotTime);
+    const reservation = getSlotReservation(slotTime);
+    return !reservation;
   };
 
   const handleSlotClick = (slotTime: string) => {
     if (!isSlotAvailable(slotTime) && !selectedSlots.includes(slotTime)) {
-      showError("Slot non disponibile.");
+      showError("Questo slot non è più disponibile.");
       return;
     }
 
@@ -161,12 +165,15 @@ const BookingCalendar = () => {
           return;
         }
 
-        const range: string[] = [];
         for (let i = firstIdx; i <= lastIdx; i++) {
           if (!isSlotAvailable(allTimeSlots[i]) && !newSelected.includes(allTimeSlots[i])) {
-            showError("Il range contiene slot occupati.");
+            showError("Il range contiene slot già occupati.");
             return;
           }
+        }
+        
+        const range: string[] = [];
+        for (let i = firstIdx; i <= lastIdx; i++) {
           range.push(allTimeSlots[i]);
         }
         setSelectedSlots(range);
@@ -180,27 +187,27 @@ const BookingCalendar = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Utente non autenticato.");
 
-      const sortedSlots = selectedSlots.sort();
-      const firstStart = setSeconds(setMilliseconds(setMinutes(setHours(date!, parseInt(sortedSlots[0].split(':')[0])), 0), 0), 0).toISOString();
-      const lastEnd = addHours(setSeconds(setMilliseconds(setMinutes(setHours(date!, parseInt(sortedSlots[sortedSlots.length - 1].split(':')[0])), 0), 0), 0), 1).toISOString();
+      const sortedSlots = [...selectedSlots].sort();
+      const firstStart = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date!), parseInt(sortedSlots[0].split(':')[0])), 0), 0), 0).toISOString();
+      const lastEnd = addHours(setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date!), parseInt(sortedSlots[sortedSlots.length - 1].split(':')[0])), 0), 0), 0), 1).toISOString();
 
       const { data: userConflicts } = await supabase
         .from('reservations')
-        .select('id, starts_at, ends_at')
+        .select('id')
         .eq('user_id', user.id)
         .lt('starts_at', lastEnd)
         .gt('ends_at', firstStart)
         .neq('status', 'cancelled');
 
       if (userConflicts && userConflicts.length > 0) {
-        showError("Hai già un'altra prenotazione in questa fascia oraria su un altro campo.");
+        showError("Hai già un'altra prenotazione attiva in questa fascia oraria.");
         setLoading(false);
         return;
       }
 
       const courtIdNum = parseInt(selectedCourtId!);
       const reservationsToInsert = sortedSlots.map(slotTime => {
-        let slotStart = setSeconds(setMilliseconds(setMinutes(setHours(date!, parseInt(slotTime.split(':')[0])), 0), 0), 0);
+        let slotStart = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date!), parseInt(slotTime.split(':')[0])), 0), 0), 0);
         return {
           court_id: courtIdNum,
           user_id: user.id,
@@ -208,14 +215,14 @@ const BookingCalendar = () => {
           ends_at: addHours(slotStart, 1).toISOString(),
           status: 'confirmed',
           booking_type: bookingType,
-          notes: `${bookingTypeLabels[bookingType]} - Socio: ${bookerFullName || user.email}`,
+          notes: `${bookingTypeLabels[bookingType]} - Prenotata da: ${bookerFullName || user.email}`,
         };
       });
 
       const { data: inserted, error: insertError } = await supabase.from('reservations').insert(reservationsToInsert).select();
       if (insertError) throw insertError;
 
-      showSuccess("Prenotazione effettuata!");
+      showSuccess("Prenotazione confermata!");
       navigate('/booking-confirmation', { state: { reservations: inserted, courtName: courts.find(c => c.id === courtIdNum)?.name } });
     } catch (error: any) {
       showError(error.message);
@@ -239,25 +246,12 @@ const BookingCalendar = () => {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 sm:p-6 lg:p-8">
         <header className="flex justify-between items-center mb-8">
-          <div className="flex items-center">
-            <Skeleton className="h-10 w-10 mr-4" />
-            <Skeleton className="h-10 w-64" />
-          </div>
+          <Skeleton className="h-10 w-48" />
           <Skeleton className="h-10 w-24" />
         </header>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="shadow-lg rounded-lg">
-            <CardHeader><Skeleton className="h-6 w-32" /></CardHeader>
-            <CardContent className="flex justify-center h-[320px]"><Skeleton className="h-full w-full max-w-[300px]" /></CardContent>
-          </Card>
-          <Card className="shadow-lg rounded-lg">
-            <CardHeader><Skeleton className="h-6 w-32" /></CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2"><Skeleton className="h-5 w-24" /><Skeleton className="h-10 w-full" /></div>
-              <div className="space-y-2"><Skeleton className="h-5 w-24" /><Skeleton className="h-10 w-full" /></div>
-              <div className="space-y-2"><Skeleton className="h-5 w-24" /><div className="grid grid-cols-2 gap-2"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div></div>
-            </CardContent>
-          </Card>
+          <Skeleton className="h-[400px] w-full rounded-lg" />
+          <Skeleton className="h-[400px] w-full rounded-lg" />
         </div>
       </div>
     );
@@ -350,14 +344,21 @@ const BookingCalendar = () => {
                     const endTime = format(setMinutes(setHours(new Date(), hours + 1), minutes), 'HH:mm');
                     const isSelected = selectedSlots.includes(t);
                     const reservation = getSlotReservation(t);
-                    const available = !reservation && isBefore(new Date(), addHours(setMinutes(setHours(date!, hours), minutes), 1));
+                    const available = !reservation && isBefore(new Date(), addHours(setMinutes(setHours(startOfDay(date!), hours), minutes), 1));
                     
-                    // Determiniamo il nome da mostrare se occupato
                     let occupiedBy = "";
+                    let isBlocked = false;
+                    
                     if (reservation) {
-                      occupiedBy = reservation.booked_for_first_name && reservation.booked_for_last_name
-                        ? `${reservation.booked_for_first_name} ${reservation.booked_for_last_name}`
-                        : reservation.profiles?.full_name || "Occupato";
+                      // Se è una prenotazione fittizia creata dall'admin per bloccare lo slot
+                      if (reservation.booked_for_first_name === 'SLOT' && reservation.booked_for_last_name === 'BLOCCATO') {
+                        occupiedBy = "BLOCCATO";
+                        isBlocked = true;
+                      } else {
+                        occupiedBy = reservation.booked_for_first_name && reservation.booked_for_last_name
+                          ? `${reservation.booked_for_first_name} ${reservation.booked_for_last_name}`
+                          : reservation.profiles?.full_name || "Socio";
+                      }
                     }
 
                     return (
@@ -370,17 +371,20 @@ const BookingCalendar = () => {
                             ? 'bg-club-orange text-white hover:bg-club-orange/90' 
                             : available 
                               ? 'bg-primary text-white hover:bg-primary/90' 
-                              : 'bg-gray-200 text-gray-500 cursor-not-allowed border-gray-300'
+                              : isBlocked
+                                ? 'bg-amber-100 text-amber-800 cursor-not-allowed border-amber-200'
+                                : 'bg-gray-200 text-gray-500 cursor-not-allowed border-gray-300'
                         }`}
                         disabled={!available && !isSelected}
                       >
                         <span className="font-bold text-sm">{t} - {endTime}</span>
                         {!available && occupiedBy && (
-                          <span className="text-[10px] uppercase tracking-tight flex items-center justify-center opacity-80">
-                            <User className="h-2.5 w-2.5 mr-1" /> {occupiedBy}
+                          <span className="text-[10px] uppercase tracking-tight flex items-center justify-center opacity-80 px-1 truncate w-full">
+                            {isBlocked ? <Lock className="h-2.5 w-2.5 mr-1" /> : <User className="h-2.5 w-2.5 mr-1" />} 
+                            {occupiedBy}
                           </span>
                         )}
-                        {!available && !occupiedBy && isBefore(addHours(setMinutes(setHours(date!, hours), minutes), 1), new Date()) && (
+                        {!available && !occupiedBy && isBefore(addHours(setMinutes(setHours(startOfDay(date!), hours), minutes), 1), new Date()) && (
                           <span className="text-[10px] uppercase opacity-60 italic">Passato</span>
                         )}
                       </Button>
