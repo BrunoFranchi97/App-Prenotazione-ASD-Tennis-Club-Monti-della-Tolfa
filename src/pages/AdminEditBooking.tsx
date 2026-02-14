@@ -3,15 +3,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Save, Clock, MapPin, CalendarDays, User, Users } from 'lucide-react';
+import { ArrowLeft, Save, Clock, MapPin, CalendarDays, User, Users, AlertTriangle, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
-import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, isEqual, setSeconds, setMilliseconds } from 'date-fns';
+import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, isEqual, setSeconds, setMilliseconds, startOfDay } from 'date-fns';
 import { it } from 'date-fns/locale';
 import type { Court, Reservation, BookingType } from '@/types/supabase';
 
@@ -68,21 +68,21 @@ const AdminEditBooking = () => {
         setCourts(courtsRes.data || []);
         setProfiles(profilesRes.data || []);
 
-        // Fetch existing reservations for this day/court (excluding current group)
-        const startOfDay = format(new Date(group.date), "yyyy-MM-dd'T'00:00:00.000'Z'");
-        const endOfDay = format(new Date(group.date), "yyyy-MM-dd'T'23:59:59.999'Z'");
+        const dateISO = format(new Date(group.date), "yyyy-MM-dd");
+        const startRange = `${dateISO}T00:00:00.000Z`;
+        const endRange = `${dateISO}T23:59:59.999Z`;
 
         const { data: resData } = await supabase
           .from('reservations')
           .select('*')
           .eq('court_id', group.court_id)
-          .gte('starts_at', startOfDay)
-          .lte('ends_at', endOfDay)
+          .gte('starts_at', startRange)
+          .lte('ends_at', endRange)
           .not('id', 'in', `(${group.reservations.map((r: any) => r.id).join(',')})`);
 
         setExistingReservations(resData || []);
 
-        // Set initial values
+        // Init values
         setSelectedUserId(group.user_id);
         setSelectedCourtId(String(group.court_id));
         setSelectedSlots(originalSlots);
@@ -100,11 +100,12 @@ const AdminEditBooking = () => {
     };
 
     fetchData();
-  }, [group, navigate, originalSlots]);
+  }, [group, navigate]);
 
   const isSlotAvailable = (slotTime: string): boolean => {
     if (!group.date) return false;
-    let slotStart = setSeconds(setMilliseconds(setMinutes(setHours(new Date(group.date), parseInt(slotTime.split(':')[0])), 0), 0), 0);
+    const [h] = slotTime.split(':').map(Number);
+    let slotStart = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(new Date(group.date)), h), 0), 0), 0);
     const slotEnd = addHours(slotStart, 1);
 
     return !existingReservations.some(res => {
@@ -115,28 +116,19 @@ const AdminEditBooking = () => {
   };
 
   const handleSlotClick = (slotTime: string) => {
-    if (!isSlotAvailable(slotTime) && !selectedSlots.includes(slotTime)) {
-      showError("Slot occupato.");
+    const isAlreadySelected = selectedSlots.includes(slotTime);
+    
+    if (!isSlotAvailable(slotTime) && !isAlreadySelected) {
+      showError("Questo slot è occupato da un'altra prenotazione.");
       return;
     }
 
-    const newSelected = [...selectedSlots];
-    if (newSelected.includes(slotTime)) {
-      setSelectedSlots(newSelected.filter(s => s !== slotTime));
+    if (isAlreadySelected) {
+      setSelectedSlots(prev => prev.filter(s => s !== slotTime));
     } else {
-      const sorted = [...newSelected, slotTime].sort();
-      const firstIdx = allTimeSlots.indexOf(sorted[0]);
-      const lastIdx = allTimeSlots.indexOf(sorted[sorted.length - 1]);
-      
-      // Gli admin possono fare anche più di 3 ore se necessario? Teniamo 3 per ora o aumentiamo a 4?
-      // Lasciamo la flessibilità all'admin ma con avviso se > 3.
-      if (lastIdx - firstIdx + 1 > 4) {
-        showError("L'intervallo selezionato è molto lungo.");
-      }
-
-      const range: string[] = [];
-      for (let i = firstIdx; i <= lastIdx; i++) range.push(allTimeSlots[i]);
-      setSelectedSlots(range);
+      // Gli admin possono selezionare slot non consecutivi? 
+      // Per coerenza con il sistema e semplicità, permettiamo selezione libera per l'admin.
+      setSelectedSlots(prev => [...prev, slotTime].sort());
     }
   };
 
@@ -151,7 +143,8 @@ const AdminEditBooking = () => {
 
       // 2. Inserisci nuovi slot
       const toInsert = selectedSlots.map(slotTime => {
-        let slotStart = setSeconds(setMilliseconds(setMinutes(setHours(new Date(group.date), parseInt(slotTime.split(':')[0])), 0), 0), 0);
+        const [h] = slotTime.split(':').map(Number);
+        let slotStart = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(new Date(group.date)), h), 0), 0), 0);
         return {
           court_id: parseInt(selectedCourtId),
           user_id: selectedUserId,
@@ -168,7 +161,7 @@ const AdminEditBooking = () => {
       const { error } = await supabase.from('reservations').insert(toInsert);
       if (error) throw error;
 
-      showSuccess("Prenotazione aggiornata!");
+      showSuccess("Prenotazione aggiornata con successo!");
       navigate('/admin/reservations');
     } catch (err: any) {
       showError(err.message);
@@ -177,100 +170,179 @@ const AdminEditBooking = () => {
     }
   };
 
-  if (loading) return <div className="p-8 text-center">Caricamento dati modifica...</div>;
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="text-center">
+        <h2 className="text-xl font-bold text-primary animate-pulse">Caricamento Hub Modifica...</h2>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 sm:p-6">
-      <header className="flex items-center mb-8">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 sm:p-6 pb-24">
+      <header className="flex items-center mb-8 max-w-6xl mx-auto">
         <Link to="/admin/reservations" className="mr-4">
-          <Button variant="outline" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
+          <Button variant="outline" size="icon" className="text-primary border-primary">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
         </Link>
-        <h1 className="text-2xl font-bold text-primary">Modifica Prenotazione Admin</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-primary">Modifica Prenotazione</h1>
+          <p className="text-sm text-gray-500">
+            {format(new Date(group.date), 'EEEE dd MMMM yyyy', { locale: it })} - {group.courtName}
+          </p>
+        </div>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-6xl mx-auto">
-        <Card className="shadow-lg">
+        {/* Sinistra: Gestione Slot (Hub) */}
+        <Card className="shadow-lg border-none">
           <CardHeader>
-            <CardTitle className="text-primary flex items-center"><Users className="mr-2 h-5 w-5" /> Dati Socio e Campo</CardTitle>
+            <CardTitle className="text-primary flex items-center">
+              <Clock className="mr-2 h-5 w-5" /> Selettore Orari
+            </CardTitle>
+            <CardDescription>Clicca per aggiungere o rimuovere le ore dalla prenotazione.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Socio che prenota</Label>
-              <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {profiles.map(p => <SelectItem key={p.id} value={p.id}>{p.full_name || 'Socio'}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Campo</Label>
-              <Select value={selectedCourtId} onValueChange={setSelectedCourtId}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {courts.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 pt-2">
-              <div className="space-y-2">
-                <Label>Nome (conto terzi)</Label>
-                <Input value={bookedForFirstName} onChange={e => setBookedForFirstName(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Cognome (conto terzi)</Label>
-                <Input value={bookedForLastName} onChange={e => setBookedForLastName(e.target.value)} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle className="text-primary flex items-center"><Clock className="mr-2 h-5 w-5" /> Orari e Note</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {allTimeSlots.map(t => {
                 const isSelected = selectedSlots.includes(t);
                 const isOriginal = originalSlots.includes(t);
-                const available = isSlotAvailable(t) || isOriginal;
+                const available = isSlotAvailable(t);
                 
+                const [h] = t.split(':').map(Number);
+                const tEnd = format(setHours(new Date(), h + 1), 'HH:mm');
+
+                let variant: "default" | "outline" | "secondary" = "outline";
+                let customClass = "h-14 flex flex-col items-center justify-center gap-0.5 transition-all ";
+
+                if (isSelected) {
+                  variant = "default";
+                  customClass += "bg-club-orange text-white border-none shadow-md hover:bg-club-orange";
+                } else if (!available) {
+                  customClass += "bg-gray-100 text-gray-400 cursor-not-allowed opacity-50";
+                } else {
+                  customClass += "hover:bg-primary/10 text-primary border-primary/20";
+                }
+
                 return (
                   <Button 
-                    key={t} onClick={() => available && handleSlotClick(t)} 
-                    variant={isSelected ? "default" : "outline"}
-                    className={`h-12 ${isSelected ? 'bg-club-orange text-white hover:bg-club-orange' : available ? 'bg-primary text-white' : 'bg-gray-200 text-gray-500'}`}
+                    key={t} 
+                    variant={variant}
                     disabled={!available && !isSelected}
+                    onClick={() => handleSlotClick(t)}
+                    className={customClass}
                   >
-                    {t}
+                    <span className="font-bold text-sm">{t} - {tEnd}</span>
+                    {isOriginal && isSelected && <span className="text-[9px] uppercase font-medium opacity-80">Originale</span>}
                   </Button>
                 );
               })}
             </div>
-
-            <div className="space-y-2">
-              <Label>Tipo Prenotazione</Label>
-              <Select value={bookingType} onValueChange={v => setBookingType(v as BookingType)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {Object.entries(bookingTypeLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
-                </SelectContent>
-              </Select>
+            
+            <div className="mt-6 p-4 bg-primary/5 rounded-lg border border-primary/10">
+              <div className="flex items-center text-sm text-primary font-medium">
+                <AlertTriangle className="mr-2 h-4 w-4" />
+                Info Admin
+              </div>
+              <p className="text-xs text-gray-600 mt-1">
+                Come amministratore puoi selezionare qualsiasi slot libero. Se deselezioni tutti gli slot originali e ne scegli altri, la prenotazione verrà spostata.
+              </p>
             </div>
-
-            <div className="space-y-2">
-              <Label>Note</Label>
-              <Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} />
-            </div>
-
-            <Button onClick={handleSave} className="w-full bg-primary h-12" disabled={saving}>
-              {saving ? "Salvataggio..." : "Applica Modifiche"}
-            </Button>
           </CardContent>
         </Card>
+
+        {/* Destra: Dati e Note */}
+        <div className="space-y-6">
+          <Card className="shadow-lg border-none">
+            <CardHeader>
+              <CardTitle className="text-primary flex items-center">
+                <Users className="mr-2 h-5 w-5" /> Socio e Campo
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Socio che ha effettuato l'ordine</Label>
+                <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                  <SelectTrigger className="bg-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {profiles.map(p => <SelectItem key={p.id} value={p.id}>{p.full_name || 'Socio'}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Campo</Label>
+                <Select value={selectedCourtId} onValueChange={setSelectedCourtId}>
+                  <SelectTrigger className="bg-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {courts.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 pt-2">
+                <div className="space-y-2">
+                  <Label>Nome (conto terzi)</Label>
+                  <Input value={bookedForFirstName} onChange={e => setBookedForFirstName(e.target.value)} placeholder="Nome" className="bg-white" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Cognome (conto terzi)</Label>
+                  <Input value={bookedForLastName} onChange={e => setBookedForLastName(e.target.value)} placeholder="Cognome" className="bg-white" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-lg border-none">
+            <CardHeader>
+              <CardTitle className="text-primary flex items-center">
+                <Edit className="mr-2 h-5 w-5" /> Dettagli Extra
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Tipo Prenotazione</Label>
+                <Select value={bookingType} onValueChange={v => setBookingType(v as BookingType)}>
+                  <SelectTrigger className="bg-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(bookingTypeLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Note Amministrative</Label>
+                <Textarea 
+                  value={notes} 
+                  onChange={e => setNotes(e.target.value)} 
+                  rows={4} 
+                  placeholder="Aggiungi dettagli o motivazioni della modifica..."
+                  className="bg-white"
+                />
+              </div>
+
+              <div className="pt-4 flex gap-3">
+                <Button 
+                  onClick={handleSave} 
+                  className="flex-1 bg-primary hover:bg-primary/90 text-white font-bold h-12" 
+                  disabled={saving || selectedSlots.length === 0}
+                >
+                  {saving ? "Salvataggio..." : <><Save className="mr-2 h-4 w-4" /> Salva Modifiche</>}
+                </Button>
+                <Link to="/admin/reservations" className="flex-1">
+                  <Button variant="outline" className="w-full h-12 border-gray-300 text-gray-600">Annulla</Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

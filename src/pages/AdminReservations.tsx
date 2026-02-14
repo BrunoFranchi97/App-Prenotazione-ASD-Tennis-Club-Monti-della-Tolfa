@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { format, parseISO, isSameDay, startOfDay } from "date-fns";
 import { it } from "date-fns/locale";
-import { ArrowLeft, Eye, LogOut, PlusCircle, RefreshCw, Search, Trash2, Edit, Clock, MapPin, Users, AlertCircle, ChevronDown, ChevronUp, Filter } from "lucide-react";
+import { ArrowLeft, Eye, LogOut, PlusCircle, RefreshCw, Search, Trash2, Edit, Clock, MapPin, Users, AlertCircle, ChevronDown, ChevronUp, Filter, MessageSquare } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
@@ -300,17 +300,17 @@ export default function AdminReservations() {
 
         <main className="lg:col-span-8">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">
+            <h2 className="text-xl font-semibold text-gray-700">
               {selectedDate ? format(selectedDate, 'dd MMMM yyyy', { locale: it }) : 'Tutte le date'}
             </h2>
-            <Badge variant="secondary">{filtered.length} Gruppi</Badge>
+            <Badge variant="secondary" className="bg-white">{filtered.length} {filtered.length === 1 ? 'Gruppo' : 'Gruppi'}</Badge>
           </div>
 
           <div className="space-y-4">
             {filtered.length === 0 ? (
               <Card className="py-20 text-center text-muted-foreground bg-white/50 border-dashed">
                 <AlertCircle className="mx-auto h-12 w-12 mb-4 opacity-20" />
-                <p>Nessun risultato trovato.</p>
+                <p>Nessuna prenotazione per questa data.</p>
               </Card>
             ) : (
               filtered.map(group => (
@@ -331,12 +331,33 @@ export default function AdminReservations() {
                             </h3>
                           </div>
                           <div className="flex gap-1">
-                            <Button variant="ghost" size="icon" className="text-blue-500 hover:bg-blue-50" onClick={(e) => { e.stopPropagation(); setDetailsReservationId(group.reservations[0].id); setDetailsOpen(true); }}><Eye className="h-5 w-5" /></Button>
-                            <Button variant="ghost" size="icon" className="text-primary hover:bg-green-50" onClick={(e) => { e.stopPropagation(); navigate('/admin/edit-reservation', { state: { group } }); }}><Edit className="h-5 w-5" /></Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="text-blue-500 hover:bg-blue-50 focus-visible:ring-0" 
+                              onClick={(e) => { e.stopPropagation(); setDetailsReservationId(group.reservations[0].id); setDetailsOpen(true); }}
+                            >
+                              <Eye className="h-5 w-5" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="text-primary hover:bg-green-50 focus-visible:ring-0" 
+                              onClick={(e) => { e.stopPropagation(); navigate('/admin/edit-reservation', { state: { group } }); }}
+                            >
+                              <Edit className="h-5 w-5" />
+                            </Button>
                             
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" className="text-destructive hover:bg-red-50" onClick={(e) => e.stopPropagation()}><Trash2 className="h-5 w-5" /></Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="text-destructive hover:bg-red-50 focus-visible:ring-0" 
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <Trash2 className="h-5 w-5" />
+                                </Button>
                               </AlertDialogTrigger>
                               <AlertDialogContent>
                                 <AlertDialogHeader>
@@ -352,38 +373,48 @@ export default function AdminReservations() {
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-gray-600">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm text-gray-600 mb-4">
                           <div className="flex items-center"><Users className="mr-2 h-4 w-4 text-club-orange" /> <span className="font-medium mr-1">Da:</span> <span className="truncate">{group.bookedByName}</span></div>
                           <div className="flex items-center"><Users className="mr-2 h-4 w-4 text-club-orange" /> <span className="font-medium mr-1">Per:</span> <span className="truncate font-semibold">{group.bookedForName}</span></div>
                         </div>
 
-                        <div className="mt-4 pt-3 border-t border-gray-50 flex items-center justify-between">
+                        {group.notes && (
+                          <div className="mb-4 p-2 bg-gray-50 rounded-md border-l-4 border-club-orange">
+                            <div className="flex items-start">
+                              <MessageSquare className="mr-2 h-4 w-4 text-club-orange shrink-0 mt-0.5" />
+                              <span className="text-sm text-gray-700 italic leading-relaxed">"{group.notes}"</span>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="mt-2 pt-3 border-t border-gray-100">
                           <CollapsibleTrigger asChild>
-                            <Button variant="link" size="sm" className="p-0 text-primary h-auto flex items-center">
+                            <Button variant="link" size="sm" className="p-0 text-primary h-auto flex items-center font-semibold hover:no-underline">
                               {openGroups[group.id] ? <ChevronUp className="h-4 w-4 mr-1" /> : <ChevronDown className="h-4 w-4 mr-1" />}
                               Dettaglio Ore
                             </Button>
                           </CollapsibleTrigger>
-                          {group.notes && <span className="text-[11px] text-muted-foreground italic truncate max-w-[150px]">"{group.notes}"</span>}
                         </div>
 
                         <CollapsibleContent className="mt-3 space-y-2">
-                          {group.reservations.map((res) => (
-                            <div key={res.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-md text-xs">
-                              <div className="flex items-center gap-3">
-                                <span className="font-bold text-gray-700">{format(parseISO(res.starts_at), 'HH:mm')} - {format(parseISO(res.ends_at), 'HH:mm')}</span>
-                                <Badge variant="outline" className="text-[10px] capitalize bg-white">{res.booking_type}</Badge>
+                          <div className="grid grid-cols-1 gap-2">
+                            {group.reservations.map((res) => (
+                              <div key={res.id} className="flex items-center justify-between p-3 bg-white border border-gray-100 rounded-lg shadow-sm">
+                                <div className="flex items-center gap-4">
+                                  <span className="font-bold text-gray-800 text-sm">{format(parseISO(res.starts_at), 'HH:mm')} - {format(parseISO(res.ends_at), 'HH:mm')}</span>
+                                  <Badge variant="outline" className="text-[10px] uppercase font-bold tracking-wider py-0.5 bg-secondary/30">{res.booking_type}</Badge>
+                                </div>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-8 w-8 text-destructive hover:bg-red-50" 
+                                  onClick={() => handleDeleteOne(res.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
                               </div>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-7 w-7 text-destructive hover:bg-red-100" 
-                                onClick={() => handleDeleteOne(res.id)}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </CollapsibleContent>
                       </div>
                     </div>
