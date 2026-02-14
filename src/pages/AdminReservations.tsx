@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { format, parseISO, isSameDay, startOfDay } from "date-fns";
 import { it } from "date-fns/locale";
-import { ArrowLeft, Eye, LogOut, PlusCircle, RefreshCw, Search, Trash2, Edit, Clock, MapPin, Users, AlertCircle, ChevronDown, ChevronUp, Filter, MessageSquare } from "lucide-react";
+import { ArrowLeft, Eye, LogOut, PlusCircle, RefreshCw, Search, Trash2, Clock, MapPin, Users, AlertCircle, ChevronDown, ChevronUp, Filter, Trophy } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
@@ -37,7 +37,7 @@ import {
 import ReservationFormDialog from "@/components/admin/ReservationFormDialog";
 import ReservationDetailsDialog from "@/components/admin/ReservationDetailsDialog";
 
-import type { Court, Reservation } from "@/types/supabase";
+import type { Court, Reservation, BookingType } from "@/types/supabase";
 
 type ProfileLite = { id: string; full_name: string | null };
 
@@ -60,9 +60,14 @@ interface ReservationGroup {
   bookedByName: string;
   bookedForName: string;
   court?: Court;
-  notes?: string;
-  bookingType?: string;
+  bookingType: BookingType;
 }
+
+const bookingTypeLabels: Record<BookingType, string> = {
+  singolare: 'Singolare',
+  doppio: 'Doppio',
+  lezione: 'Lezione con Maestro'
+};
 
 function statusLabel(s: Reservation["status"]) {
   if (s === "confirmed") return "Confermata";
@@ -136,8 +141,7 @@ function createGroup(res: ReservationRow, date: Date, start: Date, end: Date): R
     bookedByName: res.bookedByName,
     bookedForName: res.bookedForName,
     court: res.court,
-    notes: cleanReservationNotes(res.notes),
-    bookingType: res.booking_type,
+    bookingType: res.booking_type || 'singolare',
   };
 }
 
@@ -205,7 +209,7 @@ export default function AdminReservations() {
         if (filterCourtId !== "all" && String(g.court_id) !== filterCourtId) return false;
         if (filterStatus !== "all" && g.status !== filterStatus) return false;
         if (!q) return true;
-        return [g.court?.name || "", g.bookedByName, g.bookedForName, g.notes || ""].join(" ").toLowerCase().includes(q);
+        return [g.court?.name || "", g.bookedByName, g.bookedForName].join(" ").toLowerCase().includes(q);
       })
       .sort((a, b) => a.startTime.localeCompare(b.startTime));
   }, [groups, selectedDate, filterCourtId, filterStatus, search]);
@@ -288,7 +292,7 @@ export default function AdminReservations() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Cerca Socio o Note</Label>
+                <Label>Cerca Socio</Label>
                 <div className="relative">
                   <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cerca..." />
@@ -323,6 +327,9 @@ export default function AdminReservations() {
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
                               <Badge className={statusBadgeClasses(group.status as any)}>{statusLabel(group.status as any)}</Badge>
+                              <Badge variant="outline" className="bg-secondary/20 text-primary border-primary/20 flex items-center">
+                                <Trophy className="mr-1 h-3 w-3" /> {bookingTypeLabels[group.bookingType]}
+                              </Badge>
                               <span className="text-sm font-bold text-gray-500">{group.court?.name}</span>
                             </div>
                             <h3 className="text-xl font-bold text-gray-800 flex items-center">
@@ -338,14 +345,6 @@ export default function AdminReservations() {
                               onClick={(e) => { e.stopPropagation(); setDetailsReservationId(group.reservations[0].id); setDetailsOpen(true); }}
                             >
                               <Eye className="h-5 w-5" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="text-primary hover:bg-green-50 focus-visible:ring-0" 
-                              onClick={(e) => { e.stopPropagation(); navigate('/admin/edit-reservation', { state: { group } }); }}
-                            >
-                              <Edit className="h-5 w-5" />
                             </Button>
                             
                             <AlertDialog>
@@ -378,20 +377,11 @@ export default function AdminReservations() {
                           <div className="flex items-center"><Users className="mr-2 h-4 w-4 text-club-orange" /> <span className="font-medium mr-1">Per:</span> <span className="truncate font-semibold">{group.bookedForName}</span></div>
                         </div>
 
-                        {group.notes && (
-                          <div className="mb-4 p-2 bg-gray-50 rounded-md border-l-4 border-club-orange">
-                            <div className="flex items-start">
-                              <MessageSquare className="mr-2 h-4 w-4 text-club-orange shrink-0 mt-0.5" />
-                              <span className="text-sm text-gray-700 italic leading-relaxed">"{group.notes}"</span>
-                            </div>
-                          </div>
-                        )}
-
                         <div className="mt-2 pt-3 border-t border-gray-100">
                           <CollapsibleTrigger asChild>
                             <Button variant="link" size="sm" className="p-0 text-primary h-auto flex items-center font-semibold hover:no-underline">
                               {openGroups[group.id] ? <ChevronUp className="h-4 w-4 mr-1" /> : <ChevronDown className="h-4 w-4 mr-1" />}
-                              Dettaglio Ore
+                              Gestisci singole ore
                             </Button>
                           </CollapsibleTrigger>
                         </div>
@@ -427,7 +417,7 @@ export default function AdminReservations() {
       </div>
 
       <ReservationFormDialog open={formOpen} onOpenChange={setFormOpen} mode="create" courts={courts} profiles={profiles} onSubmit={async (v) => { await supabase.from('reservations').insert(v); refreshAll(); setFormOpen(false); }} />
-      <ReservationDetailsDialog open={detailsOpen} onOpenChange={setDetailsOpen} reservation={detailsReservation} court={detailsCourt} bookedByName={detailsReservation?.bookedByName || "—"} onEdit={() => { setDetailsOpen(false); navigate('/admin/edit-reservation', { state: { group: groups.find(g => g.reservations.some(r => r.id === detailsReservation?.id)) } }); }} />
+      <ReservationDetailsDialog open={detailsOpen} onOpenChange={setDetailsOpen} reservation={detailsReservation} court={detailsCourt} bookedByName={detailsReservation?.bookedByName || "—"} onEdit={() => { setDetailsOpen(false); refreshAll(); }} />
     </div>
   );
 }
