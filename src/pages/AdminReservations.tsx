@@ -148,7 +148,7 @@ export default function AdminReservations() {
   const [courts, setCourts] = useState<Court[]>([]);
   const [profiles, setProfiles] = useState<ProfileLite[]>([]);
   const [reservations, setReservations] = useState<ReservationRow[]>([]);
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
 
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [filterCourtId, setFilterCourtId] = useState<string>("all");
@@ -212,14 +212,27 @@ export default function AdminReservations() {
 
   const bookedDates = useMemo(() => groups.map(g => g.date), [groups]);
 
+  const handleDeleteOne = async (id: string) => {
+    try {
+      const { error } = await supabase.from('reservations').delete().eq('id', id);
+      if (error) throw error;
+      showSuccess("Ora eliminata.");
+      refreshAll();
+    } catch (e: any) { showError(e.message); }
+  };
+
   const handleDeleteGroup = async (group: ReservationGroup) => {
     try {
       for (const res of group.reservations) {
-        await supabase.from("reservations").delete().eq("id", res.id);
+        await supabase.from('reservations').delete().eq('id', res.id);
       }
       showSuccess("Intero gruppo eliminato.");
       refreshAll();
     } catch (e: any) { showError(e.message); }
+  };
+
+  const toggleGroup = (id: string) => {
+    setOpenGroups(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
   if (!isAdmin && !loading) return null;
@@ -301,53 +314,81 @@ export default function AdminReservations() {
               </Card>
             ) : (
               filtered.map(group => (
-                <Card key={group.id} className="shadow-sm border-none overflow-hidden hover:shadow-md transition-shadow">
-                  <div className="flex flex-col sm:flex-row">
-                    <div className={`w-full sm:w-2 ${group.status === 'confirmed' ? 'bg-primary' : 'bg-destructive'}`}></div>
-                    <div className="flex-1 p-4">
-                      <div className="flex justify-between items-start mb-3">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <Badge className={statusBadgeClasses(group.status as any)}>{statusLabel(group.status as any)}</Badge>
-                            <span className="text-sm font-bold text-gray-500">{group.court?.name}</span>
+                <Collapsible key={group.id} open={openGroups[group.id]} onOpenChange={() => toggleGroup(group.id)}>
+                  <Card className="shadow-sm border-none overflow-hidden hover:shadow-md transition-shadow">
+                    <div className="flex flex-col sm:flex-row">
+                      <div className={`w-full sm:w-2 ${group.status === 'confirmed' ? 'bg-primary' : 'bg-destructive'}`}></div>
+                      <div className="flex-1 p-4">
+                        <div className="flex justify-between items-start mb-3">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <Badge className={statusBadgeClasses(group.status as any)}>{statusLabel(group.status as any)}</Badge>
+                              <span className="text-sm font-bold text-gray-500">{group.court?.name}</span>
+                            </div>
+                            <h3 className="text-xl font-bold text-gray-800 flex items-center">
+                              <Clock className="mr-2 h-5 w-5 text-club-orange" /> {group.startTime} - {group.endTime}
+                              <span className="ml-2 text-sm font-normal text-muted-foreground">({group.totalHours}h)</span>
+                            </h3>
                           </div>
-                          <h3 className="text-xl font-bold text-gray-800 flex items-center">
-                            <Clock className="mr-2 h-5 w-5 text-club-orange" /> {group.startTime} - {group.endTime}
-                          </h3>
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="icon" className="text-blue-500 hover:bg-blue-50" onClick={(e) => { e.stopPropagation(); setDetailsReservationId(group.reservations[0].id); setDetailsOpen(true); }}><Eye className="h-5 w-5" /></Button>
+                            <Button variant="ghost" size="icon" className="text-primary hover:bg-green-50" onClick={(e) => { e.stopPropagation(); navigate('/admin/edit-reservation', { state: { group } }); }}><Edit className="h-5 w-5" /></Button>
+                            
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="text-destructive hover:bg-red-50" onClick={(e) => e.stopPropagation()}><Trash2 className="h-5 w-5" /></Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Elimina intera prenotazione?</AlertDialogTitle>
+                                  <AlertDialogDescription>Verranno eliminati tutti gli slot dalle {group.startTime} alle {group.endTime}.</AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Annulla</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDeleteGroup(group)} className="bg-destructive text-white">Elimina Tutto</AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
                         </div>
-                        <div className="flex gap-1">
-                          <Button variant="ghost" size="icon" className="text-blue-600 hover:bg-blue-50" onClick={() => { setDetailsReservationId(group.reservations[0].id); setDetailsOpen(true); }}><Eye className="h-5 w-5" /></Button>
-                          <Button variant="ghost" size="icon" className="text-primary hover:bg-green-50" onClick={() => navigate('/admin/edit-reservation', { state: { group } })}><Edit className="h-5 w-5" /></Button>
-                          
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="text-destructive hover:bg-red-50"><Trash2 className="h-5 w-5" /></Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Elimina intera prenotazione?</AlertDialogTitle>
-                                <AlertDialogDescription>Verranno eliminati tutti gli slot dalle {group.startTime} alle {group.endTime} per il campo {group.court?.name}.</AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Annulla</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeleteGroup(group)} className="bg-destructive text-white">Elimina Tutto</AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-gray-600">
+                          <div className="flex items-center"><Users className="mr-2 h-4 w-4 text-club-orange" /> <span className="font-medium mr-1">Da:</span> <span className="truncate">{group.bookedByName}</span></div>
+                          <div className="flex items-center"><Users className="mr-2 h-4 w-4 text-club-orange" /> <span className="font-medium mr-1">Per:</span> <span className="truncate font-semibold">{group.bookedForName}</span></div>
                         </div>
-                      </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-gray-600">
-                        <div className="flex items-center"><Users className="mr-2 h-4 w-4 text-club-orange" /> <span className="font-medium mr-1">Da:</span> <span className="truncate">{group.bookedByName}</span></div>
-                        <div className="flex items-center"><Users className="mr-2 h-4 w-4 text-club-orange" /> <span className="font-medium mr-1">Per:</span> <span className="truncate font-semibold">{group.bookedForName}</span></div>
-                      </div>
+                        <div className="mt-4 pt-3 border-t border-gray-50 flex items-center justify-between">
+                          <CollapsibleTrigger asChild>
+                            <Button variant="link" size="sm" className="p-0 text-primary h-auto flex items-center">
+                              {openGroups[group.id] ? <ChevronUp className="h-4 w-4 mr-1" /> : <ChevronDown className="h-4 w-4 mr-1" />}
+                              Dettaglio Ore
+                            </Button>
+                          </CollapsibleTrigger>
+                          {group.notes && <span className="text-[11px] text-muted-foreground italic truncate max-w-[150px]">"{group.notes}"</span>}
+                        </div>
 
-                      {group.notes && (
-                        <p className="mt-3 text-xs text-gray-500 italic border-l-2 border-gray-100 pl-2 line-clamp-2">"{group.notes}"</p>
-                      )}
+                        <CollapsibleContent className="mt-3 space-y-2">
+                          {group.reservations.map((res) => (
+                            <div key={res.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-md text-xs">
+                              <div className="flex items-center gap-3">
+                                <span className="font-bold text-gray-700">{format(parseISO(res.starts_at), 'HH:mm')} - {format(parseISO(res.ends_at), 'HH:mm')}</span>
+                                <Badge variant="outline" className="text-[10px] capitalize bg-white">{res.booking_type}</Badge>
+                              </div>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-7 w-7 text-destructive hover:bg-red-100" 
+                                onClick={() => handleDeleteOne(res.id)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          ))}
+                        </CollapsibleContent>
+                      </div>
                     </div>
-                  </div>
-                </Card>
+                  </Card>
+                </Collapsible>
               ))
             )}
           </div>
