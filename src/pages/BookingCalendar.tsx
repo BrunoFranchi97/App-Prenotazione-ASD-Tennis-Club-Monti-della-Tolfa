@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, LogOut, CalendarDays, Clock, MapPin, Target, User, Lock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
-import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, isEqual, setSeconds, setMilliseconds, addDays, startOfDay } from 'date-fns';
+import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, isEqual, setSeconds, setMilliseconds, addDays, startOfDay, endOfDay } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { useApprovalCheck } from '@/hooks/use-approval-check';
 import { Court, Reservation, BookingType } from '@/types/supabase';
@@ -52,15 +52,18 @@ const BookingCalendar = () => {
   const fetchReservations = async () => {
     if (!date || !selectedCourtId) return;
     setFetchingData(true);
-    const startOfDayStr = format(startOfDay(date), "yyyy-MM-dd'T'00:00:00.000'Z'");
-    const endOfDayStr = format(startOfDay(date), "yyyy-MM-dd'T'23:59:59.999'Z'");
+    
+    // Usiamo toISOString per una gestione corretta del range temporale indipendentemente dalla timezone
+    const startRange = startOfDay(date).toISOString();
+    const endRange = endOfDay(date).toISOString();
     
     const { data, error } = await supabase
       .from('reservations')
       .select('*, profiles(full_name)')
       .eq('court_id', parseInt(selectedCourtId))
-      .gte('starts_at', startOfDayStr)
-      .lte('ends_at', endOfDayStr);
+      .gte('starts_at', startRange)
+      .lte('ends_at', endRange)
+      .neq('status', 'cancelled');
       
     if (error) {
       console.error("Errore recupero prenotazioni:", error);
@@ -117,19 +120,22 @@ const BookingCalendar = () => {
 
   const getSlotReservation = (slotTime: string) => {
     if (!date || !selectedCourtId) return null;
-    let slotStart = setMinutes(setHours(startOfDay(date), parseInt(slotTime.split(':')[0])), 0);
-    slotStart = setSeconds(setMilliseconds(slotStart, 0), 0);
+    
+    const [hours, minutes] = slotTime.split(':').map(Number);
+    let slotStart = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date), hours), minutes), 0), 0);
     
     return existingReservations.find(res => {
       const resStart = parseISO(res.starts_at);
-      return isEqual(slotStart, resStart);
+      // Confronto basato sul timestamp Unix per evitare problemi di timezone
+      return resStart.getTime() === slotStart.getTime();
     });
   };
 
   const isSlotAvailable = (slotTime: string): boolean => {
     if (!date || !selectedCourtId) return false;
-    let slotStart = setMinutes(setHours(startOfDay(date), parseInt(slotTime.split(':')[0])), 0);
-    slotStart = setSeconds(setMilliseconds(slotStart, 0), 0);
+    
+    const [hours, minutes] = slotTime.split(':').map(Number);
+    let slotStart = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date), hours), minutes), 0), 0);
     const slotEnd = addHours(slotStart, 1);
     
     if (isBefore(slotEnd, new Date())) return false;
@@ -191,6 +197,7 @@ const BookingCalendar = () => {
       const firstStart = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date!), parseInt(sortedSlots[0].split(':')[0])), 0), 0), 0).toISOString();
       const lastEnd = addHours(setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date!), parseInt(sortedSlots[sortedSlots.length - 1].split(':')[0])), 0), 0), 0), 1).toISOString();
 
+      // Verifica conflitti utente
       const { data: userConflicts } = await supabase
         .from('reservations')
         .select('id')
@@ -201,6 +208,22 @@ const BookingCalendar = () => {
 
       if (userConflicts && userConflicts.length > 0) {
         showError("Hai già un'altra prenotazione attiva in questa fascia oraria.");
+        setLoading(false);
+        return;
+      }
+
+      // Doppia verifica disponibilità campo (concurrency check)
+      const { data: courtConflicts } = await supabase
+        .from('reservations')
+        .select('id')
+        .eq('court_id', parseInt(selectedCourtId!))
+        .lt('starts_at', lastEnd)
+        .gt('ends_at', firstStart)
+        .neq('status', 'cancelled');
+
+      if (courtConflicts && courtConflicts.length > 0) {
+        showError("Spiacente, qualcuno ha appena prenotato questi slot. La pagina verrà aggiornata.");
+        fetchReservations();
         setLoading(false);
         return;
       }
@@ -245,13 +268,9 @@ const BookingCalendar = () => {
   if (approvalLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 sm:p-6 lg:p-8">
-        <header className="flex justify-between items-center mb-8">
+        <div className="flex flex-col items-center justify-center h-full space-y-4">
           <Skeleton className="h-10 w-48" />
-          <Skeleton className="h-10 w-24" />
-        </header>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Skeleton className="h-[400px] w-full rounded-lg" />
-          <Skeleton className="h-[400px] w-full rounded-lg" />
+          <Skeleton className="h-64 w-full max-w-2xl rounded-lg" />
         </div>
       </div>
     );
@@ -341,16 +360,15 @@ const BookingCalendar = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-80 overflow-y-auto p-2 border rounded-md bg-gray-50">
                   {allTimeSlots.map(t => {
                     const [hours, minutes] = t.split(':').map(Number);
-                    const endTime = format(setMinutes(setHours(new Date(), hours + 1), minutes), 'HH:mm');
+                    const endTimeLabel = format(setMinutes(setHours(new Date(), hours + 1), minutes), 'HH:mm');
                     const isSelected = selectedSlots.includes(t);
                     const reservation = getSlotReservation(t);
-                    const available = !reservation && isBefore(new Date(), addHours(setMinutes(setHours(startOfDay(date!), hours), minutes), 1));
+                    const available = isSlotAvailable(t);
                     
                     let occupiedBy = "";
                     let isBlocked = false;
                     
                     if (reservation) {
-                      // Se è una prenotazione fittizia creata dall'admin per bloccare lo slot
                       if (reservation.booked_for_first_name === 'SLOT' && reservation.booked_for_last_name === 'BLOCCATO') {
                         occupiedBy = "BLOCCATO";
                         isBlocked = true;
@@ -377,7 +395,7 @@ const BookingCalendar = () => {
                         }`}
                         disabled={!available && !isSelected}
                       >
-                        <span className="font-bold text-sm">{t} - {endTime}</span>
+                        <span className="font-bold text-sm">{t} - {endTimeLabel}</span>
                         {!available && occupiedBy && (
                           <span className="text-[10px] uppercase tracking-tight flex items-center justify-center opacity-80 px-1 truncate w-full">
                             {isBlocked ? <Lock className="h-2.5 w-2.5 mr-1" /> : <User className="h-2.5 w-2.5 mr-1" />} 

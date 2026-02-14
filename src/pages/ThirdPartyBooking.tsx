@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { ArrowLeft, LogOut, Users, User, Lock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
-import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, isEqual, setSeconds, setMilliseconds, addDays, startOfDay } from 'date-fns';
+import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, isEqual, setSeconds, setMilliseconds, addDays, startOfDay, endOfDay } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { useApprovalCheck } from '@/hooks/use-approval-check';
 
@@ -67,15 +67,17 @@ const ThirdPartyBooking = () => {
   const fetchReservations = async () => {
     if (!date || !selectedCourtId) return;
     setFetchingData(true);
-    const startOfDayStr = format(startOfDay(date), "yyyy-MM-dd'T'00:00:00.000'Z'");
-    const endOfDayStr = format(startOfDay(date), "yyyy-MM-dd'T'23:59:59.999'Z'");
+    
+    const startRange = startOfDay(date).toISOString();
+    const endRange = endOfDay(date).toISOString();
 
     const { data } = await supabase
       .from('reservations')
       .select('*, profiles(full_name)')
       .eq('court_id', parseInt(selectedCourtId))
-      .gte('starts_at', startOfDayStr)
-      .lte('ends_at', endOfDayStr);
+      .gte('starts_at', startRange)
+      .lte('ends_at', endRange)
+      .neq('status', 'cancelled');
 
     if (data) setExistingReservations(data);
     setFetchingData(false);
@@ -95,20 +97,23 @@ const ThirdPartyBooking = () => {
 
   const getSlotReservation = (slotTime: string) => {
     if (!date || !selectedCourtId) return null;
-    let slotStart = setMinutes(setHours(startOfDay(date), parseInt(slotTime.split(':')[0])), 0);
-    slotStart = setSeconds(setMilliseconds(slotStart, 0), 0);
+    
+    const [hours, minutes] = slotTime.split(':').map(Number);
+    let slotStart = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date), hours), minutes), 0), 0);
     
     return existingReservations.find(res => {
       const resStart = parseISO(res.starts_at);
-      return isEqual(slotStart, resStart);
+      return resStart.getTime() === slotStart.getTime();
     });
   };
 
   const isSlotAvailable = (slotTime: string): boolean => {
     if (!date || !selectedCourtId) return false;
-    let slotStart = setMinutes(setHours(startOfDay(date), parseInt(slotTime.split(':')[0])), 0);
-    slotStart = setSeconds(setMilliseconds(slotStart, 0), 0);
+    
+    const [hours, minutes] = slotTime.split(':').map(Number);
+    let slotStart = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date), hours), minutes), 0), 0);
     const slotEnd = addHours(slotStart, 1);
+    
     if (isBefore(slotEnd, new Date())) return false;
     
     return !getSlotReservation(slotTime);
@@ -253,10 +258,10 @@ const ThirdPartyBooking = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-80 overflow-y-auto p-2 border rounded-md bg-gray-50">
                 {allTimeSlots.map(t => {
                   const [hours, minutes] = t.split(':').map(Number);
-                  const endTime = format(setMinutes(setHours(new Date(), hours + 1), minutes), 'HH:mm');
+                  const endTimeLabel = format(setMinutes(setHours(new Date(), hours + 1), minutes), 'HH:mm');
                   const isSelected = selectedSlots.includes(t);
                   const reservation = getSlotReservation(t);
-                  const available = !reservation && isBefore(new Date(), addHours(setMinutes(setHours(startOfDay(date!), hours), minutes), 1));
+                  const available = isSlotAvailable(t);
                   
                   let occupiedBy = "";
                   let isBlocked = false;
@@ -287,7 +292,7 @@ const ThirdPartyBooking = () => {
                       }`}
                       disabled={!available && !isSelected}
                     >
-                      <span className="font-bold text-sm">{t} - {endTime}</span>
+                      <span className="font-bold text-sm">{t} - {endTimeLabel}</span>
                       {!available && occupiedBy && (
                         <span className="text-[10px] uppercase truncate w-full px-1 flex items-center justify-center">
                           {isBlocked ? <Lock className="inline h-2.5 w-2.5 mr-0.5" /> : <User className="inline h-2.5 w-2.5 mr-0.5" />}
