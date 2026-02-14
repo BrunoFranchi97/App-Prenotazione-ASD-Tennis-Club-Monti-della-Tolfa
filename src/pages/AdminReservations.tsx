@@ -220,13 +220,15 @@ export default function AdminReservations() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return groups.filter((g) => {
-      if (selectedDate && !isSameDay(g.date, selectedDate)) return false;
-      if (filterCourtId !== "all" && String(g.court_id) !== filterCourtId) return false;
-      if (filterStatus !== "all" && g.status !== filterStatus) return false;
-      if (!q) return true;
-      return [g.court?.name || "", g.bookedByName, g.bookedForName, g.notes || ""].join(" ").toLowerCase().includes(q);
-    });
+    return groups
+      .filter((g) => {
+        if (selectedDate && !isSameDay(g.date, selectedDate)) return false;
+        if (filterCourtId !== "all" && String(g.court_id) !== filterCourtId) return false;
+        if (filterStatus !== "all" && g.status !== filterStatus) return false;
+        if (!q) return true;
+        return [g.court?.name || "", g.bookedByName, g.bookedForName, g.notes || ""].join(" ").toLowerCase().includes(q);
+      })
+      .sort((a, b) => a.startTime.localeCompare(b.startTime)); // Ordinamento cronologico
   }, [groups, selectedDate, filterCourtId, filterStatus, search]);
 
   const bookedDates = useMemo(() => groups.map(g => g.date), [groups]);
@@ -281,7 +283,6 @@ export default function AdminReservations() {
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Sidebar Filtri/Calendario */}
         <aside className="lg:col-span-4 space-y-6">
           <Card className="shadow-lg border-none">
             <CardHeader className="bg-primary text-primary-foreground py-4">
@@ -325,7 +326,6 @@ export default function AdminReservations() {
           </Card>
         </aside>
 
-        {/* Elenco Prenotazioni */}
         <main className="lg:col-span-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold">

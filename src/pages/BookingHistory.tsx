@@ -39,7 +39,6 @@ const BookingHistory = () => {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
   
-  // Stato per la data selezionata nel calendario
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
 
   const handleLogout = async () => {
@@ -94,7 +93,6 @@ const BookingHistory = () => {
 
   useEffect(() => { fetchData(); }, []);
 
-  // Raggruppamento di tutte le prenotazioni
   const allGroups = useMemo(() => {
     if (!reservations.length || !courts.length) return [];
     const courtMap = new Map(courts.map(c => [c.id, c]));
@@ -137,13 +135,13 @@ const BookingHistory = () => {
     return Array.from(grouped.values());
   }, [reservations, courts, currentUserId]);
 
-  // Filtro per la data selezionata
   const filteredGroups = useMemo(() => {
     if (!selectedDate) return [];
-    return allGroups.filter(g => isSameDay(g.date, selectedDate));
+    return allGroups
+      .filter(g => isSameDay(g.date, selectedDate))
+      .sort((a, b) => a.startTime.localeCompare(b.startTime)); // Ordinamento cronologico
   }, [allGroups, selectedDate]);
 
-  // Date che hanno prenotazioni (per il calendario)
   const bookedDates = useMemo(() => {
     return allGroups.map(g => g.date);
   }, [allGroups]);
@@ -185,7 +183,6 @@ const BookingHistory = () => {
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Colonna Calendario */}
         <div className="lg:col-span-4">
           <Card className="shadow-lg border-none overflow-hidden">
             <CardHeader className="bg-primary text-primary-foreground">
@@ -223,7 +220,6 @@ const BookingHistory = () => {
           </Card>
         </div>
 
-        {/* Colonna Risultati */}
         <div className="lg:col-span-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-gray-700">
