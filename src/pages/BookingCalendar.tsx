@@ -299,7 +299,13 @@ const BookingCalendar = () => {
                         onClick={() => available && handleSlotClick(t)} 
                         variant={isSelected ? "default" : "outline"} 
                         className={`w-full h-auto py-3 flex flex-col gap-1 transition-all ${
-                          isSelected ? 'bg-club-orange text-white' : available ? 'bg-primary text-white' : isBlocked ? 'bg-amber-100 text-amber-800' : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                          isSelected 
+                            ? 'bg-club-orange text-white hover:bg-club-orange' 
+                            : available 
+                              ? 'bg-primary text-white hover:bg-primary/90' 
+                              : isBlocked 
+                                ? 'bg-amber-100 text-amber-800' 
+                                : 'bg-gray-200 text-gray-500 cursor-not-allowed'
                         }`}
                         disabled={!available && !isSelected}
                       >

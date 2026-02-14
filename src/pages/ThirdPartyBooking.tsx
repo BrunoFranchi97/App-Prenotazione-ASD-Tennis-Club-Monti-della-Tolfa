@@ -204,7 +204,13 @@ const ThirdPartyBooking = () => {
                 return (
                   <Button 
                     key={t} onClick={() => available && handleSlotClick(t)} variant={isSelected ? "default" : "outline"} 
-                    className={`w-full h-auto py-3 flex flex-col transition-all ${isSelected ? 'bg-club-orange text-white' : available ? 'bg-primary text-white' : 'bg-gray-200 text-gray-500'}`}
+                    className={`w-full h-auto py-3 flex flex-col transition-all ${
+                      isSelected 
+                        ? 'bg-club-orange text-white hover:bg-club-orange' 
+                        : available 
+                          ? 'bg-primary text-white hover:bg-primary/90' 
+                          : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                    }`}
                     disabled={!available && !isSelected}
                   >
                     <span className="font-bold text-sm">{t}</span>
