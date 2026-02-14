@@ -23,6 +23,7 @@ import AdminBlockSlots from "./pages/AdminBlockSlots";
 import AdminUsageStats from "./pages/AdminUsageStats";
 import AdminApprovals from "./pages/AdminApprovals";
 import AdminUserManagement from "./pages/AdminUserManagement";
+import AdminEditBooking from "./pages/AdminEditBooking";
 import FindMatch from "./pages/FindMatch";
 import MedicalCertificates from "./pages/MedicalCertificates";
 import EmailVerificationHandler from "./components/EmailVerificationHandler";
@@ -60,6 +61,7 @@ const App = () => (
               <Route path="/admin/usage-stats" element={<AdminUsageStats />} />
               <Route path="/admin/approvals" element={<AdminApprovals />} />
               <Route path="/admin/users" element={<AdminUserManagement />} />
+              <Route path="/admin/edit-reservation" element={<AdminEditBooking />} />
               <Route path="/find-match" element={<FindMatch />} />
               <Route path="/match-booking" element={<MatchBooking />} />
               <Route path="/medical-certificates" element={<MedicalCertificates />} />
