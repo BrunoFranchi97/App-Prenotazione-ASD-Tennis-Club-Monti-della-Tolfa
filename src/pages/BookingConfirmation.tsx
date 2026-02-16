@@ -19,47 +19,24 @@ const BookingConfirmation = () => {
   const location = useLocation();
   const state = location.state as BookingConfirmationState;
 
-  // Se non c'è stato o mancano dati fondamentali, mostriamo comunque una conferma generica
-  // dato che se l'utente è arrivato qui, l'operazione di salvataggio è andata a buon fine.
-  if (!state || !state.reservations || state.reservations.length === 0) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-white p-4">
-        <Card className="w-full max-w-md shadow-lg rounded-lg text-center border-t-4 border-t-primary">
-          <CardHeader>
-            <CheckCircle2 className="mx-auto h-16 w-16 text-primary mb-4" />
-            <CardTitle className="text-primary text-3xl font-bold">Prenotazione Completata!</CardTitle>
-            <CardDescription className="text-gray-600 mt-2">
-              Il sistema ha confermato la tua richiesta. Puoi visualizzare i dettagli nello storico.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="pt-4 flex flex-col gap-3">
-              <Link to="/history">
-                <Button className="w-full bg-primary hover:bg-primary/90">
-                  Vai ai Miei Campi <ChevronRight className="ml-2 h-4 w-4" />
-                </Button>
-              </Link>
-              <Link to="/dashboard">
-                <Button variant="outline" className="w-full">
-                  Torna alla Dashboard
-                </Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  const { reservations, courtName, bookedFor } = state;
-  const sortedReservations = [...reservations].sort((a, b) => parseISO(a.starts_at).getTime() - parseISO(b.starts_at).getTime());
+  // Se mancano i dati, usiamo dei fallback per non mostrare errori
+  const hasData = state && state.reservations && state.reservations.length > 0;
+  
+  const sortedReservations = hasData 
+    ? [...state.reservations!].sort((a, b) => parseISO(a.starts_at).getTime() - parseISO(b.starts_at).getTime())
+    : [];
 
   const firstReservation = sortedReservations[0];
   const lastReservation = sortedReservations[sortedReservations.length - 1];
 
-  const bookingDate = format(parseISO(firstReservation.starts_at), 'EEEE, dd MMMM yyyy', { locale: it });
-  const bookingStartTime = format(parseISO(firstReservation.starts_at), 'HH:mm');
-  const bookingEndTime = format(parseISO(lastReservation.ends_at), 'HH:mm');
+  const bookingDate = firstReservation 
+    ? format(parseISO(firstReservation.starts_at), 'EEEE, dd MMMM yyyy', { locale: it })
+    : 'Data confermata';
+    
+  const bookingStartTime = firstReservation ? format(parseISO(firstReservation.starts_at), 'HH:mm') : '--:--';
+  const bookingEndTime = lastReservation ? format(parseISO(lastReservation.ends_at), 'HH:mm') : '--:--';
+  const courtName = state?.courtName || 'Campo selezionato';
+  const bookedFor = state?.bookedFor;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-white p-4">
@@ -72,6 +49,7 @@ const BookingConfirmation = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Box di riepilogo in stile originale ASD Tennis Club */}
           <div className="bg-primary/5 border border-primary/10 p-5 rounded-xl space-y-4 text-left shadow-inner">
             {bookedFor && (
               <div className="flex items-center text-gray-800">
@@ -84,15 +62,17 @@ const BookingConfirmation = () => {
                 </div>
               </div>
             )}
+            
             <div className="flex items-center text-gray-800">
               <div className="bg-club-orange/20 p-2 rounded-lg mr-3">
                 <MapPin className="h-5 w-5 text-club-orange shrink-0" />
               </div>
               <div className="flex flex-col">
                 <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Campo</span>
-                <span className="text-sm font-semibold">{courtName || 'Selezionato'}</span>
+                <span className="text-sm font-semibold">{courtName}</span>
               </div>
             </div>
+
             <div className="flex items-center text-gray-800">
               <div className="bg-club-orange/20 p-2 rounded-lg mr-3">
                 <CalendarDays className="h-5 w-5 text-club-orange shrink-0" />
@@ -102,6 +82,7 @@ const BookingConfirmation = () => {
                 <span className="text-sm font-semibold capitalize">{bookingDate}</span>
               </div>
             </div>
+
             <div className="flex items-center text-gray-800">
               <div className="bg-club-orange/20 p-2 rounded-lg mr-3">
                 <Clock className="h-5 w-5 text-club-orange shrink-0" />
