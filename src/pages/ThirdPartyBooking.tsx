@@ -45,6 +45,8 @@ const ThirdPartyBooking = () => {
     return getBookingLimitsStatus(userReservations, date);
   }, [userReservations, date]);
 
+  const canProceed = limitsStatus.canBookMoreThisWeek && limitsStatus.canBookMoreToday;
+
   useEffect(() => {
     if (!isApproved) return;
     const fetchMyReservations = async () => {
@@ -150,8 +152,6 @@ const ThirdPartyBooking = () => {
 
   if (approvalLoading) return <div className="p-8 text-center">Verifica...</div>;
 
-  const canProceed = limitsStatus.canBookMoreThisWeek && limitsStatus.canBookMoreToday;
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 sm:p-6 lg:p-8">
       <header className="flex justify-between items-center mb-8">
@@ -171,7 +171,8 @@ const ThirdPartyBooking = () => {
               </div>
             </CardContent>
           </Card>
-          <BookingLimitsBox status={limitsStatus} isChecking={fetchingData} />
+          {/* Mostra il box dei limiti laterali solo se la prenotazione è possibile */}
+          {canProceed && <BookingLimitsBox status={limitsStatus} isChecking={fetchingData} />}
         </div>
 
         <div className="lg:col-span-8">
