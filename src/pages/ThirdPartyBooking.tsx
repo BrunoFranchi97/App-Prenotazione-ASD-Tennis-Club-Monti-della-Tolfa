@@ -227,11 +227,30 @@ const ThirdPartyBooking = () => {
                   <Label className="mb-2 block">Campo</Label>
                   <Select onValueChange={setSelectedCourtId} value={selectedCourtId}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{courts.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}</SelectContent></Select>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-80 overflow-y-auto p-2 border rounded-md bg-gray-50">
-                    {allTimeSlots.map(t => (
-                      <Button key={t} onClick={() => isSlotAvailable(t) && handleSlotClick(t)} className={`w-full py-3 h-auto ${selectedSlots.includes(t) ? 'bg-club-orange text-white' : isSlotAvailable(t) ? 'bg-primary text-white' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`} disabled={!isSlotAvailable(t) && !selectedSlots.includes(t)}>
-                        {t}
-                      </Button>
-                    ))}
+                    {allTimeSlots.map(t => {
+                      const isSelected = selectedSlots.includes(t);
+                      const available = isSlotAvailable(t);
+                      
+                      let baseClasses = "w-full py-3 h-auto transition-none ";
+                      if (isSelected) {
+                        baseClasses += "bg-club-orange text-white hover:bg-club-orange shadow-none";
+                      } else if (available) {
+                        baseClasses += "bg-primary text-white hover:bg-primary/90";
+                      } else {
+                        baseClasses += "bg-gray-200 text-gray-500 cursor-not-allowed hover:bg-gray-200";
+                      }
+
+                      return (
+                        <Button 
+                          key={t} 
+                          onClick={() => available && handleSlotClick(t)} 
+                          className={baseClasses}
+                          disabled={!available && !isSelected}
+                        >
+                          {t}
+                        </Button>
+                      );
+                    })}
                   </div>
                   <Button onClick={handleBooking} className="w-full bg-primary hover:bg-primary/90 h-12 text-lg" disabled={selectedSlots.length === 0 || loading || !bookedForFirstName || !bookedForLastName}>
                     {loading ? "In corso..." : "Conferma"}

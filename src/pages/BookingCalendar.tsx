@@ -268,14 +268,18 @@ const BookingCalendar = () => {
                     <div>
                       <Label className="mb-2 block">Campo</Label>
                       <Select onValueChange={setSelectedCourtId} value={selectedCourtId}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
                         <SelectContent>{courts.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}</SelectContent>
                       </Select>
                     </div>
                     <div>
                       <Label className="mb-2 block">Tipo</Label>
                       <Select onValueChange={(v) => setBookingType(v as BookingType)} value={bookingType}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
                         <SelectContent><SelectItem value="singolare">Singolare</SelectItem><SelectItem value="doppio">Doppio</SelectItem><SelectItem value="lezione">Lezione</SelectItem></SelectContent>
                       </Select>
                     </div>
@@ -286,11 +290,20 @@ const BookingCalendar = () => {
                       const res = getSlotReservation(t);
                       const available = isSlotAvailable(t);
                       
+                      let baseClasses = "w-full py-3 h-auto flex flex-col transition-none ";
+                      if (isSelected) {
+                        baseClasses += "bg-club-orange text-white hover:bg-club-orange shadow-none pointer-events-auto";
+                      } else if (available) {
+                        baseClasses += "bg-primary text-white hover:bg-primary/90";
+                      } else {
+                        baseClasses += "bg-gray-200 text-gray-500 cursor-not-allowed hover:bg-gray-200";
+                      }
+
                       return (
                         <Button 
                           key={t} 
                           onClick={() => available && handleSlotClick(t)} 
-                          className={`w-full py-3 h-auto flex flex-col ${isSelected ? 'bg-club-orange text-white' : available ? 'bg-primary text-white' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`} 
+                          className={baseClasses}
                           disabled={!available && !isSelected}
                         >
                           <span className="font-bold">{t} - {format(addHours(setMinutes(setHours(new Date(), parseInt(t.split(':')[0])), 0), 1), 'HH:mm')}</span>
