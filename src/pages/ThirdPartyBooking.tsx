@@ -8,13 +8,15 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, LogOut, Users, User, Lock } from 'lucide-react';
+import { ArrowLeft, LogOut, Users, User, Lock, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, isEqual, setSeconds, setMilliseconds, addDays, startOfDay, endOfDay } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { useApprovalCheck } from '@/hooks/use-approval-check';
 import { Court, Reservation } from '@/types/supabase';
+import { getBookingLimitsStatus, BookingLimitsStatus } from '@/utils/bookingLimits';
+import BookingLimitsBox from '@/components/BookingLimitsBox';
 
 const ThirdPartyBooking = () => {
   const navigate = useNavigate();
@@ -24,26 +26,35 @@ const ThirdPartyBooking = () => {
   const [courts, setCourts] = useState<Court[]>([]);
   const [selectedCourtId, setSelectedCourtId] = useState<string | undefined>(undefined);
   const [existingReservations, setExistingReservations] = useState<any[]>([]);
+  const [userReservations, setUserReservations] = useState<Reservation[]>([]);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
   const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
   const [bookedForFirstName, setBookedForFirstName] = useState('');
   const [bookedForLastName, setBookedForLastName] = useState('');
   const [loading, setLoading] = useState(false);
   const [fetchingData, setFetchingData] = useState(true);
-  const [bookerFullName, setBookerFullName] = useState<string | null>(null);
 
   const maxDate = useMemo(() => addDays(new Date(), 14), []);
 
+  const limitsStatus = useMemo(() => {
+    if (!date) return { weeklyCount: 0, weeklyMax: 2, dailyCount: 0, dailyMax: 1, durationMax: 3, canBookMoreThisWeek: true, canBookMoreToday: true };
+    return getBookingLimitsStatus(userReservations, date);
+  }, [userReservations, date]);
+
   useEffect(() => {
     if (!isApproved) return;
-    const fetchBookerProfile = async () => {
+    const fetchMyReservations = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).single();
-        if (profile) setBookerFullName(profile.full_name);
+        const { data } = await supabase
+          .from('reservations')
+          .select('*')
+          .eq('user_id', user.id)
+          .neq('status', 'cancelled');
+        setUserReservations(data || []);
       }
     };
-    fetchBookerProfile();
+    fetchMyReservations();
   }, [isApproved]);
 
   const fetchData = async () => {
@@ -109,6 +120,18 @@ const ThirdPartyBooking = () => {
       showError("Slot non disponibile.");
       return;
     }
+
+    if (!selectedSlots.includes(slotTime)) {
+      if (!limitsStatus.canBookMoreThisWeek) {
+        showError("Hai raggiunto il limite settimanale.");
+        return;
+      }
+      if (!limitsStatus.canBookMoreToday) {
+        showError("Hai già una prenotazione per oggi.");
+        return;
+      }
+    }
+
     const newSelected = [...selectedSlots];
     if (newSelected.includes(slotTime)) {
       setSelectedSlots(newSelected.filter(s => s !== slotTime));
@@ -119,8 +142,8 @@ const ThirdPartyBooking = () => {
         const sorted = [...newSelected, slotTime].sort();
         const firstIdx = allTimeSlots.indexOf(sorted[0]);
         const lastIdx = allTimeSlots.indexOf(sorted[sorted.length - 1]);
-        if (lastIdx - firstIdx + 1 > 3) {
-          showError("Massimo 3 ore.");
+        if (lastIdx - firstIdx + 1 > limitsStatus.durationMax) {
+          showError(`Massimo ${limitsStatus.durationMax} ore.`);
           return;
         }
         const range: string[] = [];
@@ -134,6 +157,7 @@ const ThirdPartyBooking = () => {
   };
 
   const handleBooking = async () => {
+    if (!limitsStatus.canBookMoreThisWeek || !limitsStatus.canBookMoreToday) return showError("Limiti superati.");
     if (!date || !selectedCourtId || selectedSlots.length === 0 || !bookedForFirstName || !bookedForLastName) {
       showError("Compila tutti i campi.");
       return;
@@ -172,58 +196,72 @@ const ThirdPartyBooking = () => {
         <div className="w-10"></div>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="shadow-lg">
-          <CardHeader><CardTitle className="text-primary">Data e Socio</CardTitle></CardHeader>
-          <CardContent className="space-y-6">
-            <Calendar mode="single" selected={date} onSelect={setDate} locale={it} className="rounded-md border shadow mx-auto" disabled={(d) => isBefore(d, startOfDay(new Date())) || isAfter(d, maxDate)} />
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Nome</Label><Input value={bookedForFirstName} onChange={e => setBookedForFirstName(e.target.value)} /></div>
-              <div className="space-y-2"><Label>Cognome</Label><Input value={bookedForLastName} onChange={e => setBookedForLastName(e.target.value)} /></div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-4 space-y-6">
+          <Card className="shadow-lg">
+            <CardHeader><CardTitle className="text-primary">Data e Socio</CardTitle></CardHeader>
+            <CardContent className="space-y-6">
+              <Calendar mode="single" selected={date} onSelect={setDate} locale={it} className="rounded-md border shadow mx-auto" disabled={(d) => isBefore(d, startOfDay(new Date())) || isAfter(d, maxDate)} />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2"><Label>Nome</Label><Input value={bookedForFirstName} onChange={e => setBookedForFirstName(e.target.value)} /></div>
+                <div className="space-y-2"><Label>Cognome</Label><Input value={bookedForLastName} onChange={e => setBookedForLastName(e.target.value)} /></div>
+              </div>
+            </CardContent>
+          </Card>
 
-        <Card className="shadow-lg">
-          <CardHeader><CardTitle className="text-primary">Campo e Orario</CardTitle></CardHeader>
-          <CardContent className="space-y-6">
-            <div>
-              <Label className="mb-2 block">Campo</Label>
-              <Select onValueChange={setSelectedCourtId} value={selectedCourtId}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{courts.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-80 overflow-y-auto p-2 border rounded-md bg-gray-50">
-              {allTimeSlots.map(t => {
-                const isSelected = selectedSlots.includes(t);
-                const reservation = getSlotReservation(t);
-                const available = isSlotAvailable(t);
-                let occupiedBy = reservation ? (reservation.booked_for_first_name ? `${reservation.booked_for_first_name} ${reservation.booked_for_last_name}` : profiles[reservation.user_id] || "Socio") : "";
-                
-                return (
-                  <Button 
-                    key={t} onClick={() => available && handleSlotClick(t)} variant={isSelected ? "default" : "outline"} 
-                    className={`w-full h-auto py-3 flex flex-col transition-all ${
-                      isSelected 
-                        ? 'bg-club-orange text-white hover:bg-club-orange' 
-                        : available 
-                          ? 'bg-primary text-white hover:bg-primary/90' 
-                          : 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                    }`}
-                    disabled={!available && !isSelected}
-                  >
-                    <span className="font-bold text-sm">{t}</span>
-                    {!available && occupiedBy && <span className="text-[10px] uppercase truncate w-full px-1 flex items-center justify-center"><User className="h-2.5 w-2.5 mr-1" /> {occupiedBy}</span>}
-                  </Button>
-                );
-              })}
-            </div>
-            <Button onClick={handleBooking} className="w-full bg-primary hover:bg-primary/90 h-12 text-lg" disabled={selectedSlots.length === 0 || loading || !bookedForFirstName || !bookedForLastName}>
-              {loading ? "In corso..." : "Conferma"}
-            </Button>
-          </CardContent>
-        </Card>
+          <BookingLimitsBox status={limitsStatus} isChecking={fetchingData} />
+        </div>
+
+        <div className="lg:col-span-8">
+          <Card className="shadow-lg">
+            <CardHeader><CardTitle className="text-primary">Campo e Orario</CardTitle></CardHeader>
+            <CardContent className="space-y-6">
+              <div>
+                <Label className="mb-2 block">Campo</Label>
+                <Select onValueChange={setSelectedCourtId} value={selectedCourtId}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{courts.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-80 overflow-y-auto p-2 border rounded-md bg-gray-50">
+                {allTimeSlots.map(t => {
+                  const isSelected = selectedSlots.includes(t);
+                  const reservation = getSlotReservation(t);
+                  const available = isSlotAvailable(t);
+                  let occupiedBy = reservation ? (reservation.booked_for_first_name ? `${reservation.booked_for_first_name} ${reservation.booked_for_last_name}` : profiles[reservation.user_id] || "Socio") : "";
+                  
+                  return (
+                    <Button 
+                      key={t} onClick={() => available && handleSlotClick(t)} variant={isSelected ? "default" : "outline"} 
+                      className={`w-full h-auto py-3 flex flex-col transition-all ${
+                        isSelected 
+                          ? 'bg-club-orange text-white hover:bg-club-orange' 
+                          : available 
+                            ? 'bg-primary text-white hover:bg-primary/90' 
+                            : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                      }`}
+                      disabled={(!available && !isSelected) || !available}
+                    >
+                      <span className="font-bold text-sm">{t}</span>
+                      {!available && occupiedBy && <span className="text-[10px] uppercase truncate w-full px-1 flex items-center justify-center"><User className="h-2.5 w-2.5 mr-1" /> {occupiedBy}</span>}
+                    </Button>
+                  );
+                })}
+              </div>
+
+              {(!limitsStatus.canBookMoreThisWeek || !limitsStatus.canBookMoreToday) && (
+                <div className="bg-destructive/10 p-4 rounded-lg border border-destructive/20 flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                  <p className="text-xs text-destructive/80 font-medium">Hai raggiunto il massimo delle prenotazioni attive consentite.</p>
+                </div>
+              )}
+
+              <Button onClick={handleBooking} className="w-full bg-primary hover:bg-primary/90 h-12 text-lg" disabled={selectedSlots.length === 0 || loading || !bookedForFirstName || !bookedForLastName || !limitsStatus.canBookMoreThisWeek || !limitsStatus.canBookMoreToday}>
+                {loading ? "In corso..." : "Conferma"}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

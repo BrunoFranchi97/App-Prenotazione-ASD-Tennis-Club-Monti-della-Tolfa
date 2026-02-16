@@ -8,13 +8,15 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, LogOut, CalendarDays, Clock, MapPin, Target, User, Lock } from 'lucide-react';
+import { ArrowLeft, LogOut, CalendarDays, Clock, MapPin, Target, User, Lock, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, isEqual, setSeconds, setMilliseconds, addDays, startOfDay, endOfDay } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { useApprovalCheck } from '@/hooks/use-approval-check';
 import { Court, Reservation, BookingType } from '@/types/supabase';
+import { getBookingLimitsStatus, BookingLimitsStatus } from '@/utils/bookingLimits';
+import BookingLimitsBox from '@/components/BookingLimitsBox';
 
 const bookingTypeLabels: Record<BookingType, string> = {
   singolare: 'Singolare',
@@ -30,6 +32,7 @@ const BookingCalendar = () => {
   const [courts, setCourts] = useState<Court[]>([]);
   const [selectedCourtId, setSelectedCourtId] = useState<string | undefined>(undefined);
   const [existingReservations, setExistingReservations] = useState<any[]>([]);
+  const [userReservations, setUserReservations] = useState<Reservation[]>([]);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
   const [selectedSlots, setSelectedSlots] = useState<string[]>([]); 
   const [bookingType, setBookingType] = useState<BookingType>('singolare');
@@ -39,16 +42,30 @@ const BookingCalendar = () => {
 
   const maxDate = useMemo(() => addDays(new Date(), 14), []);
 
+  // Calcolo limiti in tempo reale
+  const limitsStatus = useMemo(() => {
+    if (!date) return { weeklyCount: 0, weeklyMax: 2, dailyCount: 0, dailyMax: 1, durationMax: 3, canBookMoreThisWeek: true, canBookMoreToday: true };
+    return getBookingLimitsStatus(userReservations, date);
+  }, [userReservations, date]);
+
   useEffect(() => {
     if (!isApproved) return;
-    const fetchBookerProfile = async () => {
+    const fetchProfileData = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).single();
         if (profile) setBookerFullName(profile.full_name);
+
+        // Carichiamo tutte le prenotazioni dell'utente per i limiti
+        const { data: myRes } = await supabase
+          .from('reservations')
+          .select('*')
+          .eq('user_id', user.id)
+          .neq('status', 'cancelled');
+        setUserReservations(myRes || []);
       }
     };
-    fetchBookerProfile();
+    fetchProfileData();
   }, [isApproved]);
 
   const fetchData = async () => {
@@ -82,7 +99,6 @@ const BookingCalendar = () => {
         setProfiles(profMap);
       }
     } catch (error: any) {
-      console.error("Errore recupero dati:", error);
       showError("Impossibile caricare le prenotazioni.");
     } finally {
       setFetchingData(false);
@@ -123,7 +139,6 @@ const BookingCalendar = () => {
   const getSlotReservation = (slotTime: string) => {
     const [hours, minutes] = slotTime.split(':').map(Number);
     let slotStart = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date!), hours), minutes), 0), 0);
-    
     return existingReservations.find(res => isEqual(parseISO(res.starts_at), slotStart));
   };
 
@@ -143,6 +158,18 @@ const BookingCalendar = () => {
       return;
     }
 
+    // Controlla limiti prima di permettere selezione se non è una deselezione
+    if (!selectedSlots.includes(slotTime)) {
+      if (!limitsStatus.canBookMoreThisWeek) {
+        showError("Hai raggiunto il limite di 2 prenotazioni attive per questa settimana.");
+        return;
+      }
+      if (!limitsStatus.canBookMoreToday) {
+        showError("Hai già una prenotazione attiva per questo giorno.");
+        return;
+      }
+    }
+
     const newSelected = [...selectedSlots];
     if (newSelected.includes(slotTime)) {
       const sorted = [...newSelected].sort();
@@ -158,8 +185,8 @@ const BookingCalendar = () => {
         const sorted = [...newSelected, slotTime].sort();
         const firstIdx = allTimeSlots.indexOf(sorted[0]);
         const lastIdx = allTimeSlots.indexOf(sorted[sorted.length - 1]);
-        if (lastIdx - firstIdx + 1 > 3) {
-          showError("Massimo 3 ore consecutive.");
+        if (lastIdx - firstIdx + 1 > limitsStatus.durationMax) {
+          showError(`Massimo ${limitsStatus.durationMax} ore consecutive.`);
           return;
         }
         for (let i = firstIdx; i <= lastIdx; i++) {
@@ -176,6 +203,9 @@ const BookingCalendar = () => {
   };
 
   const handleBooking = async () => {
+    if (!limitsStatus.canBookMoreThisWeek) return showError("Limite settimanale raggiunto.");
+    if (!limitsStatus.canBookMoreToday) return showError("Limite giornaliero raggiunto.");
+
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -236,100 +266,119 @@ const BookingCalendar = () => {
         </Button>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="shadow-lg rounded-lg">
-          <CardHeader><CardTitle className="text-primary">Seleziona Data</CardTitle></CardHeader>
-          <CardContent className="flex justify-center">
-            <Calendar mode="single" selected={date} onSelect={setDate} locale={it} className="rounded-md border shadow" disabled={(d) => isBefore(d, startOfDay(new Date())) || isAfter(d, maxDate)} />
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-4 space-y-6">
+          <Card className="shadow-lg rounded-lg">
+            <CardHeader><CardTitle className="text-primary">Seleziona Data</CardTitle></CardHeader>
+            <CardContent className="flex justify-center">
+              <Calendar mode="single" selected={date} onSelect={setDate} locale={it} className="rounded-md border shadow" disabled={(d) => isBefore(d, startOfDay(new Date())) || isAfter(d, maxDate)} />
+            </CardContent>
+          </Card>
 
-        <Card className="shadow-lg rounded-lg">
-          <CardHeader><CardTitle className="text-primary">Dettagli Prenotazione</CardTitle></CardHeader>
-          <CardContent className="space-y-6">
-            <div>
-              <Label className="mb-2 block">Campo</Label>
-              {fetchingData ? <Skeleton className="h-10 w-full" /> : (
-                <Select onValueChange={setSelectedCourtId} value={selectedCourtId}>
-                  <SelectTrigger><SelectValue placeholder="Seleziona un campo" /></SelectTrigger>
-                  <SelectContent>{courts.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}</SelectContent>
-                </Select>
-              )}
-            </div>
+          <BookingLimitsBox status={limitsStatus} isChecking={fetchingData} />
+        </div>
 
-            <div>
-              <Label className="mb-2 block">Tipo di Prenotazione</Label>
-              <Select onValueChange={(v) => setBookingType(v as BookingType)} value={bookingType}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="singolare">Singolare</SelectItem>
-                  <SelectItem value="doppio">Doppio</SelectItem>
-                  <SelectItem value="lezione">Lezione con Maestro</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+        <div className="lg:col-span-8">
+          <Card className="shadow-lg rounded-lg">
+            <CardHeader><CardTitle className="text-primary">Dettagli Prenotazione</CardTitle></CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <Label className="mb-2 block">Campo</Label>
+                  {fetchingData ? <Skeleton className="h-10 w-full" /> : (
+                    <Select onValueChange={setSelectedCourtId} value={selectedCourtId}>
+                      <SelectTrigger><SelectValue placeholder="Seleziona un campo" /></SelectTrigger>
+                      <SelectContent>{courts.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}</SelectContent>
+                    </Select>
+                  )}
+                </div>
 
-            <div>
-              <Label className="mb-2 block">Orario (Max 3 ore)</Label>
-              {fetchingData ? <div className="grid grid-cols-2 gap-2"><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div> : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-80 overflow-y-auto p-2 border rounded-md bg-gray-50">
-                  {allTimeSlots.map(t => {
-                    const [hours, minutes] = t.split(':').map(Number);
-                    const endTimeLabel = format(setMinutes(setHours(new Date(), hours + 1), minutes), 'HH:mm');
-                    const isSelected = selectedSlots.includes(t);
-                    const reservation = getSlotReservation(t);
-                    const available = isSlotAvailable(t);
-                    
-                    let occupiedBy = "";
-                    let isBlocked = false;
-                    if (reservation) {
-                      if (reservation.booked_for_first_name === 'SLOT' && reservation.booked_for_last_name === 'BLOCCATO') {
-                        occupiedBy = "BLOCCATO";
-                        isBlocked = true;
-                      } else {
-                        occupiedBy = reservation.booked_for_first_name && reservation.booked_for_last_name
-                          ? `${reservation.booked_for_first_name} ${reservation.booked_for_last_name}`
-                          : profiles[reservation.user_id] || "Socio";
+                <div>
+                  <Label className="mb-2 block">Tipo di Prenotazione</Label>
+                  <Select onValueChange={(v) => setBookingType(v as BookingType)} value={bookingType}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="singolare">Singolare</SelectItem>
+                      <SelectItem value="doppio">Doppio</SelectItem>
+                      <SelectItem value="lezione">Lezione con Maestro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div>
+                <Label className="mb-2 block">Orario (Max 3 ore)</Label>
+                {fetchingData ? <div className="grid grid-cols-2 gap-2"><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div> : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-80 overflow-y-auto p-2 border rounded-md bg-gray-50">
+                    {allTimeSlots.map(t => {
+                      const [hours, minutes] = t.split(':').map(Number);
+                      const endTimeLabel = format(setMinutes(setHours(new Date(), hours + 1), minutes), 'HH:mm');
+                      const isSelected = selectedSlots.includes(t);
+                      const reservation = getSlotReservation(t);
+                      const available = isSlotAvailable(t);
+                      
+                      let occupiedBy = "";
+                      let isBlocked = false;
+                      if (reservation) {
+                        if (reservation.booked_for_first_name === 'SLOT' && reservation.booked_for_last_name === 'BLOCCATO') {
+                          occupiedBy = "BLOCCATO";
+                          isBlocked = true;
+                        } else {
+                          occupiedBy = reservation.booked_for_first_name && reservation.booked_for_last_name
+                            ? `${reservation.booked_for_first_name} ${reservation.booked_for_last_name}`
+                            : profiles[reservation.user_id] || "Socio";
+                        }
                       }
-                    }
 
-                    return (
-                      <Button 
-                        key={t} 
-                        onClick={() => available && handleSlotClick(t)} 
-                        variant={isSelected ? "default" : "outline"} 
-                        className={`w-full h-auto py-3 flex flex-col gap-1 transition-all ${
-                          isSelected 
-                            ? 'bg-club-orange text-white hover:bg-club-orange' 
-                            : available 
-                              ? 'bg-primary text-white hover:bg-primary/90' 
-                              : isBlocked 
-                                ? 'bg-amber-100 text-amber-800' 
-                                : 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                        }`}
-                        disabled={!available && !isSelected}
-                      >
-                        <span className="font-bold text-sm">{t} - {endTimeLabel}</span>
-                        {!available && occupiedBy && (
-                          <span className="text-[10px] uppercase truncate w-full px-1 flex items-center justify-center opacity-80">
-                            {isBlocked ? <Lock className="h-2.5 w-2.5 mr-1" /> : <User className="h-2.5 w-2.5 mr-1" />} {occupiedBy}
-                          </span>
-                        )}
-                        {!available && !occupiedBy && isBefore(addHours(setMinutes(setHours(startOfDay(date!), hours), minutes), 1), new Date()) && (
-                          <span className="text-[10px] uppercase opacity-60 italic">Passato</span>
-                        )}
-                      </Button>
-                    );
-                  })}
+                      return (
+                        <Button 
+                          key={t} 
+                          onClick={() => available && handleSlotClick(t)} 
+                          variant={isSelected ? "default" : "outline"} 
+                          className={`w-full h-auto py-3 flex flex-col gap-1 transition-all ${
+                            isSelected 
+                              ? 'bg-club-orange text-white hover:bg-club-orange' 
+                              : available 
+                                ? 'bg-primary text-white hover:bg-primary/90' 
+                                : isBlocked 
+                                  ? 'bg-amber-100 text-amber-800' 
+                                  : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                          }`}
+                          disabled={(!available && !isSelected) || (!available && !isSelected)}
+                        >
+                          <span className="font-bold text-sm">{t} - {endTimeLabel}</span>
+                          {!available && occupiedBy && (
+                            <span className="text-[10px] uppercase truncate w-full px-1 flex items-center justify-center opacity-80">
+                              {isBlocked ? <Lock className="h-2.5 w-2.5 mr-1" /> : <User className="h-2.5 w-2.5 mr-1" />} {occupiedBy}
+                            </span>
+                          )}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {(!limitsStatus.canBookMoreThisWeek || !limitsStatus.canBookMoreToday) && (
+                <div className="bg-destructive/10 p-4 rounded-lg border border-destructive/20 flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-bold text-destructive">Limiti Raggiunti</p>
+                    <p className="text-xs text-destructive/80">Non puoi procedere con la prenotazione perché hai già raggiunto il massimo consentito per oggi o per questa settimana.</p>
+                  </div>
                 </div>
               )}
-            </div>
 
-            <Button onClick={handleBooking} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-12 text-lg" disabled={selectedSlots.length === 0 || loading || fetchingData}>
-              {loading ? "Prenotazione in corso..." : "Conferma Prenotazione"}
-            </Button>
-          </CardContent>
-        </Card>
+              <Button 
+                onClick={handleBooking} 
+                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-12 text-lg" 
+                disabled={selectedSlots.length === 0 || loading || fetchingData || !limitsStatus.canBookMoreThisWeek || !limitsStatus.canBookMoreToday}
+              >
+                {loading ? "Prenotazione in corso..." : "Conferma Prenotazione"}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
