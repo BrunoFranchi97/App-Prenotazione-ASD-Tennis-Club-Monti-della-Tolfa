@@ -24,7 +24,7 @@ const BookingConfirmation = () => {
   if (!state || !state.reservations || state.reservations.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-white p-4">
-        <Card className="w-full max-w-md shadow-lg rounded-lg text-center">
+        <Card className="w-full max-w-md shadow-lg rounded-lg text-center border-t-4 border-t-primary">
           <CardHeader>
             <CheckCircle2 className="mx-auto h-16 w-16 text-primary mb-4" />
             <CardTitle className="text-primary text-3xl font-bold">Prenotazione Completata!</CardTitle>
@@ -63,44 +63,64 @@ const BookingConfirmation = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-white p-4">
-      <Card className="w-full max-w-md shadow-lg rounded-lg text-center">
+      <Card className="w-full max-w-md shadow-lg rounded-lg text-center border-t-4 border-t-primary">
         <CardHeader>
           <CheckCircle2 className="mx-auto h-16 w-16 text-primary mb-4" />
           <CardTitle className="text-primary text-3xl font-bold">Confermata!</CardTitle>
-          <CardDescription className="text-gray-600 mt-2">
+          <CardDescription className="text-gray-600 mt-2 text-base">
             La tua prenotazione è stata salvata con successo.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="bg-gray-50 p-4 rounded-lg space-y-3 text-left">
+          <div className="bg-primary/5 border border-primary/10 p-5 rounded-xl space-y-4 text-left shadow-inner">
             {bookedFor && (
               <div className="flex items-center text-gray-800">
-                <User className="mr-3 h-5 w-5 text-club-orange shrink-0" />
-                <span className="text-sm">Per: <span className="font-semibold">{bookedFor}</span></span>
+                <div className="bg-club-orange/20 p-2 rounded-lg mr-3">
+                  <User className="h-5 w-5 text-club-orange shrink-0" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Per il socio</span>
+                  <span className="text-sm font-semibold">{bookedFor}</span>
+                </div>
               </div>
             )}
             <div className="flex items-center text-gray-800">
-              <MapPin className="mr-3 h-5 w-5 text-club-orange shrink-0" />
-              <span className="text-sm">Campo: <span className="font-semibold">{courtName || 'Selezionato'}</span></span>
+              <div className="bg-club-orange/20 p-2 rounded-lg mr-3">
+                <MapPin className="h-5 w-5 text-club-orange shrink-0" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Campo</span>
+                <span className="text-sm font-semibold">{courtName || 'Selezionato'}</span>
+              </div>
             </div>
             <div className="flex items-center text-gray-800">
-              <CalendarDays className="mr-3 h-5 w-5 text-club-orange shrink-0" />
-              <span className="text-sm capitalize">Data: <span className="font-semibold">{bookingDate}</span></span>
+              <div className="bg-club-orange/20 p-2 rounded-lg mr-3">
+                <CalendarDays className="h-5 w-5 text-club-orange shrink-0" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Data</span>
+                <span className="text-sm font-semibold capitalize">{bookingDate}</span>
+              </div>
             </div>
             <div className="flex items-center text-gray-800">
-              <Clock className="mr-3 h-5 w-5 text-club-orange shrink-0" />
-              <span className="text-sm">Orario: <span className="font-semibold">{bookingStartTime} - {bookingEndTime}</span></span>
+              <div className="bg-club-orange/20 p-2 rounded-lg mr-3">
+                <Clock className="h-5 w-5 text-club-orange shrink-0" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Orario</span>
+                <span className="text-sm font-semibold">{bookingStartTime} - {bookingEndTime}</span>
+              </div>
             </div>
           </div>
           
           <div className="pt-6 flex flex-col gap-3">
             <Link to="/history">
-              <Button className="w-full bg-primary hover:bg-primary/90">
+              <Button className="w-full bg-primary hover:bg-primary/90 py-6 text-lg">
                 Vedi i Miei Campi
               </Button>
             </Link>
             <Link to="/dashboard">
-              <Button variant="ghost" className="w-full text-gray-500">
+              <Button variant="ghost" className="w-full text-gray-500 hover:text-primary">
                 Torna alla Dashboard
               </Button>
             </Link>
