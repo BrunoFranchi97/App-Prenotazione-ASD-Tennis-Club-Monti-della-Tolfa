@@ -19,21 +19,20 @@ const BookingConfirmation = () => {
   const [showPopup, setShowPopup] = useState(false);
 
   useEffect(() => {
-    // Se non ci sono dati, torniamo alla dashboard per sicurezza
     if (!state || !state.reservations || state.reservations.length === 0) {
       navigate('/dashboard');
       return;
     }
 
-    // Apriamo il pop-up appena la pagina bianca viene caricata
+    // Forza l'apertura del pop-up al caricamento
     setShowPopup(true);
   }, [state, navigate]);
 
   if (!state || !state.reservations) return null;
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Pagina interamente bianca sotto il pop-up */}
+    <div className="min-h-screen bg-white flex items-center justify-center">
+      {/* Sfondo bianco assoluto. Il pop-up si apre sopra tramite lo stato showPopup */}
       <BookingSuccessDialog 
         open={showPopup} 
         onOpenChange={setShowPopup} 
