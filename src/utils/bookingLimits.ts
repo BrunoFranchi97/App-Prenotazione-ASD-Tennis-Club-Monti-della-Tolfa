@@ -1,4 +1,4 @@
-import { startOfWeek, endOfWeek, isWithinInterval, parseISO, isSameDay, isAfter, startOfDay } from 'date-fns';
+import { startOfWeek, endOfWeek, isWithinInterval, parseISO, isSameDay, isAfter, startOfDay, addDays } from 'date-fns';
 import { it } from 'date-fns/locale';
 import type { Reservation } from '@/types/supabase';
 
@@ -10,12 +10,9 @@ export interface BookingLimitsStatus {
   durationMax: number;
   canBookMoreThisWeek: boolean;
   canBookMoreToday: boolean;
+  nextAvailableDate?: Date; // Quando si libererà il prossimo slot
 }
 
-/**
- * Calcola lo stato dei limiti di prenotazione per un utente in una specifica data.
- * Vengono considerate solo le prenotazioni future (attive).
- */
 export const getBookingLimitsStatus = (
   userReservations: Reservation[],
   targetDate: Date
@@ -28,8 +25,6 @@ export const getBookingLimitsStatus = (
     return res.status !== 'cancelled' && isAfter(end, now);
   });
 
-  // Raggruppiamo le prenotazioni per blocchi orari per contare i "match" e non le singole ore
-  // Un blocco è un insieme di ore consecutive nello stesso campo
   const groupedReservations = groupReservationsIntoBlocks(activeReservations);
 
   // 2. Calcola limiti settimanali (Lunedì - Domenica)
@@ -37,8 +32,7 @@ export const getBookingLimitsStatus = (
   const weekEnd = endOfWeek(targetDate, { locale: it, weekStartsOn: 1 });
   
   const weeklyMatches = groupedReservations.filter(block => {
-    const blockDate = block.date;
-    return isWithinInterval(blockDate, { start: weekStart, end: weekEnd });
+    return isWithinInterval(block.date, { start: weekStart, end: weekEnd });
   });
 
   // 3. Calcola limiti giornalieri
@@ -46,18 +40,37 @@ export const getBookingLimitsStatus = (
     return isSameDay(block.date, targetDate);
   });
 
+  const canBookWeekly = weeklyMatches.length < 2;
+  const canBookDaily = dailyMatches.length < 1;
+
+  // Calcola la prossima data disponibile se i limiti sono raggiunti
+  let nextAvailableDate: Date | undefined;
+  
+  if (!canBookWeekly) {
+    // Se il limite settimanale è raggiunto, il prossimo slot si libera 
+    // quando finisce il primo dei match in programma questa settimana
+    const sortedMatches = [...weeklyMatches].sort((a, b) => a.endTime.getTime() - b.endTime.getTime());
+    if (sortedMatches.length > 0) {
+      nextAvailableDate = sortedMatches[0].endTime;
+    }
+  } else if (!canBookDaily) {
+    // Se ha già prenotato oggi, potrà prenotare di nuovo domani (per un giorno diverso)
+    // o dopo che il match di oggi è finito
+    nextAvailableDate = addDays(startOfDay(targetDate), 1);
+  }
+
   return {
     weeklyCount: weeklyMatches.length,
     weeklyMax: 2,
     dailyCount: dailyMatches.length,
     dailyMax: 1,
     durationMax: 3,
-    canBookMoreThisWeek: weeklyMatches.length < 2,
-    canBookMoreToday: dailyMatches.length < 1
+    canBookMoreThisWeek: canBookWeekly,
+    canBookMoreToday: canBookDaily,
+    nextAvailableDate
   };
 };
 
-// Funzione interna per raggruppare le singole ore in blocchi di prenotazione (match)
 function groupReservationsIntoBlocks(reservations: Reservation[]) {
   if (reservations.length === 0) return [];
 
@@ -65,7 +78,7 @@ function groupReservationsIntoBlocks(reservations: Reservation[]) {
     parseISO(a.starts_at).getTime() - parseISO(b.starts_at).getTime()
   );
 
-  const blocks: { date: Date; courtId: number }[] = [];
+  const blocks: { date: Date; courtId: number; endTime: Date }[] = [];
   const processedIds = new Set<string>();
 
   for (let i = 0; i < sorted.length; i++) {
@@ -73,11 +86,10 @@ function groupReservationsIntoBlocks(reservations: Reservation[]) {
 
     const current = sorted[i];
     const currentDate = startOfDay(parseISO(current.starts_at));
-    blocks.push({ date: currentDate, courtId: current.court_id });
+    let lastEnd = parseISO(current.ends_at);
+    
     processedIds.add(current.id);
 
-    // Cerchiamo prenotazioni consecutive per "chiudere" il blocco
-    let lastEnd = parseISO(current.ends_at);
     for (let j = i + 1; j < sorted.length; j++) {
       const next = sorted[j];
       const nextStart = parseISO(next.starts_at);
@@ -88,6 +100,8 @@ function groupReservationsIntoBlocks(reservations: Reservation[]) {
         lastEnd = parseISO(next.ends_at);
       }
     }
+
+    blocks.push({ date: currentDate, courtId: current.court_id, endTime: lastEnd });
   }
 
   return blocks;
