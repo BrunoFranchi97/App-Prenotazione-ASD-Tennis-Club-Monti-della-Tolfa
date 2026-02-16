@@ -8,7 +8,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, LogOut, CalendarDays, Clock, MapPin, User, Lock, AlertCircle, Info, CalendarCheck } from 'lucide-react';
+import { ArrowLeft, LogOut, CalendarDays, Clock, MapPin, User, Lock, AlertCircle, Info, CalendarCheck, History } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, isEqual, setSeconds, setMilliseconds, addDays, startOfDay, endOfDay } from 'date-fns';
@@ -212,19 +212,35 @@ const BookingCalendar = () => {
             <CardHeader><CardTitle className="text-primary">Dettagli Prenotazione</CardTitle></CardHeader>
             <CardContent className="space-y-6">
               {!canProceed ? (
-                <div className="flex flex-col items-center justify-center py-12 px-4 text-center space-y-6 animate-in fade-in zoom-in duration-300">
+                <div className="flex flex-col items-center justify-center py-12 px-4 text-center space-y-8 animate-in fade-in zoom-in duration-300">
                   <div className="bg-amber-100 p-6 rounded-full">
                     <AlertCircle className="h-16 w-16 text-amber-600" />
                   </div>
-                  <div className="space-y-2 max-w-md">
+                  
+                  <div className="space-y-4 max-w-md">
                     <h3 className="text-2xl font-bold text-gray-800">Limiti Raggiunti</h3>
-                    <p className="text-gray-600">
-                      Hai già raggiunto il numero massimo di prenotazioni attive consentite dal regolamento.
+                    <p className="text-gray-600 leading-relaxed">
+                      Hai già raggiunto il numero massimo di prenotazioni attive consentite dal regolamento del club.
                     </p>
+                    
+                    <div className="bg-white p-4 rounded-xl border border-primary/20 shadow-sm">
+                      <p className="text-sm font-medium text-primary flex items-center justify-center">
+                        <History className="mr-2 h-4 w-4" /> Vuoi prenotare ora?
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Puoi liberare immediatamente uno slot annullando una delle tue partite programmate.
+                      </p>
+                      <Link to="/history" className="mt-3 block">
+                        <Button variant="outline" size="sm" className="w-full border-primary text-primary hover:bg-primary hover:text-white">
+                          Gestisci i miei Campi
+                        </Button>
+                      </Link>
+                    </div>
                   </div>
+
                   {limitsStatus.nextAvailableDate && (
                     <div className="bg-primary/5 border border-primary/10 p-6 rounded-2xl w-full max-w-sm">
-                      <p className="text-xs uppercase font-bold text-gray-400 tracking-widest mb-3">Potrai prenotare di nuovo il:</p>
+                      <p className="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-3">Sblocco automatico previsto per il:</p>
                       <div className="flex items-center justify-center gap-3 text-primary">
                         <CalendarCheck className="h-6 w-6 text-club-orange" />
                         <span className="text-xl font-extrabold capitalize">
@@ -237,11 +253,6 @@ const BookingCalendar = () => {
                       </div>
                     </div>
                   )}
-                  <Link to="/history" className="pt-4 w-full max-w-xs">
-                    <Button variant="outline" className="w-full border-primary text-primary font-bold py-6">
-                      Vedi le tue prenotazioni
-                    </Button>
-                  </Link>
                 </div>
               ) : (
                 <>
