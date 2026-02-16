@@ -17,7 +17,6 @@ import { useApprovalCheck } from '@/hooks/use-approval-check';
 import { Court, Reservation } from '@/types/supabase';
 import { getBookingLimitsStatus, BookingLimitsStatus } from '@/utils/bookingLimits';
 import BookingLimitsBox from '@/components/BookingLimitsBox';
-import BookingSuccessDialog from '@/components/BookingSuccessDialog';
 
 const ThirdPartyBooking = () => {
   const navigate = useNavigate();
@@ -34,10 +33,6 @@ const ThirdPartyBooking = () => {
   const [bookedForLastName, setBookedForLastName] = useState('');
   const [loading, setLoading] = useState(false);
   const [fetchingData, setFetchingData] = useState(true);
-
-  // Stati per il pop-up di successo
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [lastBookingData, setLastBookingData] = useState<{ reservations: Reservation[], courtName: string, bookedFor: string } | null>(null);
 
   const maxDate = useMemo(() => addDays(new Date(), 14), []);
 
@@ -195,13 +190,14 @@ const ThirdPartyBooking = () => {
       
       const finalReservations = (inserted && inserted.length > 0) ? inserted : (reservationsToInsert as any);
 
-      setLastBookingData({ 
-        reservations: finalReservations, 
-        courtName: courtName,
-        bookedFor: `${bookedForFirstName} ${bookedForLastName}`
-      });
-      setShowSuccessModal(true);
       showSuccess("Prenotazione effettuata!");
+      navigate('/booking-confirmation', { 
+        state: { 
+          reservations: finalReservations, 
+          courtName: courtName,
+          bookedFor: `${bookedForFirstName} ${bookedForLastName}`
+        } 
+      });
       
     } catch (e: any) { 
       showError(e.message); 
@@ -287,14 +283,6 @@ const ThirdPartyBooking = () => {
           </Card>
         </div>
       </div>
-
-      <BookingSuccessDialog 
-        open={showSuccessModal} 
-        onOpenChange={setShowSuccessModal} 
-        reservations={lastBookingData?.reservations || null} 
-        courtName={lastBookingData?.courtName || ''} 
-        bookedFor={lastBookingData?.bookedFor}
-      />
     </div>
   );
 };
