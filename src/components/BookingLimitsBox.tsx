@@ -3,7 +3,6 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
 import { ShieldCheck, AlertCircle, Info } from 'lucide-react';
 import { BookingLimitsStatus } from '@/utils/bookingLimits';
 import { cn } from '@/lib/utils';
@@ -14,10 +13,9 @@ interface BookingLimitsBoxProps {
 }
 
 const BookingLimitsBox: React.FC<BookingLimitsBoxProps> = ({ status, isChecking }) => {
-  const { weeklyCount, weeklyMax, dailyCount, dailyMax } = status;
+  const { weeklyCount, weeklyMax } = status;
   
   const weeklyPercent = (weeklyCount / weeklyMax) * 100;
-  const dailyPercent = (dailyCount / dailyMax) * 100;
 
   return (
     <Card className="shadow-sm border-primary/10 bg-primary/5">
@@ -37,17 +35,6 @@ const BookingLimitsBox: React.FC<BookingLimitsBoxProps> = ({ status, isChecking 
             </span>
           </div>
           <Progress value={weeklyPercent} className="h-1.5" />
-        </div>
-
-        {/* Giornalieri */}
-        <div className="space-y-1.5">
-          <div className="flex justify-between text-xs font-medium">
-            <span className="text-gray-600">Prenotazioni giorno scelto</span>
-            <span className={cn(dailyCount >= dailyMax ? "text-destructive font-bold" : "text-primary")}>
-              {dailyCount}/{dailyMax}
-            </span>
-          </div>
-          <Progress value={dailyPercent} className="h-1.5" />
         </div>
 
         {/* Regole fisse */}

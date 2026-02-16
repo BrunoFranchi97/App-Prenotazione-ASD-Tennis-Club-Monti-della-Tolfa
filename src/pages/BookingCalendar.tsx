@@ -46,7 +46,7 @@ const BookingCalendar = () => {
   const maxDate = useMemo(() => addDays(new Date(), 14), []);
 
   const limitsStatus = useMemo(() => {
-    if (!date) return { weeklyCount: 0, weeklyMax: 2, dailyCount: 0, dailyMax: 1, durationMax: 3, canBookMoreThisWeek: true, canBookMoreToday: true };
+    if (!date) return { weeklyCount: 0, weeklyMax: 2, durationMax: 3, canBookMoreThisWeek: true };
     return getBookingLimitsStatus(userReservations, date);
   }, [userReservations, date]);
 
@@ -57,9 +57,7 @@ const BookingCalendar = () => {
     return `dal ${format(start, 'dd MMM')} al ${format(end, 'dd MMM')}`;
   }, [date]);
 
-  // Bug Fix: Solo il limite SETTIMANALE deve bloccare l'intera UI
   const showWeeklyBlock = !limitsStatus.canBookMoreThisWeek;
-  const showDailyWarning = !limitsStatus.canBookMoreToday && !showWeeklyBlock;
 
   useEffect(() => {
     if (!isApproved) return;
@@ -140,7 +138,7 @@ const BookingCalendar = () => {
 
   const handleSlotClick = (slotTime: string) => {
     if (!isSlotAvailable(slotTime) && !selectedSlots.includes(slotTime)) return;
-    if (!selectedSlots.includes(slotTime) && (!limitsStatus.canBookMoreThisWeek || !limitsStatus.canBookMoreToday)) return;
+    if (!selectedSlots.includes(slotTime) && !limitsStatus.canBookMoreThisWeek) return;
 
     const newSelected = [...selectedSlots];
     if (newSelected.includes(slotTime)) {
@@ -164,7 +162,7 @@ const BookingCalendar = () => {
   };
 
   const handleBooking = async () => {
-    if (!limitsStatus.canBookMoreThisWeek || !limitsStatus.canBookMoreToday) return;
+    if (!limitsStatus.canBookMoreThisWeek) return;
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -226,21 +224,23 @@ const BookingCalendar = () => {
                   </div>
                   
                   <div className="space-y-4 max-w-md">
-                    <h3 className="text-2xl font-bold text-gray-800">Limiti Settimanali Raggiunti</h3>
+                    <h3 className="text-2xl font-bold text-gray-800">Limiti Raggiunti</h3>
                     <p className="text-gray-600 leading-relaxed">
-                      Hai già 2 prenotazioni attive per la settimana <span className="font-bold text-primary">{weekRange}</span>.
+                      Hai esaurito gli slot disponibili per la settimana selezionata <span className="font-bold text-primary">{weekRange}</span>.
                     </p>
                     
-                    <div className="bg-white p-4 rounded-xl border border-primary/20 shadow-sm">
-                      <p className="text-sm font-medium text-primary flex items-center justify-center">
-                        <CalendarRange className="mr-2 h-4 w-4" /> Prova un'altra settimana
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Scegli una data differente sul calendario oppure libera uno slot annullando un match esistente.
-                      </p>
-                      <Link to="/history" className="mt-3 block">
+                    <div className="bg-white p-6 rounded-xl border border-primary/20 shadow-sm space-y-4">
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-primary flex items-center justify-center">
+                          <CalendarRange className="mr-2 h-4 w-4" /> Cosa puoi fare ora?
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Seleziona una data in una <strong>settimana differente</strong> sul calendario, oppure libera uno slot annullando un match esistente.
+                        </p>
+                      </div>
+                      <Link to="/history" className="block">
                         <Button variant="outline" size="sm" className="w-full border-primary text-primary hover:bg-primary hover:text-white">
-                          Gestisci i miei Campi
+                          <History className="mr-2 h-4 w-4" /> Gestisci i miei Campi
                         </Button>
                       </Link>
                     </div>
@@ -255,21 +255,15 @@ const BookingCalendar = () => {
                           {format(limitsStatus.nextAvailableDate, "EEEE dd MMMM", { locale: it })}
                         </span>
                       </div>
+                      <div className="flex items-center justify-center gap-2 mt-2 text-gray-700 font-medium">
+                        <Clock className="h-4 w-4 text-club-orange" />
+                        <span>dopo le ore {format(limitsStatus.nextAvailableDate, "HH:mm")}</span>
+                      </div>
                     </div>
                   )}
                 </div>
               ) : (
                 <>
-                  {showDailyWarning && (
-                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3 animate-in slide-in-from-top-2 duration-300">
-                      <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-sm font-bold text-amber-800">Hai già una partita per oggi</p>
-                        <p className="text-xs text-amber-700">Il regolamento consente un solo match al giorno. Seleziona una data diversa per prenotare il tuo secondo match settimanale.</p>
-                      </div>
-                    </div>
-                  )}
-
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <Label className="mb-2 block">Campo</Label>
@@ -297,7 +291,7 @@ const BookingCalendar = () => {
                           key={t} 
                           onClick={() => available && handleSlotClick(t)} 
                           className={`w-full py-3 h-auto flex flex-col ${isSelected ? 'bg-club-orange text-white' : available ? 'bg-primary text-white' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`} 
-                          disabled={!available || showDailyWarning}
+                          disabled={!available && !isSelected}
                         >
                           <span className="font-bold">{t} - {format(addHours(setMinutes(setHours(new Date(), parseInt(t.split(':')[0])), 0), 1), 'HH:mm')}</span>
                           {res && (
@@ -309,7 +303,7 @@ const BookingCalendar = () => {
                       );
                     })}
                   </div>
-                  <Button onClick={handleBooking} className="w-full bg-primary hover:bg-primary/90 h-12 text-lg" disabled={selectedSlots.length === 0 || loading || showDailyWarning}>
+                  <Button onClick={handleBooking} className="w-full bg-primary hover:bg-primary/90 h-12 text-lg" disabled={selectedSlots.length === 0 || loading}>
                     {loading ? "In corso..." : "Conferma Prenotazione"}
                   </Button>
                 </>

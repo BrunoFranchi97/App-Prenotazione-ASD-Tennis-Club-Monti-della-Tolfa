@@ -41,11 +41,11 @@ const ThirdPartyBooking = () => {
   const maxDate = useMemo(() => addDays(new Date(), 14), []);
 
   const limitsStatus = useMemo(() => {
-    if (!date) return { weeklyCount: 0, weeklyMax: 2, dailyCount: 0, dailyMax: 1, durationMax: 3, canBookMoreThisWeek: true, canBookMoreToday: true };
+    if (!date) return { weeklyCount: 0, weeklyMax: 2, durationMax: 3, canBookMoreThisWeek: true };
     return getBookingLimitsStatus(userReservations, date);
   }, [userReservations, date]);
 
-  const canProceed = limitsStatus.canBookMoreThisWeek && limitsStatus.canBookMoreToday;
+  const canProceed = limitsStatus.canBookMoreThisWeek;
 
   const weekRange = useMemo(() => {
     if (!date) return "";
@@ -131,7 +131,7 @@ const ThirdPartyBooking = () => {
   };
 
   const handleBooking = async () => {
-    if (!limitsStatus.canBookMoreThisWeek || !limitsStatus.canBookMoreToday) return;
+    if (!limitsStatus.canBookMoreThisWeek) return;
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
