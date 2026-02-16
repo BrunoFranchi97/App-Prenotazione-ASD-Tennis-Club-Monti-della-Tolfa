@@ -17,6 +17,7 @@ import { useApprovalCheck } from '@/hooks/use-approval-check';
 import { Court, Reservation, BookingType } from '@/types/supabase';
 import { getBookingLimitsStatus, BookingLimitsStatus } from '@/utils/bookingLimits';
 import BookingLimitsBox from '@/components/BookingLimitsBox';
+import BookingSuccessDialog from '@/components/BookingSuccessDialog';
 
 const bookingTypeLabels: Record<BookingType, string> = {
   singolare: 'Singolare',
@@ -39,6 +40,10 @@ const BookingCalendar = () => {
   const [loading, setLoading] = useState(false);
   const [fetchingData, setFetchingData] = useState(true);
   const [bookerFullName, setBookerFullName] = useState<string | null>(null);
+
+  // Stati per il pop-up di successo
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [lastBookingData, setLastBookingData] = useState<{ reservations: Reservation[], courtName: string } | null>(null);
 
   const maxDate = useMemo(() => addDays(new Date(), 14), []);
 
@@ -243,13 +248,10 @@ const BookingCalendar = () => {
 
       const finalReservations = (inserted && inserted.length > 0) ? inserted : (reservationsToInsert as any);
 
+      // Mostra il pop-up di successo invece di navigare subito
+      setLastBookingData({ reservations: finalReservations, courtName: courtName });
+      setShowSuccessModal(true);
       showSuccess("Prenotazione confermata!");
-      navigate('/booking-confirmation', { 
-        state: { 
-          reservations: finalReservations, 
-          courtName: courtName 
-        } 
-      });
       
     } catch (error: any) {
       showError(error.message);
@@ -388,6 +390,13 @@ const BookingCalendar = () => {
           </Card>
         </div>
       </div>
+
+      <BookingSuccessDialog 
+        open={showSuccessModal} 
+        onOpenChange={setShowSuccessModal} 
+        reservations={lastBookingData?.reservations || null} 
+        courtName={lastBookingData?.courtName || ''} 
+      />
     </div>
   );
 };
