@@ -8,10 +8,10 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, LogOut, CalendarDays, Clock, MapPin, User, Lock, AlertCircle, Info, CalendarCheck, History } from 'lucide-react';
+import { ArrowLeft, LogOut, CalendarDays, Clock, MapPin, User, Lock, AlertCircle, Info, CalendarCheck, History, CalendarRange } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
-import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, isEqual, setSeconds, setMilliseconds, addDays, startOfDay, endOfDay } from 'date-fns';
+import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, isEqual, setSeconds, setMilliseconds, addDays, startOfDay, endOfDay, startOfWeek, endOfWeek } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { useApprovalCheck } from '@/hooks/use-approval-check';
 import { Court, Reservation, BookingType } from '@/types/supabase';
@@ -51,7 +51,12 @@ const BookingCalendar = () => {
     return getBookingLimitsStatus(userReservations, date);
   }, [userReservations, date]);
 
-  const canProceed = limitsStatus.canBookMoreThisWeek && limitsStatus.canBookMoreToday;
+  const weekRange = useMemo(() => {
+    if (!date) return "";
+    const start = startOfWeek(date, { locale: it, weekStartsOn: 1 });
+    const end = endOfWeek(date, { locale: it, weekStartsOn: 1 });
+    return `dal ${format(start, 'dd MMM')} al ${format(end, 'dd MMM')}`;
+  }, [date]);
 
   useEffect(() => {
     if (!isApproved) return;
@@ -185,6 +190,8 @@ const BookingCalendar = () => {
 
   if (approvalLoading) return <div className="p-8 text-center">Verifica...</div>;
 
+  const canProceed = limitsStatus.canBookMoreThisWeek && limitsStatus.canBookMoreToday;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 sm:p-6 lg:p-8">
       <header className="flex justify-between items-center mb-8">
@@ -204,7 +211,6 @@ const BookingCalendar = () => {
               <Calendar mode="single" selected={date} onSelect={setDate} locale={it} className="rounded-md border shadow" disabled={(d) => isBefore(d, startOfDay(new Date())) || isAfter(d, maxDate)} />
             </CardContent>
           </Card>
-          {/* Mostra il box dei limiti solo se l'utente può effettivamente prenotare (evita ripetizioni nel blocco) */}
           {canProceed && <BookingLimitsBox status={limitsStatus} isChecking={fetchingData} />}
         </div>
 
@@ -221,27 +227,29 @@ const BookingCalendar = () => {
                   <div className="space-y-4 max-w-md">
                     <h3 className="text-2xl font-bold text-gray-800">Limiti Raggiunti</h3>
                     <p className="text-gray-600 leading-relaxed">
-                      Hai già raggiunto il numero massimo di prenotazioni attive consentite dal regolamento del club.
+                      Hai esaurito gli slot disponibili per la settimana selezionata <span className="font-bold text-primary">{weekRange}</span>.
                     </p>
                     
-                    <div className="bg-white p-4 rounded-xl border border-primary/20 shadow-sm">
-                      <p className="text-sm font-medium text-primary flex items-center justify-center">
-                        <History className="mr-2 h-4 w-4" /> Vuoi prenotare ora?
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Puoi liberare immediatamente uno slot annullando una delle tue partite programmate.
-                      </p>
-                      <Link to="/history" className="mt-3 block">
+                    <div className="bg-white p-6 rounded-xl border border-primary/20 shadow-sm space-y-4">
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-primary flex items-center justify-center">
+                          <CalendarRange className="mr-2 h-4 w-4" /> Cosa puoi fare ora?
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Seleziona una data in una <strong>settimana differente</strong> sul calendario, oppure libera uno slot annullando un match esistente.
+                        </p>
+                      </div>
+                      <Link to="/history" className="block">
                         <Button variant="outline" size="sm" className="w-full border-primary text-primary hover:bg-primary hover:text-white">
-                          Gestisci i miei Campi
+                          <History className="mr-2 h-4 w-4" /> Gestisci i miei Campi
                         </Button>
                       </Link>
                     </div>
                   </div>
 
-                  {limitsStatus.nextAvailableDate && (
+                  {!limitsStatus.canBookMoreThisWeek && limitsStatus.nextAvailableDate && (
                     <div className="bg-primary/5 border border-primary/10 p-6 rounded-2xl w-full max-w-sm">
-                      <p className="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-3">Sblocco automatico previsto per il:</p>
+                      <p className="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-3">Uno slot in questa settimana si libererà il:</p>
                       <div className="flex items-center justify-center gap-3 text-primary">
                         <CalendarCheck className="h-6 w-6 text-club-orange" />
                         <span className="text-xl font-extrabold capitalize">
@@ -250,7 +258,7 @@ const BookingCalendar = () => {
                       </div>
                       <div className="flex items-center justify-center gap-2 mt-2 text-gray-700 font-medium">
                         <Clock className="h-4 w-4 text-club-orange" />
-                        <span>dalle ore {format(limitsStatus.nextAvailableDate, "HH:mm")}</span>
+                        <span>dopo le ore {format(limitsStatus.nextAvailableDate, "HH:mm")}</span>
                       </div>
                     </div>
                   )}
