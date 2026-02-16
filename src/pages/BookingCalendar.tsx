@@ -243,7 +243,7 @@ const BookingCalendar = () => {
 
       const finalReservations = (inserted && inserted.length > 0) ? inserted : (reservationsToInsert as any);
 
-      showSuccess("Prenotazione effettuata!");
+      showSuccess("Prenotazione confermata!");
       navigate('/booking-confirmation', { 
         state: { 
           reservations: finalReservations, 
