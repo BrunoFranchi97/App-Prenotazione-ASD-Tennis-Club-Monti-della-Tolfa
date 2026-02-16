@@ -19,24 +19,56 @@ const BookingConfirmation = () => {
   const location = useLocation();
   const state = location.state as BookingConfirmationState;
 
-  // Se mancano i dati, usiamo dei fallback per non mostrare errori
-  const hasData = state && state.reservations && state.reservations.length > 0;
-  
-  const sortedReservations = hasData 
-    ? [...state.reservations!].sort((a, b) => parseISO(a.starts_at).getTime() - parseISO(b.starts_at).getTime())
-    : [];
+  // Verifichiamo se abbiamo effettivamente dei dati validi da mostrare
+  const hasValidData = state && state.reservations && state.reservations.length > 0;
+
+  // Se i dati mancano del tutto (es. refresh della pagina), mostriamo un messaggio di successo semplice
+  if (!hasValidData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-white p-4">
+        <Card className="w-full max-w-md shadow-lg rounded-lg text-center border-t-4 border-t-primary">
+          <CardHeader>
+            <CheckCircle2 className="mx-auto h-16 w-16 text-primary mb-4" />
+            <CardTitle className="text-primary text-3xl font-bold">Prenotazione Confermata!</CardTitle>
+            <CardDescription className="text-gray-600 mt-2">
+              La tua prenotazione è stata salvata con successo nel sistema.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <p className="text-sm text-muted-foreground">
+              Non è stato possibile caricare il riepilogo immediato, ma puoi trovare tutti i dettagli nel tuo storico.
+            </p>
+            <div className="flex flex-col gap-3">
+              <Link to="/history">
+                <Button className="w-full bg-primary hover:bg-primary/90">
+                  Vedi i Miei Campi
+                </Button>
+              </Link>
+              <Link to="/dashboard">
+                <Button variant="ghost" className="w-full">
+                  Torna alla Dashboard
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Se abbiamo i dati, calcoliamo il riepilogo
+  const sortedReservations = [...state.reservations!].sort((a, b) => 
+    parseISO(a.starts_at).getTime() - parseISO(b.starts_at).getTime()
+  );
 
   const firstReservation = sortedReservations[0];
   const lastReservation = sortedReservations[sortedReservations.length - 1];
 
-  const bookingDate = firstReservation 
-    ? format(parseISO(firstReservation.starts_at), 'EEEE, dd MMMM yyyy', { locale: it })
-    : 'Data confermata';
-    
-  const bookingStartTime = firstReservation ? format(parseISO(firstReservation.starts_at), 'HH:mm') : '--:--';
-  const bookingEndTime = lastReservation ? format(parseISO(lastReservation.ends_at), 'HH:mm') : '--:--';
-  const courtName = state?.courtName || 'Campo selezionato';
-  const bookedFor = state?.bookedFor;
+  const bookingDate = format(parseISO(firstReservation.starts_at), 'EEEE, dd MMMM yyyy', { locale: it });
+  const bookingStartTime = format(parseISO(firstReservation.starts_at), 'HH:mm');
+  const bookingEndTime = format(parseISO(lastReservation.ends_at), 'HH:mm');
+  const courtName = state.courtName || 'Campo Tennis';
+  const bookedFor = state.bookedFor;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-white p-4">
@@ -49,7 +81,6 @@ const BookingConfirmation = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Box di riepilogo in stile originale ASD Tennis Club */}
           <div className="bg-primary/5 border border-primary/10 p-5 rounded-xl space-y-4 text-left shadow-inner">
             {bookedFor && (
               <div className="flex items-center text-gray-800">
