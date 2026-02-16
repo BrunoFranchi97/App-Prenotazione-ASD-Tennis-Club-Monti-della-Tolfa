@@ -10,7 +10,7 @@ export interface BookingLimitsStatus {
   durationMax: number;
   canBookMoreThisWeek: boolean;
   canBookMoreToday: boolean;
-  nextAvailableDate?: Date; // Quando si libererà il prossimo slot
+  nextAvailableDate?: Date;
 }
 
 export const getBookingLimitsStatus = (
@@ -18,6 +18,7 @@ export const getBookingLimitsStatus = (
   targetDate: Date
 ): BookingLimitsStatus => {
   const now = new Date();
+  const targetDateStart = startOfDay(targetDate);
   
   // 1. Filtra solo le prenotazioni "attive" (future e non annullate)
   const activeReservations = userReservations.filter(res => {
@@ -27,36 +28,30 @@ export const getBookingLimitsStatus = (
 
   const groupedReservations = groupReservationsIntoBlocks(activeReservations);
 
-  // 2. Calcola limiti settimanali (Lunedì - Domenica)
+  // 2. Calcola limiti settimanali (Lunedì - Domenica) della data TARGET selezionata
   const weekStart = startOfWeek(targetDate, { locale: it, weekStartsOn: 1 });
   const weekEnd = endOfWeek(targetDate, { locale: it, weekStartsOn: 1 });
   
   const weeklyMatches = groupedReservations.filter(block => {
-    return isWithinInterval(block.date, { start: weekStart, end: weekEnd });
+    const blockDate = startOfDay(block.date);
+    return isWithinInterval(blockDate, { start: weekStart, end: weekEnd });
   });
 
-  // 3. Calcola limiti giornalieri
+  // 3. Calcola limiti giornalieri per il giorno TARGET selezionato
   const dailyMatches = groupedReservations.filter(block => {
-    return isSameDay(block.date, targetDate);
+    return isSameDay(startOfDay(block.date), targetDateStart);
   });
 
   const canBookWeekly = weeklyMatches.length < 2;
   const canBookDaily = dailyMatches.length < 1;
 
-  // Calcola la prossima data disponibile se i limiti sono raggiunti
+  // Calcola la prossima data di sblocco (solo se il settimanale è pieno)
   let nextAvailableDate: Date | undefined;
-  
   if (!canBookWeekly) {
-    // Se il limite settimanale è raggiunto, il prossimo slot si libera 
-    // quando finisce il primo dei match in programma questa settimana
     const sortedMatches = [...weeklyMatches].sort((a, b) => a.endTime.getTime() - b.endTime.getTime());
     if (sortedMatches.length > 0) {
       nextAvailableDate = sortedMatches[0].endTime;
     }
-  } else if (!canBookDaily) {
-    // Se ha già prenotato oggi, potrà prenotare di nuovo domani (per un giorno diverso)
-    // o dopo che il match di oggi è finito
-    nextAvailableDate = addDays(startOfDay(targetDate), 1);
   }
 
   return {
@@ -85,7 +80,7 @@ function groupReservationsIntoBlocks(reservations: Reservation[]) {
     if (processedIds.has(sorted[i].id)) continue;
 
     const current = sorted[i];
-    const currentDate = startOfDay(parseISO(current.starts_at));
+    const currentDate = parseISO(current.starts_at);
     let lastEnd = parseISO(current.ends_at);
     
     processedIds.add(current.id);

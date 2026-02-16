@@ -6,16 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, LogOut, CalendarDays, Clock, MapPin, User, Lock, AlertCircle, Info, CalendarCheck, History, CalendarRange } from 'lucide-react';
+import { ArrowLeft, LogOut, CalendarDays, Clock, MapPin, AlertCircle, CalendarCheck, History, CalendarRange } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, isEqual, setSeconds, setMilliseconds, addDays, startOfDay, endOfDay, startOfWeek, endOfWeek } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { useApprovalCheck } from '@/hooks/use-approval-check';
 import { Court, Reservation, BookingType } from '@/types/supabase';
-import { getBookingLimitsStatus, BookingLimitsStatus } from '@/utils/bookingLimits';
+import { getBookingLimitsStatus } from '@/utils/bookingLimits';
 import BookingLimitsBox from '@/components/BookingLimitsBox';
 import BookingSuccessDialog from '@/components/BookingSuccessDialog';
 
@@ -57,6 +56,10 @@ const BookingCalendar = () => {
     const end = endOfWeek(date, { locale: it, weekStartsOn: 1 });
     return `dal ${format(start, 'dd MMM')} al ${format(end, 'dd MMM')}`;
   }, [date]);
+
+  // Bug Fix: Solo il limite SETTIMANALE deve bloccare l'intera UI
+  const showWeeklyBlock = !limitsStatus.canBookMoreThisWeek;
+  const showDailyWarning = !limitsStatus.canBookMoreToday && !showWeeklyBlock;
 
   useEffect(() => {
     if (!isApproved) return;
@@ -190,8 +193,6 @@ const BookingCalendar = () => {
 
   if (approvalLoading) return <div className="p-8 text-center">Verifica...</div>;
 
-  const canProceed = limitsStatus.canBookMoreThisWeek && limitsStatus.canBookMoreToday;
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 sm:p-6 lg:p-8">
       <header className="flex justify-between items-center mb-8">
@@ -211,43 +212,41 @@ const BookingCalendar = () => {
               <Calendar mode="single" selected={date} onSelect={setDate} locale={it} className="rounded-md border shadow" disabled={(d) => isBefore(d, startOfDay(new Date())) || isAfter(d, maxDate)} />
             </CardContent>
           </Card>
-          {canProceed && <BookingLimitsBox status={limitsStatus} isChecking={fetchingData} />}
+          {!showWeeklyBlock && <BookingLimitsBox status={limitsStatus} isChecking={fetchingData} />}
         </div>
 
         <div className="lg:col-span-8">
           <Card className="shadow-lg h-full">
             <CardHeader><CardTitle className="text-primary">Dettagli Prenotazione</CardTitle></CardHeader>
             <CardContent className="space-y-6">
-              {!canProceed ? (
+              {showWeeklyBlock ? (
                 <div className="flex flex-col items-center justify-center py-12 px-4 text-center space-y-8 animate-in fade-in zoom-in duration-300">
                   <div className="bg-amber-100 p-6 rounded-full">
                     <AlertCircle className="h-16 w-16 text-amber-600" />
                   </div>
                   
                   <div className="space-y-4 max-w-md">
-                    <h3 className="text-2xl font-bold text-gray-800">Limiti Raggiunti</h3>
+                    <h3 className="text-2xl font-bold text-gray-800">Limiti Settimanali Raggiunti</h3>
                     <p className="text-gray-600 leading-relaxed">
-                      Hai esaurito gli slot disponibili per la settimana selezionata <span className="font-bold text-primary">{weekRange}</span>.
+                      Hai già 2 prenotazioni attive per la settimana <span className="font-bold text-primary">{weekRange}</span>.
                     </p>
                     
-                    <div className="bg-white p-6 rounded-xl border border-primary/20 shadow-sm space-y-4">
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium text-primary flex items-center justify-center">
-                          <CalendarRange className="mr-2 h-4 w-4" /> Cosa puoi fare ora?
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          Seleziona una data in una <strong>settimana differente</strong> sul calendario, oppure libera uno slot annullando un match esistente.
-                        </p>
-                      </div>
-                      <Link to="/history" className="block">
+                    <div className="bg-white p-4 rounded-xl border border-primary/20 shadow-sm">
+                      <p className="text-sm font-medium text-primary flex items-center justify-center">
+                        <CalendarRange className="mr-2 h-4 w-4" /> Prova un'altra settimana
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Scegli una data differente sul calendario oppure libera uno slot annullando un match esistente.
+                      </p>
+                      <Link to="/history" className="mt-3 block">
                         <Button variant="outline" size="sm" className="w-full border-primary text-primary hover:bg-primary hover:text-white">
-                          <History className="mr-2 h-4 w-4" /> Gestisci i miei Campi
+                          Gestisci i miei Campi
                         </Button>
                       </Link>
                     </div>
                   </div>
 
-                  {!limitsStatus.canBookMoreThisWeek && limitsStatus.nextAvailableDate && (
+                  {limitsStatus.nextAvailableDate && (
                     <div className="bg-primary/5 border border-primary/10 p-6 rounded-2xl w-full max-w-sm">
                       <p className="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-3">Uno slot in questa settimana si libererà il:</p>
                       <div className="flex items-center justify-center gap-3 text-primary">
@@ -256,15 +255,21 @@ const BookingCalendar = () => {
                           {format(limitsStatus.nextAvailableDate, "EEEE dd MMMM", { locale: it })}
                         </span>
                       </div>
-                      <div className="flex items-center justify-center gap-2 mt-2 text-gray-700 font-medium">
-                        <Clock className="h-4 w-4 text-club-orange" />
-                        <span>dopo le ore {format(limitsStatus.nextAvailableDate, "HH:mm")}</span>
-                      </div>
                     </div>
                   )}
                 </div>
               ) : (
                 <>
+                  {showDailyWarning && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3 animate-in slide-in-from-top-2 duration-300">
+                      <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-bold text-amber-800">Hai già una partita per oggi</p>
+                        <p className="text-xs text-amber-700">Il regolamento consente un solo match al giorno. Seleziona una data diversa per prenotare il tuo secondo match settimanale.</p>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <Label className="mb-2 block">Campo</Label>
@@ -286,14 +291,25 @@ const BookingCalendar = () => {
                       const isSelected = selectedSlots.includes(t);
                       const res = getSlotReservation(t);
                       const available = isSlotAvailable(t);
+                      
                       return (
-                        <Button key={t} onClick={() => available && handleSlotClick(t)} className={`w-full py-3 h-auto flex flex-col ${isSelected ? 'bg-club-orange text-white' : available ? 'bg-primary text-white' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`} disabled={!available && !isSelected}>
+                        <Button 
+                          key={t} 
+                          onClick={() => available && handleSlotClick(t)} 
+                          className={`w-full py-3 h-auto flex flex-col ${isSelected ? 'bg-club-orange text-white' : available ? 'bg-primary text-white' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`} 
+                          disabled={!available || showDailyWarning}
+                        >
                           <span className="font-bold">{t} - {format(addHours(setMinutes(setHours(new Date(), parseInt(t.split(':')[0])), 0), 1), 'HH:mm')}</span>
+                          {res && (
+                            <span className="text-[10px] opacity-80 truncate px-1">
+                              Occupato da: {profiles[res.user_id] || 'Socio'}
+                            </span>
+                          )}
                         </Button>
                       );
                     })}
                   </div>
-                  <Button onClick={handleBooking} className="w-full bg-primary hover:bg-primary/90 h-12 text-lg" disabled={selectedSlots.length === 0 || loading}>
+                  <Button onClick={handleBooking} className="w-full bg-primary hover:bg-primary/90 h-12 text-lg" disabled={selectedSlots.length === 0 || loading || showDailyWarning}>
                     {loading ? "In corso..." : "Conferma Prenotazione"}
                   </Button>
                 </>
