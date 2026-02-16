@@ -241,14 +241,15 @@ const BookingCalendar = () => {
       const { data: inserted, error: insertError } = await supabase.from('reservations').insert(reservationsToInsert).select();
       if (insertError) throw insertError;
 
-      if (!inserted || inserted.length === 0) {
-        throw new Error("Errore durante il salvataggio della prenotazione.");
-      }
+      // Fallback: se Supabase non restituisce i dati (raro ma possibile), costruiamo un oggetto minimo
+      const confirmationReservations = (inserted && inserted.length > 0) 
+        ? inserted 
+        : reservationsToInsert.map((r, i) => ({ ...r, id: `temp-${i}` })) as Reservation[];
 
       showSuccess("Prenotazione confermata!");
       navigate('/booking-confirmation', { 
         state: { 
-          reservations: inserted, 
+          reservations: confirmationReservations, 
           courtName: courtName 
         } 
       });
