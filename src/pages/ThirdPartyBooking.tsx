@@ -166,10 +166,15 @@ const ThirdPartyBooking = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       const sortedSlots = [...selectedSlots].sort();
+      
+      const courtIdNum = parseInt(selectedCourtId);
+      const currentCourt = courts.find(c => c.id === courtIdNum);
+      const courtName = currentCourt?.name || `Campo ${courtIdNum}`;
+
       const reservationsToInsert = sortedSlots.map(slotTime => {
         let slotStart = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date!), parseInt(slotTime.split(':')[0])), 0), 0), 0);
         return {
-          court_id: parseInt(selectedCourtId),
+          court_id: courtIdNum,
           user_id: user?.id,
           starts_at: slotStart.toISOString(),
           ends_at: addHours(slotStart, 1).toISOString(),
@@ -179,11 +184,27 @@ const ThirdPartyBooking = () => {
           booked_for_last_name: bookedForLastName,
         };
       });
-      const { error } = await supabase.from('reservations').insert(reservationsToInsert);
+
+      const { data: inserted, error } = await supabase.from('reservations').insert(reservationsToInsert).select();
       if (error) throw error;
+      
+      if (!inserted || inserted.length === 0) {
+        throw new Error("Errore durante il salvataggio della prenotazione.");
+      }
+
       showSuccess("Prenotazione effettuata!");
-      navigate('/history');
-    } catch (e: any) { showError(e.message); } finally { setLoading(false); }
+      navigate('/booking-confirmation', { 
+        state: { 
+          reservations: inserted, 
+          courtName: courtName,
+          bookedFor: `${bookedForFirstName} ${bookedForLastName}`
+        } 
+      });
+    } catch (e: any) { 
+      showError(e.message); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   if (approvalLoading) return <div className="p-8 text-center">Verifica...</div>;
@@ -191,7 +212,7 @@ const ThirdPartyBooking = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 sm:p-6 lg:p-8">
       <header className="flex justify-between items-center mb-8">
-        <Link to="/dashboard"><Button variant="outline" size="icon" className="text-primary border-primary"><ArrowLeft className="h-4 w-4" /></Button></Link>
+        <Link to="/dashboard"><Button variant="outline" size="icon" className="text-primary border-primary hover:bg-secondary"><ArrowLeft className="h-4 w-4" /></Button></Link>
         <h1 className="text-3xl font-bold text-primary flex items-center"><Users className="mr-2 h-7 w-7" /> Prenota per un Socio</h1>
         <div className="w-10"></div>
       </header>
@@ -203,8 +224,8 @@ const ThirdPartyBooking = () => {
             <CardContent className="space-y-6">
               <Calendar mode="single" selected={date} onSelect={setDate} locale={it} className="rounded-md border shadow mx-auto" disabled={(d) => isBefore(d, startOfDay(new Date())) || isAfter(d, maxDate)} />
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2"><Label>Nome</Label><Input value={bookedForFirstName} onChange={e => setBookedForFirstName(e.target.value)} /></div>
-                <div className="space-y-2"><Label>Cognome</Label><Input value={bookedForLastName} onChange={e => setBookedForLastName(e.target.value)} /></div>
+                <div className="space-y-2"><Label>Nome</Label><Input value={bookedForFirstName} onChange={e => setBookedForFirstName(e.target.value)} placeholder="Nome" /></div>
+                <div className="space-y-2"><Label>Cognome</Label><Input value={bookedForLastName} onChange={e => setBookedForLastName(e.target.value)} placeholder="Cognome" /></div>
               </div>
             </CardContent>
           </Card>

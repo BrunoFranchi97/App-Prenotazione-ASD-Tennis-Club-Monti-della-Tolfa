@@ -42,7 +42,6 @@ const BookingCalendar = () => {
 
   const maxDate = useMemo(() => addDays(new Date(), 14), []);
 
-  // Calcolo limiti in tempo reale
   const limitsStatus = useMemo(() => {
     if (!date) return { weeklyCount: 0, weeklyMax: 2, dailyCount: 0, dailyMax: 1, durationMax: 3, canBookMoreThisWeek: true, canBookMoreToday: true };
     return getBookingLimitsStatus(userReservations, date);
@@ -56,7 +55,6 @@ const BookingCalendar = () => {
         const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).single();
         if (profile) setBookerFullName(profile.full_name);
 
-        // Carichiamo tutte le prenotazioni dell'utente per i limiti
         const { data: myRes } = await supabase
           .from('reservations')
           .select('*')
@@ -158,7 +156,6 @@ const BookingCalendar = () => {
       return;
     }
 
-    // Controlla limiti prima di permettere selezione se non è una deselezione
     if (!selectedSlots.includes(slotTime)) {
       if (!limitsStatus.canBookMoreThisWeek) {
         showError("Hai raggiunto il limite di 2 prenotazioni attive per questa settimana.");
@@ -225,6 +222,9 @@ const BookingCalendar = () => {
       }
 
       const courtIdNum = parseInt(selectedCourtId!);
+      const currentCourt = courts.find(c => c.id === courtIdNum);
+      const courtName = currentCourt?.name || `Campo ${courtIdNum}`;
+
       const reservationsToInsert = sortedSlots.map(slotTime => {
         let slotStart = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date!), parseInt(slotTime.split(':')[0])), 0), 0), 0);
         return {
@@ -241,8 +241,17 @@ const BookingCalendar = () => {
       const { data: inserted, error: insertError } = await supabase.from('reservations').insert(reservationsToInsert).select();
       if (insertError) throw insertError;
 
+      if (!inserted || inserted.length === 0) {
+        throw new Error("Errore durante il salvataggio della prenotazione.");
+      }
+
       showSuccess("Prenotazione confermata!");
-      navigate('/booking-confirmation', { state: { reservations: inserted, courtName: courts.find(c => c.id === courtIdNum)?.name } });
+      navigate('/booking-confirmation', { 
+        state: { 
+          reservations: inserted, 
+          courtName: courtName 
+        } 
+      });
     } catch (error: any) {
       showError(error.message);
     } finally {
