@@ -48,16 +48,13 @@ const BookingSuccessDialog: React.FC<BookingSuccessDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent 
-        className="sm:max-w-md border-t-8 border-t-primary rounded-3xl shadow-2xl"
-        onPointerDownOutside={(e) => e.preventDefault()} // Impedisce la chiusura accidentale cliccando fuori
-      >
+      <DialogContent className="sm:max-w-md border-t-8 border-t-primary rounded-3xl shadow-2xl">
         <DialogHeader className="text-center items-center">
           <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mb-2">
             <CheckCircle2 className="h-10 w-10 text-primary" />
           </div>
           <DialogTitle className="text-2xl font-bold text-primary">Prenotazione Confermata!</DialogTitle>
-          <DialogDescription className="text-base font-medium text-gray-600">
+          <DialogDescription className="text-base font-medium">
             Il campo è stato riservato correttamente.
           </DialogDescription>
         </DialogHeader>
