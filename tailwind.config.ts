@@ -52,52 +52,44 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        sidebar: {
-          DEFAULT: "hsl(var(--sidebar-background))",
-          foreground: "hsl(var(--sidebar-foreground))",
-          primary: "hsl(var(--sidebar-primary))",
-          "primary-foreground": "hsl(var(--sidebar-primary-foreground))",
-          accent: "hsl(var(--sidebar-accent))",
-          "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
-          border: "hsl(var(--sidebar-border))",
-          ring: "hsl(var(--sidebar-ring))",
-        },
         // Custom club colors
         'club-green': {
-          DEFAULT: 'hsl(138 41% 30%)', // #2E6B3D
-          foreground: 'hsl(0 0% 100%)', // White
+          DEFAULT: 'hsl(138 41% 30%)',
+          foreground: 'hsl(0 0% 100%)',
         },
         'club-orange': {
-          DEFAULT: 'hsl(23 72% 50%)', // #D96B27
-          foreground: 'hsl(0 0% 100%)', // White
+          DEFAULT: 'hsl(23 72% 50%)',
+          foreground: 'hsl(0 0% 100%)',
         },
       },
       borderRadius: {
         lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        md: "calc(var(--radius) - 4px)",
+        sm: "calc(var(--radius) - 8px)",
+      },
+      boxShadow: {
+        'airbnb': '0 6px 16px rgba(0,0,0,0.12)',
+        'airbnb-hover': '0 12px 24px rgba(0,0,0,0.16)',
+        'depth': '0 2px 4px rgba(0,0,0,0.04), 0 8px 16px rgba(0,0,0,0.08)',
       },
       keyframes: {
         "accordion-down": {
-          from: {
-            height: "0",
-          },
-          to: {
-            height: "var(--radix-accordion-content-height)",
-          },
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
-          from: {
-            height: "var(--radix-accordion-content-height)",
-          },
-          to: {
-            height: "0",
-          },
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
         },
+        "float": {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-5px)" },
+        }
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "float": "float 3s ease-in-out infinite",
       },
     },
   },
