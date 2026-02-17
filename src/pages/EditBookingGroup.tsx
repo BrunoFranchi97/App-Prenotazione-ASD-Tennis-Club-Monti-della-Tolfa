@@ -324,13 +324,14 @@ const EditBookingGroup = () => {
         <Card className="shadow-lg rounded-lg">
           <CardHeader><CardTitle className="text-primary">Seleziona Slot</CardTitle></CardHeader>
           <CardContent className="space-y-6">
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-60 overflow-y-auto p-2 border rounded-md bg-gray-50">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto p-2 border rounded-md bg-gray-50">
               {allTimeSlots.map((slotTime) => {
                 const isSelected = selectedSlots.includes(slotTime);
                 const isOriginal = originalSlots.includes(slotTime);
                 const available = isSlotAvailable(slotTime) || isOriginal;
+                const endTime = format(addHours(setMinutes(setHours(new Date(), parseInt(slotTime.split(':')[0])), 0), 1), 'HH:mm');
                 
-                let btnClasses = "px-3 py-2 rounded-md text-sm font-medium transition-none ";
+                let btnClasses = "px-3 py-4 rounded-md text-sm font-medium transition-none ";
                 if (isSelected) {
                   btnClasses += "bg-club-orange text-white hover:bg-club-orange shadow-none";
                 } else if (available) {
@@ -346,7 +347,7 @@ const EditBookingGroup = () => {
                     disabled={!available && !isSelected}
                     className={btnClasses}
                   >
-                    {slotTime}
+                    {slotTime} - {endTime}
                   </Button>
                 );
               })}

@@ -293,11 +293,12 @@ const BookingCalendar = () => {
                       <Label className="text-sm font-bold text-gray-700">Seleziona Orario</Label>
                       <span className="text-[11px] text-gray-400 font-medium italic">Max 3 ore consecutive</span>
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {allTimeSlots.map(t => {
                         const isSelected = selectedSlots.includes(t);
                         const res = getSlotReservation(t);
                         const available = isSlotAvailable(t);
+                        const endTime = format(addHours(setMinutes(setHours(new Date(), parseInt(t.split(':')[0])), 0), 1), 'HH:mm');
                         
                         return (
                           <button 
@@ -314,7 +315,7 @@ const BookingCalendar = () => {
                               }
                             `}
                           >
-                            <span className="text-base font-bold tracking-tight">{t}</span>
+                            <span className="text-base font-bold tracking-tight">{t} - {endTime}</span>
                             <span className="text-[10px] font-medium opacity-60 uppercase tracking-tighter">
                               {res ? profiles[res.user_id]?.split(' ')[0] : 'Disponibile'}
                             </span>

@@ -230,6 +230,7 @@ const ThirdPartyBooking = () => {
                     {allTimeSlots.map(t => {
                       const isSelected = selectedSlots.includes(t);
                       const available = isSlotAvailable(t);
+                      const endTime = format(addHours(setMinutes(setHours(new Date(), parseInt(t.split(':')[0])), 0), 1), 'HH:mm');
                       
                       let baseClasses = "w-full py-3 h-auto transition-none ";
                       if (isSelected) {
@@ -247,7 +248,7 @@ const ThirdPartyBooking = () => {
                           className={baseClasses}
                           disabled={!available && !isSelected}
                         >
-                          {t}
+                          {t} - {endTime}
                         </Button>
                       );
                     })}
