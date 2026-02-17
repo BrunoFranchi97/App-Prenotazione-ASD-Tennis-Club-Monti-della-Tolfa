@@ -5,7 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { CalendarDays, History, LogOut, Users, Settings, Search, FileText, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { CalendarDays, History, LogOut, Users, Settings, Search, FileText, AlertTriangle, ShieldCheck, ChevronRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import Footer from '@/components/Footer';
@@ -30,7 +30,6 @@ const MemberDashboard = () => {
           .single();
 
         if (error) {
-          console.error("Error fetching user profile:", error.message);
           setFullName(user.email);
         } else if (profile) {
           setFullName(profile.full_name);
@@ -39,8 +38,6 @@ const MemberDashboard = () => {
         } else {
           setFullName(user.email);
         }
-      } else {
-        setFullName("Socio");
       }
       setLoading(false);
     };
@@ -49,10 +46,10 @@ const MemberDashboard = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-white p-4">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold mb-4 text-primary">Caricamento...</h1>
-          <p className="text-xl text-gray-600">Recupero profilo utente.</p>
+      <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
+        <div className="flex flex-col items-center">
+          <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+          <p className="mt-4 text-gray-500 font-medium">Caricamento Club...</p>
         </div>
       </div>
     );
@@ -63,60 +60,66 @@ const MemberDashboard = () => {
       path: "/book", 
       title: "Prenota un Campo", 
       icon: CalendarDays, 
-      description: "Scegli la data e l'orario per la tua prossima partita.",
-      buttonText: "Prenota Ora"
+      description: "Riserva il tuo slot orario per giocare.",
+      buttonText: "Vai al Calendario",
+      isPrimary: true
     },
     { 
       path: "/book-for-third-party", 
-      title: "Prenota per un Socio", 
+      title: "Prenota per Socio", 
       icon: Users, 
-      description: "Effettua una prenotazione per un altro socio.",
-      buttonText: "Effettua Prenotazione"
+      description: "Gestisci la prenotazione per un altro amico.",
+      buttonText: "Prenota per terzi"
     },
     { 
       path: "/find-match", 
       title: "Cerco Partita", 
       icon: Search, 
-      description: "Trova compagni di gioco del tuo livello.",
-      buttonText: "Cerca Avversari"
+      description: "Trova nuovi avversari e organizza sfide.",
+      buttonText: "Apri la Bacheca"
     },
   ];
 
   const nonBookingRoutes = [
     { 
       path: "/history", 
-      title: "Storico Prenotazioni", 
+      title: "I miei Campi", 
       icon: History, 
-      description: "Visualizza le tue prenotazioni passate e future.",
-      buttonText: "Vedi i miei Campi"
+      description: "Visualizza i tuoi impegni passati e futuri.",
+      buttonText: "Vedi Storico"
     },
     { 
       path: "/medical-certificates", 
       title: "Certificato Medico", 
       icon: FileText, 
-      description: "Gestisci il tuo certificato medico e le scadenze.",
+      description: "Carica e verifica l'idoneità sportiva.",
       buttonText: "Gestisci Documenti"
     },
   ];
 
-  const renderCard = (item: any, disabled: boolean, specialVariant: boolean = false) => {
+  const renderCard = (item: any, disabled: boolean, isAdminCard: boolean = false) => {
     const Icon = item.icon;
     return (
-      <Card key={item.path} className={`shadow-lg rounded-lg ${disabled ? 'opacity-60' : ''} ${specialVariant ? 'border-2 border-club-orange/20' : ''}`}>
-        <CardHeader>
-          <CardTitle className={`${specialVariant ? 'text-club-orange' : 'text-primary'} flex items-center`}>
-            <Icon className="mr-2 h-5 w-5" /> {item.title}
+      <Card key={item.path} className={`group relative border-none shadow-[0_2px_12px_rgba(0,0,0,0.06)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] rounded-[1.5rem] transition-all duration-500 overflow-hidden bg-white ${disabled ? 'opacity-60 cursor-not-allowed' : 'hover:-translate-y-2'}`}>
+        <div className={`h-1.5 w-full ${isAdminCard ? 'bg-club-orange' : item.isPrimary ? 'bg-primary' : 'bg-gray-100'}`}></div>
+        <CardHeader className="pb-2">
+          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-2 ${isAdminCard ? 'bg-club-orange/10 text-club-orange' : item.isPrimary ? 'bg-primary/10 text-primary' : 'bg-gray-50 text-gray-400'}`}>
+            <Icon size={24} />
+          </div>
+          <CardTitle className={`text-xl font-bold tracking-tight ${isAdminCard ? 'text-club-orange' : 'text-gray-900'}`}>
+            {item.title}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-gray-700 mb-4">{item.description}</p>
-          <Link to={item.path} onClick={(e) => disabled && e.preventDefault()}>
+          <p className="text-gray-500 text-sm mb-6 leading-relaxed">{item.description}</p>
+          <Link to={item.path} className="block" onClick={(e) => disabled && e.preventDefault()}>
             <Button 
-              className={`w-full ${item.path === '/book' ? 'bg-primary hover:bg-primary/90 text-primary-foreground' : specialVariant ? 'bg-club-orange hover:bg-club-orange/90 text-white' : 'text-primary border-primary hover:bg-secondary hover:text-primary'}`}
+              className={`w-full h-12 rounded-xl font-bold transition-all flex items-center justify-between px-5 ${item.isPrimary ? 'bg-primary hover:bg-[#357a46] text-white shadow-lg shadow-primary/10' : isAdminCard ? 'bg-club-orange hover:bg-opacity-90 text-white' : 'bg-white border-2 border-gray-100 text-gray-700 hover:border-primary/20 hover:bg-primary/5 hover:text-primary'}`}
               disabled={disabled}
-              variant={item.path === '/book' || specialVariant ? 'default' : 'outline'}
+              variant={item.isPrimary || isAdminCard ? 'default' : 'outline'}
             >
               {item.buttonText || "Visualizza"}
+              <ChevronRight size={18} className={`transition-transform group-hover:translate-x-1 ${disabled ? 'opacity-0' : ''}`} />
             </Button>
           </Link>
         </CardContent>
@@ -125,25 +128,29 @@ const MemberDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-green-50 to-white">
-      <div className="flex-grow p-4 sm:p-6 lg:p-8">
-        <header className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-primary">Benvenuto, {fullName}!</h1>
+    <div className="min-h-screen flex flex-col bg-[#F8FAFC]">
+      <div className="flex-grow p-6 sm:p-10 lg:p-12 max-w-7xl mx-auto w-full">
+        <header className="flex justify-between items-end mb-12">
+          <div className="space-y-1">
+            <p className="text-sm font-bold text-primary uppercase tracking-[0.2em] mb-1">Bentornato</p>
+            <h1 className="text-4xl font-extrabold text-gray-900 tracking-tighter">Ciao, {fullName}!</h1>
+          </div>
           <UserNav />
         </header>
 
         {!isApproved && (
-          <Alert className="mb-6 border-club-orange bg-club-orange/10 text-club-orange-foreground">
-            <AlertTriangle className="h-4 w-4 text-club-orange" />
-            <AlertTitle className="text-club-orange">Accesso Limitato</AlertTitle>
-            <AlertDescription className="text-club-orange/90">
-              Il tuo account è in attesa di approvazione da parte di un amministratore. 
-              Fino all'approvazione, non potrai effettuare prenotazioni o cercare partite.
-            </AlertDescription>
+          <Alert className="mb-10 border-none bg-amber-50 rounded-[1.5rem] p-6 shadow-sm">
+            <AlertTriangle className="h-6 w-6 text-amber-600 mt-1" />
+            <div className="ml-4">
+              <AlertTitle className="text-amber-800 font-bold text-lg">In attesa di approvazione</AlertTitle>
+              <AlertDescription className="text-amber-700 mt-1">
+                La segreteria sta verificando il tuo profilo. Presto potrai prenotare i campi!
+              </AlertDescription>
+            </div>
           </Alert>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {bookingRoutes.map(item => renderCard(item, !isApproved))}
           {nonBookingRoutes.map(item => renderCard(item, false))}
           
@@ -151,8 +158,8 @@ const MemberDashboard = () => {
             path: "/admin", 
             title: "Pannello Admin", 
             icon: ShieldCheck, 
-            description: "Gestisci prenotazioni, soci, campi e visualizza le statistiche del club.",
-            buttonText: "Accedi al Pannello"
+            description: "Strumenti di gestione per l'amministrazione del club.",
+            buttonText: "Accedi agli Strumenti"
           }, false, true)}
         </div>
       </div>
