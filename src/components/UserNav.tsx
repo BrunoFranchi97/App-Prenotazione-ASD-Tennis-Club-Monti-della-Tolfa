@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { User, LogOut, Settings, LayoutDashboard, History } from 'lucide-react';
+import { User, LogOut, Settings, LayoutDashboard, History, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 
@@ -42,7 +42,7 @@ const UserNav = () => {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      showSuccess("A presto!");
+      showSuccess("Disconnessione effettuata!");
       navigate('/login');
     } catch (error: any) {
       showError(error.message);
@@ -52,61 +52,59 @@ const UserNav = () => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-11 w-11 rounded-full border border-gray-100 shadow-sm hover:shadow-md transition-premium active:scale-95 p-0 bg-white">
-          <Avatar className="h-10 w-10 border-2 border-white">
-            <AvatarImage src={profile?.avatar_url} alt={profile?.full_name} className="object-cover" />
-            <AvatarFallback className="bg-primary/10 text-primary font-bold text-xs">
+        <Button variant="ghost" className="relative h-10 w-10 rounded-full focus-visible:ring-0">
+          <Avatar className="h-10 w-10 border-2 border-primary/20">
+            <AvatarImage src={profile?.avatar_url} alt={profile?.full_name} />
+            <AvatarFallback className="bg-primary text-white">
               {profile?.full_name?.charAt(0).toUpperCase() || email.charAt(0).toUpperCase()}
             </AvatarFallback>
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-64 rounded-2xl p-2 shadow-airbnb border-none mt-2" align="end" forceMount>
-        <DropdownMenuLabel className="font-normal px-4 py-3">
+      <DropdownMenuContent className="w-56" align="end" forceMount>
+        <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-bold leading-none text-gray-900">{profile?.full_name || 'Socio'}</p>
-            <p className="text-xs leading-none text-gray-400">{email}</p>
+            <p className="text-sm font-medium leading-none">{profile?.full_name || 'Socio'}</p>
+            <p className="text-xs leading-none text-muted-foreground">{email}</p>
           </div>
         </DropdownMenuLabel>
-        <DropdownMenuSeparator className="bg-gray-50 mx-2" />
-        <DropdownMenuGroup className="p-1">
-          <DropdownMenuItem asChild className="rounded-xl cursor-pointer py-2.5 focus:bg-gray-50">
-            <Link to="/profile">
-              <User className="mr-3 h-4 w-4 text-gray-400" />
-              <span className="font-medium">Profilo</span>
+        <DropdownMenuSeparator />
+        <DropdownMenuGroup>
+          <DropdownMenuItem asChild>
+            <Link to="/profile" className="cursor-pointer">
+              <User className="mr-2 h-4 w-4" />
+              <span>Il mio profilo</span>
             </Link>
           </DropdownMenuItem>
-          <DropdownMenuItem asChild className="rounded-xl cursor-pointer py-2.5 focus:bg-gray-50">
-            <Link to="/dashboard">
-              <LayoutDashboard className="mr-3 h-4 w-4 text-gray-400" />
-              <span className="font-medium">Dashboard</span>
+          <DropdownMenuItem asChild>
+            <Link to="/dashboard" className="cursor-pointer">
+              <LayoutDashboard className="mr-2 h-4 w-4" />
+              <span>Dashboard</span>
             </Link>
           </DropdownMenuItem>
-          <DropdownMenuItem asChild className="rounded-xl cursor-pointer py-2.5 focus:bg-gray-50">
-            <Link to="/history">
-              <History className="mr-3 h-4 w-4 text-gray-400" />
-              <span className="font-medium">I miei campi</span>
+          <DropdownMenuItem asChild>
+            <Link to="/history" className="cursor-pointer">
+              <History className="mr-2 h-4 w-4" />
+              <span>I miei campi</span>
             </Link>
           </DropdownMenuItem>
         </DropdownMenuGroup>
-        <DropdownMenuSeparator className="bg-gray-50 mx-2" />
+        <DropdownMenuSeparator />
         {profile?.is_admin && (
-          <div className="p-1">
-            <DropdownMenuItem asChild className="rounded-xl cursor-pointer py-2.5 focus:bg-gray-50 text-club-orange">
-              <Link to="/admin">
-                <Settings className="mr-3 h-4 w-4" />
-                <span className="font-bold">Pannello Admin</span>
+          <>
+            <DropdownMenuItem asChild>
+              <Link to="/admin" className="cursor-pointer font-semibold text-club-orange">
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Pannello Admin</span>
               </Link>
             </DropdownMenuItem>
-            <DropdownMenuSeparator className="bg-gray-50 mx-2" />
-          </div>
+            <DropdownMenuSeparator />
+          </>
         )}
-        <div className="p-1">
-          <DropdownMenuItem onClick={handleLogout} className="rounded-xl cursor-pointer py-2.5 text-red-600 focus:text-red-700 focus:bg-red-50">
-            <LogOut className="mr-3 h-4 w-4" />
-            <span className="font-bold">Esci</span>
-          </DropdownMenuItem>
-        </div>
+        <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600 focus:text-red-600">
+          <LogOut className="mr-2 h-4 w-4" />
+          <span>Esci</span>
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
