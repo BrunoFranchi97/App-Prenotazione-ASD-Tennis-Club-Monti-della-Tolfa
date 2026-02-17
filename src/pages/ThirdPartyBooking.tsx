@@ -8,7 +8,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, LogOut, Users, User, Lock, AlertCircle, CalendarCheck, Clock, History, CalendarRange } from 'lucide-react';
+import { ArrowLeft, LogOut, Users, User, Lock, AlertCircle, CalendarCheck, Clock, History, CalendarRange, ChevronRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, isEqual, setSeconds, setMilliseconds, addDays, startOfDay, endOfDay, startOfWeek, endOfWeek } from 'date-fns';
@@ -157,105 +157,160 @@ const ThirdPartyBooking = () => {
     finally { setLoading(false); }
   };
 
-  if (approvalLoading) return <div className="p-8 text-center">Verifica...</div>;
+  if (approvalLoading) return <div className="p-8 text-center bg-[#F8FAFC]">Verifica...</div>;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 sm:p-6 lg:p-8">
-      <header className="flex justify-between items-center mb-8">
-        <Link to="/dashboard"><Button variant="outline" size="icon" className="text-primary border-primary hover:bg-secondary"><ArrowLeft className="h-4 w-4" /></Button></Link>
-        <h1 className="text-3xl font-bold text-primary flex items-center ml-4"><Users className="mr-2 h-7 w-7" /> Prenota per un Socio</h1>
-        <div className="w-10"></div>
+    <div className="min-h-screen bg-[#F8FAFC] p-6 sm:p-10 lg:p-12">
+      <header className="flex justify-between items-center mb-12 max-w-7xl mx-auto">
+        <div className="flex items-center gap-6">
+          <Link to="/dashboard">
+            <Button variant="outline" size="icon" className="rounded-2xl border-none shadow-sm bg-white text-primary hover:scale-110 active:scale-95">
+              <ArrowLeft size={20} />
+            </Button>
+          </Link>
+          <h1 className="text-3xl font-extrabold text-gray-900 tracking-tighter">Prenota per un Socio</h1>
+        </div>
+        <div className="flex items-center gap-4">
+          <History 
+            className="text-gray-400 hover:text-primary cursor-pointer transition-colors hidden sm:block" 
+            onClick={() => navigate('/history')}
+            size={24}
+          />
+        </div>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-4 space-y-6">
-          <Card className="shadow-lg"><CardHeader><CardTitle className="text-primary">Data e Socio</CardTitle></CardHeader>
-            <CardContent className="space-y-6">
-              <Calendar mode="single" selected={date} onSelect={setDate} locale={it} className="rounded-md border shadow mx-auto" disabled={(d) => isBefore(d, startOfDay(new Date())) || isAfter(d, maxDate)} />
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2"><Label>Nome</Label><Input value={bookedForFirstName} onChange={e => setBookedForFirstName(e.target.value)} /></div>
-                <div className="space-y-2"><Label>Cognome</Label><Input value={bookedForLastName} onChange={e => setBookedForLastName(e.target.value)} /></div>
-              </div>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 max-w-7xl mx-auto">
+        <div className="lg:col-span-4 space-y-8">
+          <Card className="border-none shadow-[0_2px_12px_rgba(0,0,0,0.04)] rounded-[2rem] bg-white overflow-hidden">
+            <CardHeader className="pb-0">
+              <CardTitle className="text-lg font-bold text-gray-800">Seleziona Data</CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 flex justify-center">
+              <Calendar 
+                mode="single" 
+                selected={date} 
+                onSelect={setDate} 
+                locale={it} 
+                className="rounded-3xl border-none" 
+                disabled={(d) => isBefore(d, startOfDay(new Date())) || isAfter(d, maxDate)} 
+              />
             </CardContent>
           </Card>
           {canProceed && <BookingLimitsBox status={limitsStatus} isChecking={fetchingData} />}
         </div>
 
         <div className="lg:col-span-8">
-          <Card className="shadow-lg h-full">
-            <CardHeader><CardTitle className="text-primary">Campo e Orario</CardTitle></CardHeader>
-            <CardContent className="space-y-6">
+          <Card className="border-none shadow-[0_2px_12px_rgba(0,0,0,0.04)] rounded-[2rem] bg-white min-h-[600px] flex flex-col">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
+                <span className="text-[11px] font-bold uppercase tracking-widest text-primary/60">Prenotazione Esterna</span>
+              </div>
+              <CardTitle className="text-2xl font-bold text-gray-900">Dettagli del match</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-8 flex-grow">
               {!canProceed ? (
-                <div className="flex flex-col items-center justify-center py-12 px-4 text-center space-y-8 animate-in fade-in zoom-in duration-300">
-                  <div className="bg-amber-100 p-6 rounded-full"><AlertCircle className="h-16 w-16 text-amber-600" /></div>
+                <div className="flex flex-col items-center justify-center py-20 px-8 text-center space-y-8 animate-in fade-in zoom-in duration-500">
+                  <div className="bg-amber-50 p-8 rounded-[2.5rem]">
+                    <AlertCircle className="h-20 w-20 text-amber-500" />
+                  </div>
                   <div className="space-y-4 max-w-md">
-                    <h3 className="text-2xl font-bold text-gray-800">Limiti Raggiunti</h3>
-                    <p className="text-gray-600 leading-relaxed">
-                      Hai esaurito gli slot disponibili per la settimana selezionata <span className="font-bold text-primary">{weekRange}</span>.
-                    </p>
-                    
-                    <div className="bg-white p-6 rounded-xl border border-primary/20 shadow-sm space-y-4">
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium text-primary flex items-center justify-center">
-                          <CalendarRange className="mr-2 h-4 w-4" /> Cosa puoi fare ora?
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          Seleziona una data in una <strong>settimana differente</strong> sul calendario, oppure libera uno slot annullando un match esistente.
-                        </p>
-                      </div>
-                      <Link to="/history" className="block">
-                        <Button variant="outline" size="sm" className="w-full border-primary text-primary hover:bg-primary hover:text-white">
-                          <History className="mr-2 h-4 w-4" /> Gestisci i miei Campi
-                        </Button>
-                      </Link>
+                    <h3 className="text-3xl font-extrabold text-gray-900 tracking-tight">Limiti Raggiunti</h3>
+                    <p className="text-gray-500 text-lg">Hai già prenotato i tuoi 2 match settimanali per <span className="font-bold text-primary">{weekRange}</span>.</p>
+                    <div className="flex flex-col gap-3 pt-6">
+                      <Button onClick={() => navigate('/history')} className="premium-button-primary h-14 text-lg">
+                        Gestisci le mie prenotazioni
+                      </Button>
                     </div>
                   </div>
-                  {!limitsStatus.canBookMoreThisWeek && limitsStatus.nextAvailableDate && (
-                    <div className="bg-primary/5 border border-primary/10 p-6 rounded-2xl w-full max-w-sm">
-                      <p className="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-3">Uno slot in questa settimana si libererà il:</p>
-                      <div className="flex items-center justify-center gap-3 text-primary">
-                        <CalendarCheck className="h-6 w-6 text-club-orange" /><span className="text-xl font-extrabold capitalize">{format(limitsStatus.nextAvailableDate, "EEEE dd MMMM", { locale: it })}</span>
-                      </div>
-                      <div className="flex items-center justify-center gap-2 mt-2 text-gray-700 font-medium">
-                        <Clock className="h-4 w-4 text-club-orange" /><span>dopo le ore {format(limitsStatus.nextAvailableDate, "HH:mm")}</span>
-                      </div>
-                    </div>
-                  )}
                 </div>
               ) : (
                 <>
-                  <Label className="mb-2 block">Campo</Label>
-                  <Select onValueChange={setSelectedCourtId} value={selectedCourtId}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{courts.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}</SelectContent></Select>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-80 overflow-y-auto p-2 border rounded-md bg-gray-50">
-                    {allTimeSlots.map(t => {
-                      const isSelected = selectedSlots.includes(t);
-                      const available = isSlotAvailable(t);
-                      const endTime = format(addHours(setMinutes(setHours(new Date(), parseInt(t.split(':')[0])), 0), 1), 'HH:mm');
-                      
-                      let baseClasses = "w-full py-3 h-auto transition-none ";
-                      if (isSelected) {
-                        baseClasses += "bg-club-orange text-white hover:bg-club-orange shadow-none";
-                      } else if (available) {
-                        baseClasses += "bg-primary text-white hover:bg-primary/90";
-                      } else {
-                        baseClasses += "bg-gray-200 text-gray-500 cursor-not-allowed hover:bg-gray-200";
-                      }
-
-                      return (
-                        <Button 
-                          key={t} 
-                          onClick={() => available && handleSlotClick(t)} 
-                          className={baseClasses}
-                          disabled={!available && !isSelected}
-                        >
-                          {t} - {endTime}
-                        </Button>
-                      );
-                    })}
+                  <div className="space-y-3">
+                    <Label className="text-sm font-bold text-gray-700 ml-1">Campo da Gioco</Label>
+                    <Select onValueChange={setSelectedCourtId} value={selectedCourtId}>
+                      <SelectTrigger className="h-14 rounded-2xl border-gray-100 bg-gray-50/50 focus:ring-primary/20">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-2xl">
+                        {courts.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <Button onClick={handleBooking} className="w-full bg-primary hover:bg-primary/90 h-12 text-lg" disabled={selectedSlots.length === 0 || loading || !bookedForFirstName || !bookedForLastName}>
-                    {loading ? "In corso..." : "Conferma"}
-                  </Button>
+
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center ml-1">
+                      <Label className="text-sm font-bold text-gray-700">Seleziona Orario</Label>
+                      <span className="text-[11px] text-gray-400 font-medium italic">Max 3 ore consecutive</span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {allTimeSlots.map(t => {
+                        const isSelected = selectedSlots.includes(t);
+                        const available = isSlotAvailable(t);
+                        const endTime = format(addHours(setMinutes(setHours(new Date(), parseInt(t.split(':')[0])), 0), 1), 'HH:mm');
+                        
+                        return (
+                          <button 
+                            key={t} 
+                            disabled={!available && !isSelected}
+                            onClick={() => available && handleSlotClick(t)} 
+                            className={`
+                              relative h-16 rounded-2xl flex flex-col items-center justify-center p-2 transition-all duration-300
+                              ${isSelected 
+                                ? 'bg-gradient-to-br from-accent to-[#b85a20] text-white shadow-lg shadow-accent/20 scale-[0.98]' 
+                                : available 
+                                  ? 'bg-gray-50 text-gray-700 hover:bg-primary/5 hover:border-primary/20 hover:text-primary border-2 border-transparent' 
+                                  : 'bg-gray-100 text-gray-300 cursor-not-allowed opacity-50'
+                              }
+                            `}
+                          >
+                            <span className="text-sm font-bold tracking-tight">{t} - {endTime}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="pt-6 border-t border-gray-50 space-y-6">
+                    <div className="flex items-center gap-2 mb-2">
+                      <User className="h-4 w-4 text-primary" />
+                      <span className="text-[11px] font-bold uppercase tracking-widest text-primary/60">Dati del Socio Beneficiario</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold text-gray-500 uppercase ml-1">Nome</Label>
+                        <Input 
+                          placeholder="Es: Mario" 
+                          className="h-14 rounded-2xl border-gray-100 bg-gray-50 focus:ring-primary/20"
+                          value={bookedForFirstName} 
+                          onChange={e => setBookedForFirstName(e.target.value)} 
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold text-gray-500 uppercase ml-1">Cognome</Label>
+                        <Input 
+                          placeholder="Es: Rossi" 
+                          className="h-14 rounded-2xl border-gray-100 bg-gray-50 focus:ring-primary/20"
+                          value={bookedForLastName} 
+                          onChange={e => setBookedForLastName(e.target.value)} 
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-8">
+                    <Button 
+                      onClick={handleBooking} 
+                      className="w-full h-16 rounded-[1.5rem] bg-gradient-to-br from-primary to-[#23532f] hover:scale-[1.01] active:scale-[0.98] text-xl font-extrabold shadow-xl shadow-primary/20 flex items-center justify-center gap-3 transition-all"
+                      disabled={selectedSlots.length === 0 || loading || !bookedForFirstName || !bookedForLastName}
+                    >
+                      {loading ? (
+                        <div className="w-6 h-6 border-3 border-white/20 border-t-white rounded-full animate-spin"></div>
+                      ) : (
+                        <>Conferma Prenotazione <ChevronRight size={24} /></>
+                      )}
+                    </Button>
+                  </div>
                 </>
               )}
             </CardContent>
