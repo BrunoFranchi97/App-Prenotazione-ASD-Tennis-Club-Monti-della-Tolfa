@@ -226,52 +226,7 @@ const ThirdPartyBooking = () => {
                 </div>
               ) : (
                 <>
-                  <div className="space-y-3">
-                    <Label className="text-sm font-bold text-gray-700 ml-1">Campo da Gioco</Label>
-                    <Select onValueChange={setSelectedCourtId} value={selectedCourtId}>
-                      <SelectTrigger className="h-14 rounded-2xl border-gray-100 bg-gray-50/50 focus:ring-primary/20">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-2xl">
-                        {courts.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center ml-1">
-                      <Label className="text-sm font-bold text-gray-700">Seleziona Orario</Label>
-                      <span className="text-[11px] text-gray-400 font-medium italic">Max 3 ore consecutive</span>
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      {allTimeSlots.map(t => {
-                        const isSelected = selectedSlots.includes(t);
-                        const available = isSlotAvailable(t);
-                        const endTime = format(addHours(setMinutes(setHours(new Date(), parseInt(t.split(':')[0])), 0), 1), 'HH:mm');
-                        
-                        return (
-                          <button 
-                            key={t} 
-                            disabled={!available && !isSelected}
-                            onClick={() => available && handleSlotClick(t)} 
-                            className={`
-                              relative h-16 rounded-2xl flex flex-col items-center justify-center p-2 transition-all duration-300
-                              ${isSelected 
-                                ? 'bg-gradient-to-br from-accent to-[#b85a20] text-white shadow-lg shadow-accent/20 scale-[0.98]' 
-                                : available 
-                                  ? 'bg-gray-50 text-gray-700 hover:bg-primary/5 hover:border-primary/20 hover:text-primary border-2 border-transparent' 
-                                  : 'bg-gray-100 text-gray-300 cursor-not-allowed opacity-50'
-                              }
-                            `}
-                          >
-                            <span className="text-sm font-bold tracking-tight">{t} - {endTime}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="pt-6 border-t border-gray-50 space-y-6">
+                  <div className="space-y-6">
                     <div className="flex items-center gap-2 mb-2">
                       <User className="h-4 w-4 text-primary" />
                       <span className="text-[11px] font-bold uppercase tracking-widest text-primary/60">Dati del Socio Beneficiario</span>
@@ -294,6 +249,53 @@ const ThirdPartyBooking = () => {
                           value={bookedForLastName} 
                           onChange={e => setBookedForLastName(e.target.value)} 
                         />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-6 border-t border-gray-50 space-y-6">
+                    <div className="space-y-3">
+                      <Label className="text-sm font-bold text-gray-700 ml-1">Campo da Gioco</Label>
+                      <Select onValueChange={setSelectedCourtId} value={selectedCourtId}>
+                        <SelectTrigger className="h-14 rounded-2xl border-gray-100 bg-gray-50/50 focus:ring-primary/20">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-2xl">
+                          {courts.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center ml-1">
+                        <Label className="text-sm font-bold text-gray-700">Seleziona Orario</Label>
+                        <span className="text-[11px] text-gray-400 font-medium italic">Max 3 ore consecutive</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {allTimeSlots.map(t => {
+                          const isSelected = selectedSlots.includes(t);
+                          const available = isSlotAvailable(t);
+                          const endTime = format(addHours(setMinutes(setHours(new Date(), parseInt(t.split(':')[0])), 0), 1), 'HH:mm');
+                          
+                          return (
+                            <button 
+                              key={t} 
+                              disabled={!available && !isSelected}
+                              onClick={() => available && handleSlotClick(t)} 
+                              className={`
+                                relative h-20 rounded-2xl flex flex-col items-center justify-center p-2 transition-all duration-300
+                                ${isSelected 
+                                  ? 'bg-gradient-to-br from-accent to-[#b85a20] text-white shadow-lg shadow-accent/20 scale-[0.98]' 
+                                  : available 
+                                    ? 'bg-gray-50 text-gray-700 hover:bg-primary/5 hover:border-primary/20 hover:text-primary border-2 border-transparent' 
+                                    : 'bg-gray-100 text-gray-300 cursor-not-allowed opacity-50'
+                                }
+                              `}
+                            >
+                              <span className="text-base font-bold tracking-tight">{t} - {endTime}</span>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
