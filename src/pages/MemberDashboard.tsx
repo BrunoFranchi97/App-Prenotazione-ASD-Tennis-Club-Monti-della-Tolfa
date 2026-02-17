@@ -44,6 +44,9 @@ const MemberDashboard = () => {
     fetchUserProfile();
   }, []);
 
+  // Estrai solo il primo nome
+  const firstName = fullName ? fullName.split(' ')[0] : 'Socio';
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
@@ -68,7 +71,7 @@ const MemberDashboard = () => {
       path: "/book-for-third-party", 
       title: "Prenota per Socio", 
       icon: Users, 
-      description: "Gestisci la prenotazione per un altro amico.",
+      description: "Gestisci la prenotazione per un altro socio.",
       buttonText: "Prenota per terzi"
     },
     { 
@@ -133,7 +136,7 @@ const MemberDashboard = () => {
         <header className="flex justify-between items-end mb-12">
           <div className="space-y-1">
             <p className="text-sm font-bold text-primary uppercase tracking-[0.2em] mb-1">Bentornato</p>
-            <h1 className="text-4xl font-extrabold text-gray-900 tracking-tighter">Ciao, {fullName}!</h1>
+            <h1 className="text-4xl font-extrabold text-gray-900 tracking-tighter">Ciao, {firstName}!</h1>
           </div>
           <UserNav />
         </header>
