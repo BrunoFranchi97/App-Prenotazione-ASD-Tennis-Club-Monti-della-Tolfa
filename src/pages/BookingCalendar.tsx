@@ -238,7 +238,7 @@ const BookingCalendar = () => {
                 <div className="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
                 <span className="text-[11px] font-bold uppercase tracking-widest text-primary/60">Disponibilità Tempo Reale</span>
               </div>
-              <CardTitle className="text-2xl font-bold text-gray-900">Configura la tua partita</CardTitle>
+              <CardTitle className="text-2xl font-bold text-gray-900">Prenota Campo</CardTitle>
             </CardHeader>
             <CardContent className="space-y-8 flex-grow">
               {showWeeklyBlock ? (
