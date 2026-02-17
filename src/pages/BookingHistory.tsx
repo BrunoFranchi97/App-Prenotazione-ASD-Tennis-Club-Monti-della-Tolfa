@@ -168,7 +168,7 @@ const BookingHistory = () => {
       <header className="flex justify-between items-center mb-8">
         <div className="flex items-center">
           <Link to="/dashboard" className="mr-4">
-            <Button variant="outline" size="icon" className="text-primary border-primary hover:bg-secondary">
+            <Button variant="outline" size="icon" className="text-primary border-primary hover:bg-secondary hover:text-primary">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
@@ -176,7 +176,7 @@ const BookingHistory = () => {
         </div>
         <div className="flex items-center gap-2">
           <UserNav />
-          <Button variant="outline" onClick={handleLogout} className="hidden sm:flex border-primary text-primary hover:bg-secondary">
+          <Button variant="outline" onClick={handleLogout} className="hidden sm:flex border-primary text-primary hover:bg-secondary hover:text-primary">
             <LogOut className="mr-2 h-4 w-4" /> Esci
           </Button>
         </div>
@@ -291,7 +291,7 @@ const BookingHistory = () => {
                             <Button 
                               variant="outline" 
                               size="sm" 
-                              className="flex-1 border-primary text-primary hover:bg-secondary"
+                              className="flex-1 border-primary text-primary hover:bg-secondary hover:text-primary"
                               onClick={() => navigate('/edit-booking', { state: { group } })}
                             >
                               <Edit className="h-4 w-4 mr-1.5" /> Modifica

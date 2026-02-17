@@ -194,13 +194,13 @@ const AdminBlockSlots = () => {
       <header className="flex justify-between items-center mb-8">
         <div className="flex items-center">
           <Link to="/admin" className="mr-4">
-            <Button variant="outline" size="icon" className="text-primary border-primary hover:bg-secondary">
+            <Button variant="outline" size="icon" className="text-primary border-primary hover:bg-secondary hover:text-primary">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
           <h1 className="text-3xl font-bold text-primary">Blocca Slot Orari</h1>
         </div>
-        <Button variant="outline" className="text-primary border-primary hover:bg-secondary" onClick={handleLogout}>
+        <Button variant="outline" className="text-primary border-primary hover:bg-secondary hover:text-primary" onClick={handleLogout}>
           <LogOut className="mr-2 h-4 w-4" /> Esci
         </Button>
       </header>
