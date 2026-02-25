@@ -14,10 +14,16 @@ import { showError } from '@/utils/toast';
 import { format, parseISO, addHours, setHours, setMinutes, isBefore, isEqual, setSeconds, setMilliseconds, addDays, startOfDay, endOfDay, isSameDay, addMinutes } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { useApprovalCheck } from '@/hooks/use-approval-check';
-import { Court, Reservation } from '@/types/supabase';
+import { Court, Reservation, BookingType } from '@/types/supabase';
 import BookingSuccessDialog from '@/components/BookingSuccessDialog';
 import UserNav from '@/components/UserNav';
 import { cn } from '@/lib/utils';
+
+const bookingTypeLabels: Record<BookingType, string> = {
+  singolare: 'Singolare',
+  doppio: 'Doppio',
+  lezione: 'Lezione'
+};
 
 const ThirdPartyBooking = () => {
   const navigate = useNavigate();
@@ -28,6 +34,7 @@ const ThirdPartyBooking = () => {
   const [selectedCourtId, setSelectedCourtId] = useState<string | undefined>(undefined);
   const [allReservations, setAllReservations] = useState<Reservation[]>([]);
   const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
+  const [bookingType, setBookingType] = useState<BookingType>('singolare');
   const [bookedForFirstName, setBookedForFirstName] = useState('');
   const [bookedForLastName, setBookedForLastName] = useState('');
   const [loading, setLoading] = useState(false);
@@ -127,7 +134,8 @@ const ThirdPartyBooking = () => {
         return {
           court_id: courtIdNum, user_id: user?.id,
           starts_at: slotStart.toISOString(), ends_at: addHours(slotStart, 1).toISOString(),
-          status: 'confirmed', notes: `Per ${bookedForFirstName} ${bookedForLastName}`,
+          status: 'confirmed', booking_type: bookingType, 
+          notes: `Per ${bookedForFirstName} ${bookedForLastName} (${bookingTypeLabels[bookingType]})`,
           booked_for_first_name: bookedForFirstName, booked_for_last_name: bookedForLastName,
         };
       });
@@ -258,6 +266,29 @@ const ThirdPartyBooking = () => {
                     );
                   })}
                 </div>
+
+                {/* Tipologia Match (Pills) */}
+                {selectedCourtId && (
+                  <div className="flex items-center gap-3 pt-4 animate-in fade-in slide-in-from-top-2">
+                    <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tipologia:</Label>
+                    <div className="flex gap-2">
+                      {(['singolare', 'doppio', 'lezione'] as BookingType[]).map(type => (
+                        <button
+                          key={type}
+                          onClick={() => setBookingType(type)}
+                          className={cn(
+                            "px-5 py-1.5 rounded-full text-xs font-bold transition-all border-2",
+                            bookingType === type 
+                              ? "bg-primary border-primary text-white shadow-md shadow-primary/10" 
+                              : "bg-white border-gray-100 text-gray-400 hover:border-primary/30 hover:text-primary"
+                          )}
+                        >
+                          {bookingTypeLabels[type]}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Selezione Orario */}

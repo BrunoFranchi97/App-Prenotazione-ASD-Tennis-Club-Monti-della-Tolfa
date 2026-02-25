@@ -48,7 +48,7 @@ import { cn } from '@/lib/utils';
 const bookingTypeLabels: Record<BookingType, string> = {
   singolare: 'Singolare',
   doppio: 'Doppio',
-  lezione: 'Lezione con Maestro'
+  lezione: 'Lezione'
 };
 
 const BookingCalendar = () => {
@@ -399,7 +399,7 @@ const BookingCalendar = () => {
                       <div className="flex items-center gap-3 pt-4 animate-in fade-in slide-in-from-top-2">
                         <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tipologia:</Label>
                         <div className="flex gap-2">
-                          {(['singolare', 'doppio'] as BookingType[]).map(type => (
+                          {(['singolare', 'doppio', 'lezione'] as BookingType[]).map(type => (
                             <button
                               key={type}
                               onClick={() => setBookingType(type)}
