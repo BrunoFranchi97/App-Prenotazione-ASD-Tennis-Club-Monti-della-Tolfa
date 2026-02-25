@@ -11,11 +11,12 @@ import { Label } from "@/components/ui/label";
 import { ArrowLeft, Save, Clock, MapPin, CalendarDays, User, ChevronRight, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
-import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, isEqual, setSeconds, setMilliseconds, addMinutes, isSameDay } from 'date-fns';
+import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, isEqual, setSeconds, setMilliseconds, addMinutes, isSameDay, startOfDay, endOfDay } from 'date-fns';
 import { it } from 'date-fns/locale';
 import type { Court, Reservation, BookingType } from '@/types/supabase';
 import { cn } from '@/lib/utils';
 import UserNav from '@/components/UserNav';
+import { Input } from "@/components/ui/input";
 
 interface ReservationGroup {
   id: string;
@@ -35,7 +36,7 @@ interface ReservationGroup {
 const bookingTypeLabels: Record<BookingType, string> = {
   singolare: 'Singolare',
   doppio: 'Doppio',
-  lezione: 'Lezione con Maestro'
+  lezione: 'Lezione'
 };
 
 const EditBookingGroup = () => {

@@ -64,7 +64,6 @@ const ThirdPartyBooking = () => {
       const { data } = await supabase.from('courts').select('*').eq('is_active', true).order('id');
       if (data) {
         setCourts(data);
-        if (data.length > 0 && !selectedCourtId) setSelectedCourtId(data[0].id.toString());
       }
     };
     fetchCourts();
@@ -219,7 +218,6 @@ const ThirdPartyBooking = () => {
             </CardHeader>
             
             <CardContent className="py-8 space-y-10 flex-grow">
-              {/* Socio Beneficiario */}
               <div className="space-y-6">
                 <Label className="text-xs font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Socio Beneficiario</Label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -242,7 +240,6 @@ const ThirdPartyBooking = () => {
                 </div>
               </div>
 
-              {/* Selezione Campo (Compact Grid) */}
               <div className="space-y-6">
                 <Label className="text-xs font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Selezione Campo</Label>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -267,7 +264,6 @@ const ThirdPartyBooking = () => {
                   })}
                 </div>
 
-                {/* Tipologia Match (Pills) */}
                 {selectedCourtId && (
                   <div className="flex items-center gap-3 pt-4 animate-in fade-in slide-in-from-top-2">
                     <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tipologia:</Label>
@@ -291,7 +287,6 @@ const ThirdPartyBooking = () => {
                 )}
               </div>
 
-              {/* Selezione Orario */}
               <div className="space-y-6 pt-8 border-t border-gray-50">
                 <div className="flex justify-between items-end ml-1">
                   <Label className="text-xs font-black text-gray-400 uppercase tracking-[0.2em]">Selezione Orario</Label>
