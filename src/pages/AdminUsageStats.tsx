@@ -2,398 +2,143 @@
 
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { format, startOfMonth, endOfMonth, subMonths, isWithinInterval, parseISO } from 'date-fns';
+import { format, startOfMonth, subMonths, isWithinInterval, parseISO } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, LogOut, BarChart2, TrendingUp, Users, Clock } from 'lucide-react';
+import { ArrowLeft, BarChart2, TrendingUp, Users, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { showSuccess, showError } from '@/utils/toast';
+import { showError } from '@/utils/toast';
 import { Court, Reservation } from '@/types/supabase';
-
-interface CourtStats {
-  court: Court;
-  totalReservations: number;
-  totalHours: number;
-  utilizationRate: number;
-  monthlyReservations: number;
-}
-
-interface MonthlyStats {
-  month: string;
-  totalReservations: number;
-  totalHours: number;
-  uniqueUsers: number;
-}
 
 const AdminUsageStats = () => {
   const navigate = useNavigate();
-  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [courts, setCourts] = useState<Court[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState<string>("current");
-  const [courtStats, setCourtStats] = useState<CourtStats[]>([]);
-  const [monthlyStats, setMonthlyStats] = useState<MonthlyStats[]>([]);
+  const [topUsers, setTopUsers] = useState<{name: string, count: number}[]>([]);
 
-  const periods = [
-    { value: "current", label: "Mese Corrente" },
-    { value: "last3", label: "Ultimi 3 Mesi" },
-    { value: "last6", label: "Ultimi 6 Mesi" },
-    { value: "year", label: "Ultimo Anno" }
-  ];
-
-  const handleLogout = async () => {
+  const fetchStats = async () => {
+    setLoading(true);
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        showError(error.message);
-      } else {
-        showSuccess("Disconnessione effettuata con successo!");
-        navigate('/login');
-      }
-    } catch (error: any) {
-      showError(error.message || "Errore durante la disconnessione.");
-    }
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: isAdmin } = await supabase.from('profiles').select('is_admin').eq('id', user?.id).single();
+      if (!isAdmin?.is_admin) return navigate('/dashboard');
+
+      const [cData, rData, pData] = await Promise.all([
+        supabase.from('courts').select('*'),
+        supabase.from('reservations').select('*').neq('status', 'cancelled'),
+        supabase.from('profiles').select('id, full_name')
+      ]);
+
+      setCourts(cData.data || []);
+      setReservations(rData.data || []);
+
+      const userMap = new Map(pData.data?.map(p => [p.id, p.full_name || "Socio"]) || []);
+      const userCounts: Record<string, number> = {};
+      rData.data?.forEach(r => {
+        userCounts[r.user_id] = (userCounts[r.user_id] || 0) + 1;
+      });
+
+      const top = Object.entries(userCounts)
+        .map(([id, count]) => ({ name: userMap.get(id) || "Socio", count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5);
+      
+      setTopUsers(top);
+    } catch (e: any) { showError(e.message); }
+    finally { setLoading(false); }
   };
 
-  const fetchAdminStatus = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('is_admin')
-        .eq('id', user.id)
-        .single();
+  useEffect(() => { fetchStats(); }, []);
 
-      if (error || !profile?.is_admin) {
-        setIsAdmin(false);
-        showError("Accesso negato. Non sei un amministratore.");
-        navigate('/dashboard');
-      } else {
-        setIsAdmin(true);
-      }
-    } else {
-      setIsAdmin(false);
-      navigate('/login');
-    }
-  };
-
-  const fetchData = async () => {
-    try {
-      // Fetch courts
-      const { data: courtsData, error: courtsError } = await supabase
-        .from('courts')
-        .select('*')
-        .order('name', { ascending: true });
-
-      if (courtsError) throw courtsError;
-      setCourts(courtsData || []);
-
-      // Fetch reservations
-      const { data: reservationsData, error: reservationsError } = await supabase
-        .from('reservations')
-        .select('*')
-        .order('starts_at', { ascending: false });
-
-      if (reservationsError) throw reservationsError;
-      setReservations(reservationsData || []);
-
-    } catch (err: any) {
-      showError("Errore nel caricamento dei dati: " + err.message);
-    }
-  };
-
-  const calculateStats = () => {
-    if (!courts.length || !reservations.length) return;
-
+  const statsByCourt = useMemo(() => {
     const now = new Date();
-    let startDate: Date;
-    let endDate: Date = now;
+    const start = selectedPeriod === "current" ? startOfMonth(now) : subMonths(now, 3);
+    const filtered = reservations.filter(r => isWithinInterval(parseISO(r.starts_at), { start, end: now }));
 
-    switch (selectedPeriod) {
-      case "current":
-        startDate = startOfMonth(now);
-        endDate = endOfMonth(now);
-        break;
-      case "last3":
-        startDate = subMonths(now, 3);
-        break;
-      case "last6":
-        startDate = subMonths(now, 6);
-        break;
-      case "year":
-        startDate = subMonths(now, 12);
-        break;
-      default:
-        startDate = subMonths(now, 1);
-    }
-
-    // Filter reservations by period
-    const filteredReservations = reservations.filter(reservation => {
-      const reservationDate = parseISO(reservation.starts_at);
-      return isWithinInterval(reservationDate, { start: startDate, end: endDate });
-    });
-
-    // Calculate court stats
-    const stats: CourtStats[] = courts.map(court => {
-      const courtReservations = filteredReservations.filter(r => r.court_id === court.id);
-      const totalHours = courtReservations.reduce((sum, r) => {
-        const start = parseISO(r.starts_at);
-        const end = parseISO(r.ends_at);
-        return sum + (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-      }, 0);
-
-      // Calculate utilization rate (simplified: based on 12 hours per day, 30 days)
-      const totalPossibleHours = selectedPeriod === "current" ? 12 * 30 : 
-        selectedPeriod === "last3" ? 12 * 90 :
-        selectedPeriod === "last6" ? 12 * 180 : 12 * 365;
-      const utilizationRate = totalPossibleHours > 0 ? (totalHours / totalPossibleHours) * 100 : 0;
-
+    return courts.map(c => {
+      const courtRes = filtered.filter(r => r.court_id === c.id);
       return {
-        court,
-        totalReservations: courtReservations.length,
-        totalHours: Math.round(totalHours * 10) / 10,
-        utilizationRate: Math.round(utilizationRate * 10) / 10,
-        monthlyReservations: Math.round((courtReservations.length / (selectedPeriod === "current" ? 1 : 
-          selectedPeriod === "last3" ? 3 : selectedPeriod === "last6" ? 6 : 12)) * 10) / 10
+        name: c.name,
+        count: courtRes.length,
+        hours: courtRes.length // Ogni record è 1h nell'attuale logica
       };
     });
-
-    setCourtStats(stats);
-
-    // Calculate monthly stats
-    const monthlyData: { [key: string]: MonthlyStats } = {};
-    
-    filteredReservations.forEach(reservation => {
-      const date = parseISO(reservation.starts_at);
-      const monthKey = format(date, 'MMMM yyyy', { locale: it });
-      
-      if (!monthlyData[monthKey]) {
-        monthlyData[monthKey] = {
-          month: monthKey,
-          totalReservations: 0,
-          totalHours: 0,
-          uniqueUsers: new Set()
-        } as any;
-      }
-      
-      monthlyData[monthKey].totalReservations++;
-      monthlyData[monthKey].totalHours += (parseISO(reservation.ends_at).getTime() - date.getTime()) / (1000 * 60 * 60);
-      (monthlyData[monthKey] as any).uniqueUsers.add(reservation.user_id);
-    });
-
-    // Convert Set to number and round hours
-    const monthlyStatsArray = Object.values(monthlyData).map(stat => ({
-      ...stat,
-      totalHours: Math.round(stat.totalHours * 10) / 10,
-      uniqueUsers: (stat as any).uniqueUsers.size
-    }));
-
-    setMonthlyStats(monthlyStatsArray.reverse());
-  };
-
-  useEffect(() => {
-    const initialize = async () => {
-      await fetchAdminStatus();
-      if (isAdmin) {
-        await fetchData();
-      }
-      setLoading(false);
-    };
-    initialize();
-  }, []);
-
-  useEffect(() => {
-    calculateStats();
   }, [courts, reservations, selectedPeriod]);
 
-  if (!isAdmin && !loading) {
-    return null;
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-white p-4">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold mb-4 text-primary">Caricamento...</h1>
-          <p className="text-xl text-gray-600">Calcolo statistiche.</p>
-        </div>
-      </div>
-    );
-  }
-
-  const totalReservations = courtStats.reduce((sum, stat) => sum + stat.totalReservations, 0);
-  const totalHours = courtStats.reduce((sum, stat) => sum + stat.totalHours, 0);
-  const avgUtilization = courtStats.length > 0 ? 
-    Math.round((courtStats.reduce((sum, stat) => sum + stat.utilizationRate, 0) / courtStats.length) * 10) / 10 : 0;
+  if (loading) return <div className="p-8 text-center">Caricamento statistiche...</div>;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 sm:p-6 lg:p-8">
       <header className="flex justify-between items-center mb-8">
-        <div className="flex items-center">
-          <Link to="/admin" className="mr-4">
-            <Button variant="outline" size="icon" className="text-primary border-primary hover:bg-secondary hover:text-primary">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <h1 className="text-3xl font-bold text-primary">Statistiche Utilizzo</h1>
+        <div className="flex items-center gap-3">
+          <Link to="/admin"><Button variant="outline" size="icon"><ArrowLeft className="h-4 w-4" /></Button></Link>
+          <h1 className="text-3xl font-bold text-primary">Statistiche</h1>
         </div>
-        <div className="flex items-center gap-4">
-          <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-            <SelectTrigger className="w-48">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {periods.map((period) => (
-                <SelectItem key={period.value} value={period.value}>
-                  {period.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button variant="outline" className="text-primary border-primary hover:bg-secondary hover:text-primary" onClick={handleLogout}>
-            <LogOut className="mr-2 h-4 w-4" /> Esci
-          </Button>
-        </div>
+        <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+          <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="current">Mese Corrente</SelectItem>
+            <SelectItem value="last3">Ultimi 3 Mesi</SelectItem>
+          </SelectContent>
+        </Select>
       </header>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <Card className="shadow-lg rounded-lg">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Prenotazioni Totali</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalReservations}</div>
-            <p className="text-xs text-muted-foreground">
-              {periods.find(p => p.value === selectedPeriod)?.label}
-            </p>
-          </CardContent>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <Card className="p-6 flex flex-col items-center">
+          <Users className="h-8 w-8 text-primary mb-2" />
+          <p className="text-sm text-gray-500 uppercase font-bold">Prenotazioni Totali</p>
+          <p className="text-4xl font-black">{reservations.length}</p>
         </Card>
-
-        <Card className="shadow-lg rounded-lg">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Ore Totali</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalHours}</div>
-            <p className="text-xs text-muted-foreground">
-              Ore di utilizzo
-            </p>
-          </CardContent>
+        <Card className="p-6 flex flex-col items-center">
+          <Clock className="h-8 w-8 text-club-orange mb-2" />
+          <p className="text-sm text-gray-500 uppercase font-bold">Ore Giocate</p>
+          <p className="text-4xl font-black">{reservations.length}h</p>
         </Card>
-
-        <Card className="shadow-lg rounded-lg">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Utilizzo Medio</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{avgUtilization}%</div>
-            <p className="text-xs text-muted-foreground">
-              Tasso di utilizzo
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-lg rounded-lg">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Campi Attivi</CardTitle>
-            <BarChart2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{courts.filter(c => c.is_active).length}/{courts.length}</div>
-            <p className="text-xs text-muted-foreground">
-              Campi disponibili
-            </p>
-          </CardContent>
+        <Card className="p-6 flex flex-col items-center">
+          <TrendingUp className="h-8 w-8 text-green-500 mb-2" />
+          <p className="text-sm text-gray-500 uppercase font-bold">Campi Attivi</p>
+          <p className="text-4xl font-black">{courts.length}</p>
         </Card>
       </div>
 
-      {/* Court Stats Table */}
-      <Card className="shadow-lg rounded-lg mb-8">
-        <CardHeader>
-          <CardTitle className="text-primary">Statistiche per Campo</CardTitle>
-          <CardDescription>Utilizzo dettagliato di ogni campo</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <Card>
+          <CardHeader><CardTitle>Utilizzo per Campo</CardTitle></CardHeader>
+          <CardContent>
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Campo</TableHead>
-                  <TableHead>Superficie</TableHead>
-                  <TableHead>Prenotazioni</TableHead>
-                  <TableHead>Ore Totali</TableHead>
-                  <TableHead>Media Mensile</TableHead>
-                  <TableHead>Tasso Utilizzo</TableHead>
-                </TableRow>
-              </TableHeader>
+              <TableHeader><TableRow><TableHead>Campo</TableHead><TableHead>Prenotazioni</TableHead><TableHead>Ore</TableHead></TableRow></TableHeader>
               <TableBody>
-                {courtStats.map((stat) => (
-                  <TableRow key={stat.court.id}>
-                    <TableCell className="font-medium">{stat.court.name}</TableCell>
-                    <TableCell>{stat.court.surface}</TableCell>
-                    <TableCell>{stat.totalReservations}</TableCell>
-                    <TableCell>{stat.totalHours}h</TableCell>
-                    <TableCell>{stat.monthlyReservations}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center">
-                        <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
-                          <div 
-                            className="bg-primary h-2 rounded-full" 
-                            style={{ width: `${Math.min(stat.utilizationRate, 100)}%` }}
-                          ></div>
-                        </div>
-                        <span className="text-sm">{stat.utilizationRate}%</span>
-                      </div>
-                    </TableCell>
+                {statsByCourt.map(s => (
+                  <TableRow key={s.name}>
+                    <TableCell className="font-bold">{s.name}</TableCell>
+                    <TableCell>{s.count}</TableCell>
+                    <TableCell>{s.hours}h</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      {/* Monthly Stats */}
-      {monthlyStats.length > 0 && (
-        <Card className="shadow-lg rounded-lg">
-          <CardHeader>
-            <CardTitle className="text-primary">Andamento Mensile</CardTitle>
-            <CardDescription>Evoluzione delle prenotazioni nel tempo</CardDescription>
-          </CardHeader>
+        <Card>
+          <CardHeader><CardTitle>Top 5 Soci Attivi</CardTitle></CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Mese</TableHead>
-                    <TableHead>Prenotazioni</TableHead>
-                    <TableHead>Ore Totali</TableHead>
-                    <TableHead>Utenti Unici</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {monthlyStats.map((stat, index) => (
-                    <TableRow key={index}>
-                      <TableCell className="font-medium">{stat.month}</TableCell>
-                      <TableCell>{stat.totalReservations}</TableCell>
-                      <TableCell>{stat.totalHours}h</TableCell>
-                      <TableCell>{stat.uniqueUsers}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+            <div className="space-y-4">
+              {topUsers.map((u, i) => (
+                <div key={u.name} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
+                  <span className="font-bold text-gray-700">{i+1}. {u.name}</span>
+                  <Badge>{u.count} match</Badge>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
-      )}
+      </div>
     </div>
   );
 };

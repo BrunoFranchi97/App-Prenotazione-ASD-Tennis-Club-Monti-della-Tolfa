@@ -6,6 +6,7 @@ export interface Court {
 }
 
 export type BookingType = 'singolare' | 'doppio' | 'lezione';
+export type ProfileStatus = 'pending' | 'approved' | 'rejected';
 
 export interface Reservation {
   id: string;
@@ -62,7 +63,8 @@ export interface Profile {
   full_name?: string | null;
   phone?: string | null;
   is_admin: boolean;
-  approved: boolean;
+  approved: boolean; // Mantenuto per compatibilità legacy
+  status: ProfileStatus;
   approved_at?: string | null;
   skill_level: SkillLevel;
   created_at: string;

@@ -17,59 +17,39 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
   const location = useLocation();
   const [searchParams] = useSearchParams();
 
-  // DEBUG: Log dei parametri di query per verifica email
   useEffect(() => {
     const token = searchParams.get('token');
     const type = searchParams.get('type');
     
-    if (token && type) {
-      console.log('AuthLayout - Email verification parameters detected:');
-      console.log('- Token:', token ? 'Present' : 'Missing');
-      console.log('- Type:', type);
-      console.log('- Full URL:', window.location.href);
-      console.log('- Origin:', window.location.origin);
-      console.log('- Pathname:', location.pathname);
-      
-      // Se siamo sulla dashboard con parametri di verifica, reindirizza al gestore di verifica
-      if (location.pathname === '/dashboard' && type === 'email') {
-        console.log('Redirecting to email verification handler...');
-        navigate(`/auth/verify?token=${token}&type=${type}`);
-      }
+    if (token && type && location.pathname === '/dashboard' && type === 'email') {
+      navigate(`/auth/verify?token=${token}&type=${type}`);
     }
   }, [searchParams, location, navigate]);
 
   const ensureProfileExists = async (userId: string, userEmail: string | undefined, rawMetaData: any) => {
     const { data: profile, error: fetchError } = await supabase
       .from('profiles')
-      .select('is_admin, approved')
+      .select('is_admin, status, approved')
       .eq('id', userId)
       .single();
 
     if (fetchError && fetchError.code === 'PGRST116') {
-      console.warn("Profile missing for user, attempting manual creation.");
-      
       const fullName = rawMetaData?.full_name || userEmail || 'Socio';
-
       const { error: insertError } = await supabase
         .from('profiles')
         .insert({ 
           id: userId, 
           full_name: fullName,
+          status: 'pending'
         });
 
       if (insertError) {
-        showError("Errore critico: Impossibile creare il profilo utente. Contatta l'amministratore.");
-        console.error("Manual profile creation failed:", insertError);
+        showError("Errore critico: Impossibile creare il profilo utente.");
         await supabase.auth.signOut();
         navigate('/login');
         return null;
       }
-      
-      return { is_admin: false, approved: false };
-    } else if (fetchError) {
-      console.error("Error fetching profile:", fetchError);
-      showError("Errore nel recupero del profilo utente.");
-      return null;
+      return { is_admin: false, status: 'pending', approved: false };
     }
     
     return profile;
@@ -85,16 +65,22 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
     const isAdminRoute = location.pathname.startsWith('/admin');
 
     if (session) {
-      const user = session.user;
-      
-      const profile = await ensureProfileExists(user.id, user.email, user.user_metadata);
-      
+      const profile = await ensureProfileExists(session.user.id, session.user.email, session.user.user_metadata);
       if (!profile) {
         setLoading(false);
         return;
       }
       
       const isAdmin = profile.is_admin || false;
+      const status = profile.status || (profile.approved ? 'approved' : 'pending');
+
+      // Se l'utente non è approvato o è rifiutato, può stare solo in dashboard o profilo
+      if (status !== 'approved' && !isAdmin) {
+        const allowedNonApprovedRoutes = ['/dashboard', '/profile', '/medical-certificates'];
+        if (!allowedNonApprovedRoutes.includes(location.pathname)) {
+          navigate('/dashboard');
+        }
+      }
 
       if (location.pathname === '/') {
         navigate('/dashboard');
@@ -115,15 +101,10 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
 
   useEffect(() => {
     checkAuthAndRedirect();
-
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
+    const { data: authListener } = supabase.auth.onAuthStateChange(() => {
       checkAuthAndRedirect();
     });
-
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
+    return () => authListener.subscription.unsubscribe();
   }, [navigate, location.pathname]);
 
   if (loading) {

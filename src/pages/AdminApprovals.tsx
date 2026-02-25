@@ -7,79 +7,44 @@ import { it } from 'date-fns/locale';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, LogOut, CheckCircle, XCircle, UserCheck, RefreshCw } from 'lucide-react';
+import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, LogOut, CheckCircle, UserCheck, RefreshCw, XCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import type { Profile } from '@/types/supabase';
-
-interface UnapprovedProfile extends Profile {
-    // Rimuoviamo 'email' qui, dato che non possiamo recuperarla facilmente dal frontend
-    // e usiamo full_name come campo principale.
-}
 
 const AdminApprovals = () => {
   const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [profiles, setProfiles] = useState<UnapprovedProfile[]>([]);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [processingId, setProcessingId] = useState<string | null>(null);
 
   const handleLogout = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        showError(error.message);
-      } else {
-        showSuccess("Disconnessione effettuata con successo!");
-        navigate('/login');
-      }
-    } catch (error: any) {
-      showError(error.message || "Errore durante la disconnessione.");
-    }
+    await supabase.auth.signOut();
+    navigate('/login');
   };
 
   const fetchAdminStatus = async (): Promise<boolean> => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      navigate('/login');
-      return false;
-    }
-
-    const { data: profile, error } = await supabase
-      .from('profiles')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single();
-
-    if (error || !profile?.is_admin) {
-      showError("Accesso negato. Non sei un amministratore.");
-      navigate('/dashboard');
-      return false;
-    }
-
-    return true;
+    if (!user) return false;
+    const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single();
+    return !!profile?.is_admin;
   };
 
-  const fetchUnapprovedProfiles = async () => {
+  const fetchPendingProfiles = async () => {
     setLoading(true);
     try {
-      // Fetch profiles that are not approved
-      // Recuperiamo anche l'email dall'utente autenticato per visualizzarla
-      const { data: profilesData, error: profilesError } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
-        .select('id, full_name, created_at') // Rimosso skill_level
-        .eq('approved', false)
+        .select('*')
+        .neq('status', 'approved')
         .order('created_at', { ascending: true });
 
-      if (profilesError) throw profilesError;
-
-      // Nota: Non possiamo recuperare l'email dell'utente non approvato direttamente qui
-      // senza una chiamata API aggiuntiva o una funzione Edge.
-      // Per ora, usiamo solo full_name. Se full_name è nullo, usiamo l'ID troncato.
-      setProfiles(profilesData as UnapprovedProfile[]);
-
+      if (error) throw error;
+      setProfiles(data || []);
     } catch (err: any) {
-      showError("Errore nel caricamento dei soci: " + err.message);
+      showError("Errore nel caricamento: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -90,69 +55,37 @@ const AdminApprovals = () => {
       const adminOk = await fetchAdminStatus();
       if (adminOk) {
         setIsAdmin(true);
-        await fetchUnapprovedProfiles();
+        await fetchPendingProfiles();
+      } else {
+        navigate('/dashboard');
       }
     };
     initialize();
   }, [navigate]);
 
-  const handleApprove = async (profileId: string) => {
+  const handleUpdateStatus = async (profileId: string, status: 'approved' | 'rejected') => {
     setProcessingId(profileId);
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ approved: true, approved_at: new Date().toISOString() })
+        .update({ 
+          status, 
+          approved: status === 'approved',
+          approved_at: status === 'approved' ? new Date().toISOString() : null 
+        })
         .eq('id', profileId);
 
       if (error) throw error;
-
-      showSuccess("Socio approvato con successo!");
-      
-      // Rimuovi il profilo approvato dallo stato locale
-      setProfiles(prev => prev.filter(p => p.id !== profileId));
-      
+      showSuccess(status === 'approved' ? "Socio approvato!" : "Socio rifiutato.");
+      fetchPendingProfiles();
     } catch (err: any) {
-      showError("Errore durante l'approvazione: " + err.message);
+      showError("Errore: " + err.message);
     } finally {
       setProcessingId(null);
     }
   };
 
-  const handleReject = async (profileId: string) => {
-    setProcessingId(profileId);
-    try {
-      // In a real scenario, you might want to delete the user from auth.users as well, 
-      // but for simplicity here, we just delete the profile entry.
-      const { error } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('id', profileId);
-
-      if (error) throw error;
-
-      showSuccess("Socio rifiutato e rimosso.");
-      
-      // Rimuovi il profilo rifiutato dallo stato locale
-      setProfiles(prev => prev.filter(p => p.id !== profileId));
-      
-    } catch (err: any) {
-      showError("Errore durante il rifiuto: " + err.message);
-    } finally {
-      setProcessingId(null);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-white p-4">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold mb-4 text-primary">Caricamento...</h1>
-          <p className="text-xl text-gray-600">Recupero richieste di approvazione.</p>
-        </div>
-      </div>
-    );
-  }
-
+  if (loading) return <div className="p-8 text-center">Caricamento...</div>;
   if (!isAdmin) return null;
 
   return (
@@ -165,38 +98,33 @@ const AdminApprovals = () => {
             </Button>
           </Link>
           <h1 className="text-3xl font-bold text-primary flex items-center">
-            <UserCheck className="mr-2 h-7 w-7" /> Gestione Approvazioni Soci
+            <UserCheck className="mr-2 h-7 w-7" /> Approvazioni
           </h1>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" className="text-primary border-primary hover:bg-secondary" onClick={fetchUnapprovedProfiles}>
-            <RefreshCw className="mr-2 h-4 w-4" /> Aggiorna
-          </Button>
-          <Button variant="outline" className="text-primary border-primary hover:bg-secondary" onClick={handleLogout}>
-            <LogOut className="mr-2 h-4 w-4" /> Esci
-          </Button>
+          <Button variant="outline" onClick={fetchPendingProfiles}><RefreshCw className="mr-2 h-4 w-4" /> Aggiorna</Button>
+          <Button variant="outline" onClick={handleLogout}><LogOut className="mr-2 h-4 w-4" /> Esci</Button>
         </div>
       </header>
 
       <Card className="shadow-lg rounded-lg">
         <CardHeader>
-          <CardTitle className="text-primary">Soci in Attesa di Approvazione</CardTitle>
-          <CardDescription>
-            {profiles.length} soci in attesa. Approva per consentire loro di prenotare.
-          </CardDescription>
+          <CardTitle>Richieste in Sospeso</CardTitle>
+          <CardDescription>Soci in attesa o precedentemente rifiutati.</CardDescription>
         </CardHeader>
         <CardContent>
           {profiles.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground">
               <CheckCircle className="mx-auto h-12 w-12 mb-4 text-green-500 opacity-70" />
-              <p>Nessun socio in attesa di approvazione. Tutto in ordine!</p>
+              <p>Nessuna richiesta in sospeso.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Nome Completo</TableHead>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Stato</TableHead>
                     <TableHead>Registrato il</TableHead>
                     <TableHead className="text-right">Azioni</TableHead>
                   </TableRow>
@@ -204,28 +132,33 @@ const AdminApprovals = () => {
                 <TableBody>
                   {profiles.map((p) => (
                     <TableRow key={p.id}>
-                      <TableCell className="font-medium">
-                        {p.full_name || `ID: ${p.id.substring(0, 8)}...`}
+                      <TableCell className="font-medium">{p.full_name}</TableCell>
+                      <TableCell>
+                        <Badge variant={p.status === 'rejected' ? 'destructive' : 'secondary'}>
+                          {p.status === 'rejected' ? 'Rifiutato' : 'In attesa'}
+                        </Badge>
                       </TableCell>
                       <TableCell>{format(parseISO(p.created_at), 'dd/MM/yyyy HH:mm', { locale: it })}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button 
                             size="sm" 
-                            onClick={() => handleApprove(p.id)} 
+                            onClick={() => handleUpdateStatus(p.id, 'approved')}
                             disabled={processingId === p.id}
-                            className="bg-green-600 hover:bg-green-700 text-white"
+                            className="bg-green-600 hover:bg-green-700"
                           >
-                            {processingId === p.id ? 'Approvazione...' : 'Approva'}
+                            Approva
                           </Button>
-                          <Button 
-                            variant="destructive" 
-                            size="sm" 
-                            onClick={() => handleReject(p.id)}
-                            disabled={processingId === p.id}
-                          >
-                            Rifiuta
-                          </Button>
+                          {p.status !== 'rejected' && (
+                            <Button 
+                              variant="destructive" 
+                              size="sm" 
+                              onClick={() => handleUpdateStatus(p.id, 'rejected')}
+                              disabled={processingId === p.id}
+                            >
+                              Rifiuta
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

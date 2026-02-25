@@ -8,15 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { showSuccess, showError } from '@/utils/toast';
-import { MailCheck, Info } from 'lucide-react';
-import { getAuthRedirectTo } from '@/utils/authRedirect';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { showError } from '@/utils/toast';
+import { MailCheck } from 'lucide-react';
+import Footer from '@/components/Footer';
 
 const Register = () => {
   const [name, setName] = useState('');
@@ -25,216 +19,73 @@ const Register = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
-
-  // GDPR Consents
-  const [termsAccepted, setTermsAccepted] = useState(false);
-  const [personalDataAccepted, setPersonalDataAccepted] = useState(false);
-  const [healthDataAccepted, setHealthDataAccepted] = useState(false);
+  const [consents, setConsents] = useState({ terms: false, personal: false, health: false });
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!termsAccepted || !personalDataAccepted || !healthDataAccepted) {
-      showError("È necessario accettare tutti i consensi per procedere.");
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      showError("Le password non corrispondono.");
-      return;
-    }
-
+    if (!consents.terms || !consents.personal || !consents.health) return showError("Accetta tutti i consensi.");
+    if (password !== confirmPassword) return showError("Le password non corrispondono.");
     setLoading(true);
-
     try {
-      const redirectTo = getAuthRedirectTo();
-
-      // Inviamo i consensi nei metadata dell'utente. 
-      // Il trigger DB handle_new_user li prenderà e li scriverà nella tabella profiles.
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: name,
-            terms_accepted: termsAccepted,
-            personal_data_accepted: personalDataAccepted,
-            health_data_accepted: healthDataAccepted,
-          },
-          emailRedirectTo: redirectTo,
-        },
+      const { error } = await supabase.auth.signUp({
+        email, password,
+        options: { data: { full_name: name, terms_accepted: true, personal_data_accepted: true, health_data_accepted: true } }
       });
-
-      if (error) {
-        if (error.message.toLowerCase().includes("already registered") || error.status === 400) {
-          showError("Questa email è già in uso. Effettua il login.");
-        } else {
-          showError(error.message);
-        }
-      } else if (data.user && data.user.identities && data.user.identities.length === 0) {
-        showError("Email già in uso. Effettua il login o recupera la password.");
-      } else if (data.user) {
-        setIsRegistered(true);
-      }
-    } catch (error: any) {
-      showError("Errore durante la registrazione. Riprova più tardi.");
-    } finally {
-      setLoading(false);
-    }
+      if (error) throw error;
+      setIsRegistered(true);
+    } catch (error: any) { showError(error.message); }
+    finally { setLoading(false); }
   };
 
-  if (isRegistered) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-white p-4">
-        <Card className="w-full max-w-md shadow-lg rounded-lg text-center">
-          <CardHeader>
-            <MailCheck className="mx-auto h-16 w-16 text-primary mb-4" />
-            <CardTitle className="text-3xl font-bold text-primary">Verifica Email Inviata</CardTitle>
-            <CardDescription className="text-gray-600 mt-2">
-              Abbiamo inviato un link di verifica a <strong>{email}</strong>.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-gray-700">
-              Per completare la registrazione e accedere, clicca sul link contenuto nell'email.
-            </p>
-            <p className="text-sm text-red-600 font-medium">
-              Attenzione: Dopo la verifica, il tuo account dovrà essere approvato da un amministratore prima di poter prenotare.
-            </p>
-          </CardContent>
-          <CardFooter className="flex flex-col gap-2">
-            <Link to="/login" className="w-full">
-              <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
-                Vai al Login
-              </Button>
-            </Link>
-          </CardFooter>
-        </Card>
-      </div>
-    );
-  }
+  if (isRegistered) return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <Card className="w-full max-w-md text-center p-8">
+        <MailCheck className="mx-auto h-16 w-16 text-primary mb-4" />
+        <CardTitle>Verifica Email Inviata</CardTitle>
+        <p className="mt-4 text-gray-600">Controlla la tua casella di posta per confermare l'account.</p>
+        <Link to="/login"><Button className="w-full mt-6">Torna al Login</Button></Link>
+      </Card>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-white p-4">
-      <Card className="w-full max-w-md shadow-lg rounded-lg">
-        <CardHeader className="text-center">
-          <img src="/logo.png" alt="Logo" className="mx-auto h-20 w-20 mb-4" />
-          <CardTitle className="text-3xl font-bold text-primary">Registrati</CardTitle>
-          <CardDescription className="text-gray-600 mt-2">Crea il tuo account socio.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <form onSubmit={handleRegister} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Nome Completo</Label>
-              <Input id="name" type="text" placeholder="Nome e Cognome" value={name} onChange={(e) => setName(e.target.value)} required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="email@esempio.it" value={email} onChange={(e) => setEmail(e.target.value)} required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" placeholder="Min. 6 caratteri" value={password} onChange={(e) => setPassword(e.target.value)} required />
-            </div>
-            <div className="space-y-2 mb-6">
-              <Label htmlFor="confirm-password">Conferma Password</Label>
-              <Input id="confirm-password" type="password" placeholder="Ripeti password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
-            </div>
-
-            {/* GDPR Checkboxes */}
-            <div className="space-y-4 pt-4 border-t border-gray-100">
-              <div className="flex items-start space-x-3">
-                <Checkbox 
-                  id="terms" 
-                  checked={termsAccepted} 
-                  onCheckedChange={(checked) => setTermsAccepted(!!checked)}
-                  className="mt-1"
-                />
-                <div className="grid gap-1.5 leading-none">
-                  <div className="flex items-center">
-                    <Label htmlFor="terms" className="text-sm font-normal cursor-pointer">
-                      Ho letto e accetto i <Link to="/terms" className="text-primary hover:underline font-medium">Termini</Link> e l'<Link to="/privacy" className="text-primary hover:underline font-medium">Informativa Privacy</Link>
-                    </Label>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Info className="h-4 w-4 ml-2 text-muted-foreground cursor-help" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="max-w-xs text-xs">Accettazione dei termini di servizio e delle politiche di riservatezza del club.</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                </div>
+    <div className="min-h-screen flex flex-col bg-gray-50">
+      <div className="flex-grow flex items-center justify-center p-6">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CardTitle>Registrati</CardTitle>
+            <CardDescription>Entra a far parte dell'ASD Tennis Club.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <form onSubmit={handleRegister} className="space-y-4">
+              <div className="space-y-1">
+                <Label>Nome Completo</Label>
+                <Input maxLength={50} value={name} onChange={e => setName(e.target.value)} required placeholder="Mario Rossi" />
               </div>
-
-              <div className="flex items-start space-x-3">
-                <Checkbox 
-                  id="personalData" 
-                  checked={personalDataAccepted} 
-                  onCheckedChange={(checked) => setPersonalDataAccepted(!!checked)}
-                  className="mt-1"
-                />
-                <div className="grid gap-1.5 leading-none">
-                  <div className="flex items-center">
-                    <Label htmlFor="personalData" className="text-sm font-normal cursor-pointer">
-                      Trattamento dati personali (nome, cognome, email)
-                    </Label>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Info className="h-4 w-4 ml-2 text-muted-foreground cursor-help" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="max-w-xs text-xs">Consenso al trattamento dei dati anagrafici per la gestione del profilo socio e delle prenotazioni.</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                </div>
+              <div className="space-y-1">
+                <Label>Email</Label>
+                <Input maxLength={100} type="email" value={email} onChange={e => setEmail(e.target.value)} required />
               </div>
-
-              <div className="flex items-start space-x-3">
-                <Checkbox 
-                  id="healthData" 
-                  checked={healthDataAccepted} 
-                  onCheckedChange={(checked) => setHealthDataAccepted(!!checked)}
-                  className="mt-1"
-                />
-                <div className="grid gap-1.5 leading-none">
-                  <div className="flex items-center">
-                    <Label htmlFor="healthData" className="text-sm font-normal cursor-pointer">
-                      Trattamento dati sanitari e accesso amministratori
-                    </Label>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Info className="h-4 w-4 ml-2 text-muted-foreground cursor-help" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="max-w-xs text-xs">Consenso necessario per la gestione dei certificati medici e la verifica dell'idoneità sportiva da parte del club.</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                </div>
+              <div className="space-y-1">
+                <Label>Password</Label>
+                <Input maxLength={100} type="password" value={password} onChange={e => setPassword(e.target.value)} required />
               </div>
-            </div>
-
-            <Button 
-              type="submit" 
-              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground mt-4" 
-              disabled={loading || !termsAccepted || !personalDataAccepted || !healthDataAccepted}
-            >
-              {loading ? "Registrazione..." : "Registrati"}
-            </Button>
-          </form>
-        </CardContent>
-        <CardFooter className="text-sm text-center">
-          <Link to="/login" className="text-primary hover:underline">Hai già un account? Accedi</Link>
-        </CardFooter>
-      </Card>
+              <div className="space-y-1">
+                <Label>Conferma Password</Label>
+                <Input maxLength={100} type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required />
+              </div>
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center gap-2"><Checkbox checked={consents.terms} onCheckedChange={v => setConsents({...consents, terms: !!v})} /> <Label className="text-xs">Accetto Termini e Privacy</Label></div>
+                <div className="flex items-center gap-2"><Checkbox checked={consents.personal} onCheckedChange={v => setConsents({...consents, personal: !!v})} /> <Label className="text-xs">Consento trattamento dati personali</Label></div>
+                <div className="flex items-center gap-2"><Checkbox checked={consents.health} onCheckedChange={v => setConsents({...consents, health: !!v})} /> <Label className="text-xs">Consento trattamento dati sanitari</Label></div>
+              </div>
+              <Button type="submit" className="w-full" disabled={loading}>Registrati</Button>
+            </form>
+          </CardContent>
+          <CardFooter className="justify-center text-sm"><Link to="/login" className="text-primary hover:underline">Hai già un account? Accedi</Link></CardFooter>
+        </Card>
+      </div>
+      <Footer />
     </div>
   );
 };
