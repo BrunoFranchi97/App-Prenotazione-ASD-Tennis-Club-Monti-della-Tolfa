@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { ArrowLeft, ChevronRight, CalendarDays, MapPin, Clock, Info, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError } from '@/utils/toast';
-import { format, parseISO, addHours, setHours, setMinutes, isBefore, isEqual, setSeconds, setMilliseconds, addDays, startOfDay, endOfDay, isSameDay, addMinutes } from 'date-fns';
+import { format, parseISO, addHours, setHours, setMinutes, isBefore, isEqual, setSeconds, setMilliseconds, addDays, startOfDay, endOfDay, isSameDay, addMinutes, isValid } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { useApprovalCheck } from '@/hooks/use-approval-check';
 import { Court, Reservation, BookingType } from '@/types/supabase';
@@ -60,7 +60,7 @@ const BookingCalendar = () => {
   };
 
   const fetchReservations = async () => {
-    if (!date) return;
+    if (!date || !isValid(date)) return;
     setFetchingData(true);
     try {
       const { data: resData } = await supabase
@@ -73,7 +73,6 @@ const BookingCalendar = () => {
       const reservations = resData || [];
       setAllReservations(reservations);
 
-      // Fetch profile names for these reservations
       const userIds = Array.from(new Set(reservations.map(r => r.user_id)));
       if (userIds.length > 0) {
         const { data: profiles } = await supabase
@@ -95,16 +94,13 @@ const BookingCalendar = () => {
     if (isApproved) {
       fetchUserData();
       supabase.from('courts').select('*').eq('is_active', true).order('id').then(({data}) => {
-        if (data) {
-          setCourts(data);
-          // Rimosso l'auto-settaggio di selectedCourtId al primo elemento
-        }
+        if (data) setCourts(data);
       });
     }
   }, [isApproved]);
 
   useEffect(() => {
-    if (isApproved && date) {
+    if (isApproved && date && isValid(date)) {
       fetchReservations();
       setSelectedSlots([]);
     }
@@ -117,13 +113,14 @@ const BookingCalendar = () => {
   }, []);
 
   const getSlotReservation = (slotTime: string, courtId: number) => {
+    if (!date || !isValid(date)) return undefined;
     const [hours, minutes] = slotTime.split(':').map(Number);
-    let slotStart = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date!), hours), minutes), 0), 0);
+    let slotStart = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date), hours), minutes), 0), 0);
     return allReservations.find(res => res.court_id === courtId && isEqual(parseISO(res.starts_at), slotStart));
   };
 
   const isSlotAvailable = (slotTime: string, courtId: number): boolean => {
-    if (!date) return false;
+    if (!date || !isValid(date)) return false;
     const [hours, minutes] = slotTime.split(':').map(Number);
     let slotStart = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date), hours), minutes), 0), 0);
     const slotEnd = addHours(slotStart, 1);
@@ -138,16 +135,14 @@ const BookingCalendar = () => {
   const getSlotOccupantName = (slotTime: string, courtId: number): string => {
     const res = getSlotReservation(slotTime, courtId);
     if (!res) return '';
-    
     if (res.booked_for_first_name && res.booked_for_last_name) {
       return `${res.booked_for_first_name} ${res.booked_for_last_name}`;
     }
-    
     return profileMap[res.user_id] || 'Socio';
   };
 
   const handleSlotClick = (slotTime: string) => {
-    if (!selectedCourtId) return;
+    if (!selectedCourtId || !date || !isValid(date)) return;
     const courtIdNum = parseInt(selectedCourtId);
     if (!isSlotAvailable(slotTime, courtIdNum) && !selectedSlots.includes(slotTime)) return;
 
@@ -169,10 +164,11 @@ const BookingCalendar = () => {
   };
 
   const handleBooking = async () => {
+    if (!date || !isValid(date)) return;
     const { data: { user } } = await supabase.auth.getUser();
     
     const hasOverlap = selectedSlots.some(slotTime => {
-      const slotStart = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date!), parseInt(slotTime.split(':')[0])), 0), 0), 0);
+      const slotStart = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date), parseInt(slotTime.split(':')[0])), 0), 0), 0);
       return userReservations.some(r => isEqual(parseISO(r.starts_at), slotStart));
     });
 
@@ -183,7 +179,7 @@ const BookingCalendar = () => {
       const courtIdNum = parseInt(selectedCourtId!);
       const courtName = courts.find(c => c.id === courtIdNum)?.name || `Campo ${courtIdNum}`;
       const inserts = selectedSlots.map(t => {
-        let start = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date!), parseInt(t.split(':')[0])), 0), 0), 0);
+        let start = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date), parseInt(t.split(':')[0])), 0), 0), 0);
         return {
           court_id: courtIdNum, 
           user_id: user?.id,
@@ -208,6 +204,7 @@ const BookingCalendar = () => {
   };
 
   const getCourtAvailability = (courtId: number) => {
+    if (!date || !isValid(date)) return 0;
     let availableCount = 0;
     allTimeSlots.forEach(t => {
       if (isSlotAvailable(t, courtId)) availableCount++;
@@ -243,7 +240,7 @@ const BookingCalendar = () => {
               <Calendar 
                 mode="single" 
                 selected={date} 
-                onSelect={(d) => { setDate(d); setSelectedSlots([]); }} 
+                onSelect={(d) => { if (d) setDate(d); setSelectedSlots([]); }} 
                 locale={it} 
                 className="rounded-3xl border-none" 
                 fromDate={today}
@@ -252,7 +249,7 @@ const BookingCalendar = () => {
             </CardContent>
           </Card>
           
-          <BookingLimitsBox status={getBookingLimitsStatus(userReservations, date || new Date())} />
+          <BookingLimitsBox status={getBookingLimitsStatus(userReservations, date && isValid(date) ? date : new Date())} />
         </div>
 
         <div className="lg:col-span-8">
@@ -263,7 +260,7 @@ const BookingCalendar = () => {
                 <span className="text-[11px] font-bold uppercase tracking-widest text-primary/60">Live Availability</span>
               </div>
               <CardTitle className="text-2xl font-bold text-gray-900 capitalize">
-                {format(date || new Date(), 'EEEE d MMMM', { locale: it })}
+                {format(date && isValid(date) ? date : new Date(), 'EEEE d MMMM', { locale: it })}
               </CardTitle>
             </CardHeader>
             
@@ -315,7 +312,7 @@ const BookingCalendar = () => {
                 )}
               </div>
 
-              {selectedCourtId && (
+              {selectedCourtId && date && isValid(date) && (
                 <div className="space-y-6 pt-8 border-t border-gray-50 animate-in fade-in slide-in-from-bottom-4">
                   <div className="flex justify-between items-end ml-1">
                     <Label className="text-xs font-black text-gray-400 uppercase tracking-[0.2em]">Orario</Label>
@@ -330,7 +327,7 @@ const BookingCalendar = () => {
                     {allTimeSlots.map(t => {
                       const courtIdNum = parseInt(selectedCourtId);
                       const [hours, minutes] = t.split(':').map(Number);
-                      const slotStart = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date!), hours), minutes), 0), 0);
+                      const slotStart = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date), hours), minutes), 0), 0);
                       const slotEnd = addHours(slotStart, 1);
                       const now = new Date();
 
