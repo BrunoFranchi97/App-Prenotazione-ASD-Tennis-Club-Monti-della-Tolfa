@@ -7,7 +7,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, ChevronRight, CalendarDays, MapPin, Clock, Info } from 'lucide-react';
+import { ArrowLeft, ChevronRight, CalendarDays, MapPin, Clock, Info, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError } from '@/utils/toast';
 import { format, parseISO, addHours, setHours, setMinutes, isBefore, isEqual, setSeconds, setMilliseconds, addDays, startOfDay, endOfDay, isSameDay, addMinutes } from 'date-fns';
@@ -35,6 +35,7 @@ const BookingCalendar = () => {
   const [selectedCourtId, setSelectedCourtId] = useState<string | undefined>(undefined);
   const [allReservations, setAllReservations] = useState<Reservation[]>([]);
   const [userReservations, setUserReservations] = useState<Reservation[]>([]);
+  const [profileMap, setProfileMap] = useState<Record<string, string>>({});
   const [selectedSlots, setSelectedSlots] = useState<string[]>([]); 
   const [bookingType, setBookingType] = useState<BookingType>('singolare');
   const [loading, setLoading] = useState(false);
@@ -62,13 +63,30 @@ const BookingCalendar = () => {
     if (!date) return;
     setFetchingData(true);
     try {
-      const { data } = await supabase
+      const { data: resData } = await supabase
         .from('reservations')
         .select('*')
         .gte('starts_at', startOfDay(date).toISOString())
         .lte('ends_at', endOfDay(date).toISOString())
         .neq('status', 'cancelled');
-      setAllReservations(data || []);
+      
+      const reservations = resData || [];
+      setAllReservations(reservations);
+
+      // Fetch profile names for these reservations
+      const userIds = Array.from(new Set(reservations.map(r => r.user_id)));
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', userIds);
+        
+        const map: Record<string, string> = {};
+        profiles?.forEach(p => {
+          map[p.id] = p.full_name || 'Socio';
+        });
+        setProfileMap(map);
+      }
     } catch (e) { console.error(e); }
     setFetchingData(false);
   };
@@ -115,6 +133,17 @@ const BookingCalendar = () => {
     if (isSameDay(date, now) && now > addMinutes(slotStart, 20)) return false;
     
     return !getSlotReservation(slotTime, courtId);
+  };
+
+  const getSlotOccupantName = (slotTime: string, courtId: number): string => {
+    const res = getSlotReservation(slotTime, courtId);
+    if (!res) return '';
+    
+    if (res.booked_for_first_name && res.booked_for_last_name) {
+      return `${res.booked_for_first_name} ${res.booked_for_last_name}`;
+    }
+    
+    return profileMap[res.user_id] || 'Socio';
   };
 
   const handleSlotClick = (slotTime: string) => {
@@ -286,23 +315,18 @@ const BookingCalendar = () => {
                 )}
               </div>
 
-              <div className="space-y-6 pt-8 border-t border-gray-50">
-                <div className="flex justify-between items-end ml-1">
-                  <Label className="text-xs font-black text-gray-400 uppercase tracking-[0.2em]">Orario Partenza</Label>
-                  {selectedSlots.length > 0 && (
-                    <span className="text-[10px] text-primary font-black uppercase tracking-widest bg-primary/5 px-2 py-1 rounded">
-                      Selezionati: {selectedSlots.length} / max 3 ore
-                    </span>
-                  )}
-                </div>
-                
-                {!selectedCourtId ? (
-                  <div className="flex flex-col items-center justify-center py-16 px-6 bg-gray-50/50 rounded-[2rem] border-2 border-dashed border-gray-100 text-gray-400">
-                    <MapPin className="h-8 w-8 mb-3 opacity-20" />
-                    <p className="text-xs font-bold uppercase tracking-widest text-center">← Seleziona prima un campo</p>
+              {selectedCourtId && (
+                <div className="space-y-6 pt-8 border-t border-gray-50 animate-in fade-in slide-in-from-bottom-4">
+                  <div className="flex justify-between items-end ml-1">
+                    <Label className="text-xs font-black text-gray-400 uppercase tracking-[0.2em]">Orario</Label>
+                    {selectedSlots.length > 0 && (
+                      <span className="text-[10px] text-primary font-black uppercase tracking-widest bg-primary/5 px-2 py-1 rounded">
+                        Selezionati: {selectedSlots.length} / max 3 ore
+                      </span>
+                    )}
                   </div>
-                ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 animate-in fade-in slide-in-from-bottom-4">
+                  
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {allTimeSlots.map(t => {
                       const courtIdNum = parseInt(selectedCourtId);
                       const [hours, minutes] = t.split(':').map(Number);
@@ -313,9 +337,9 @@ const BookingCalendar = () => {
                       if (now >= slotEnd) return null;
 
                       const isSelected = selectedSlots.includes(t);
-                      const res = getSlotReservation(t, courtIdNum);
                       const available = isSlotAvailable(t, courtIdNum);
                       const endTime = format(slotEnd, 'HH:mm');
+                      const occupantName = getSlotOccupantName(t, courtIdNum);
                       
                       return (
                         <button 
@@ -323,35 +347,51 @@ const BookingCalendar = () => {
                           disabled={!available && !isSelected}
                           onClick={() => available && handleSlotClick(t)} 
                           className={cn(
-                            "relative h-16 rounded-2xl flex flex-col items-center justify-center p-2 transition-all duration-150 border-2",
+                            "relative h-20 rounded-2xl flex flex-col items-center justify-center p-3 transition-all duration-150 border-2",
                             isSelected ? "bg-primary border-primary text-white scale-[1.02] shadow-lg shadow-primary/10" : 
                             available ? "bg-gray-50 border-transparent text-gray-700 hover:border-primary/20" : 
-                            "bg-gray-100 border-transparent text-gray-300 cursor-not-allowed opacity-40"
+                            "bg-red-500 border-red-600 text-white shadow-sm"
                           )}
                         >
-                          <span className="text-sm font-black tracking-tight">{t} - {endTime}</span>
-                          <span className={cn("text-[9px] font-black uppercase tracking-tighter mt-0.5", isSelected ? "text-white/60" : available ? "text-primary/30" : "text-destructive")}>
-                            {res ? 'OCCUPATO' : 'LIBERO'}
-                          </span>
+                          <span className={cn("text-sm font-black tracking-tight", !available && "mb-1")}>{t} - {endTime}</span>
+                          {!available ? (
+                            <div className="flex items-center gap-1 overflow-hidden w-full justify-center">
+                              <User className="h-3 w-3 shrink-0 opacity-80" />
+                              <span className="text-[10px] font-bold uppercase truncate px-1">
+                                {occupantName}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className={cn("text-[9px] font-black uppercase tracking-tighter mt-0.5", isSelected ? "text-white/60" : "text-primary/30")}>
+                              LIBERO
+                            </span>
+                          )}
                         </button>
                       );
                     })}
                   </div>
-                )}
-              </div>
 
-              <div className="pt-8">
-                <Button 
-                  onClick={handleBooking} 
-                  className={cn(
-                    "w-full h-16 rounded-[1.5rem] font-black text-xl shadow-xl transition-all flex items-center justify-center gap-3",
-                    selectedSlots.length > 0 ? "bg-gradient-to-br from-primary to-[#23532f] text-white hover:scale-[1.01] active:scale-[0.98] shadow-primary/20" : "bg-gray-100 text-gray-400 cursor-not-allowed shadow-none"
-                  )}
-                  disabled={selectedSlots.length === 0 || loading}
-                >
-                  {loading ? <div className="w-6 h-6 border-3 border-white/20 border-t-white rounded-full animate-spin"></div> : <>Conferma Prenotazione <ChevronRight size={24} /></>}
-                </Button>
-              </div>
+                  <div className="pt-8">
+                    <Button 
+                      onClick={handleBooking} 
+                      className={cn(
+                        "w-full h-16 rounded-[1.5rem] font-black text-xl shadow-xl transition-all flex items-center justify-center gap-3",
+                        selectedSlots.length > 0 ? "bg-gradient-to-br from-primary to-[#23532f] text-white hover:scale-[1.01] active:scale-[0.98] shadow-primary/20" : "bg-gray-100 text-gray-400 cursor-not-allowed shadow-none"
+                      )}
+                      disabled={selectedSlots.length === 0 || loading}
+                    >
+                      {loading ? <div className="w-6 h-6 border-3 border-white/20 border-t-white rounded-full animate-spin"></div> : <>Conferma Prenotazione <ChevronRight size={24} /></>}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {!selectedCourtId && (
+                <div className="flex flex-col items-center justify-center py-20 px-6 bg-gray-50/50 rounded-[2rem] border-2 border-dashed border-gray-100 text-gray-400">
+                  <MapPin className="h-10 w-10 mb-4 opacity-20" />
+                  <p className="text-sm font-bold uppercase tracking-widest text-center">Seleziona prima un campo per vedere gli orari</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
