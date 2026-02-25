@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { format, parseISO, addDays, subDays, startOfDay, endOfDay, isSameDay, setHours, setMinutes, addHours } from "date-fns";
+import { format, parseISO, addDays, subDays, startOfDay, endOfDay, isSameDay, setHours, setMinutes, addHours, differenceInMinutes } from "date-fns";
 import { it } from "date-fns/locale";
 import { 
   ArrowLeft, ChevronLeft, ChevronRight, Eye, Edit, Trash2, Plus, X, Calendar
@@ -45,6 +45,7 @@ type ProfileLite = { id: string; full_name: string | null };
 type ReservationRow = Reservation & {
   court?: Court;
   bookedByName: string;
+  groupId?: string; // ID del gruppo per prenotazioni consecutive
 };
 
 const TIME_SLOTS = [
@@ -64,22 +65,82 @@ const SURFACE_LABELS: Record<string, string> = {
   "superficie_dura": "Sup. Dura",
 };
 
-// Palette di colori pastello per gli slot delle prenotazioni
+// Palette di colori pastello senza rosso/arancione per evitare segnali di urgenza
 const SLOT_COLORS = [
   "bg-green-100 border-green-200 text-green-800",      // Verde chiaro (coerente con il club)
-  "bg-orange-100 border-orange-200 text-orange-800",   // Arancione chiaro (coerente con club-orange)
   "bg-blue-100 border-blue-200 text-blue-800",         // Blu chiaro
   "bg-purple-100 border-purple-200 text-purple-800",   // Viola chiaro
-  "bg-pink-100 border-pink-200 text-pink-800",         // Rosa chiaro
-  "bg-amber-100 border-amber-200 text-amber-800",      // Ambra chiaro
+  "bg-amber-100 border-amber-200 text-amber-800",      // Ambra chiaro (sostituisce l'arancione)
   "bg-cyan-100 border-cyan-200 text-cyan-800",         // Ciano chiaro
   "bg-lime-100 border-lime-200 text-lime-800",         // Lime chiaro
+  "bg-indigo-100 border-indigo-200 text-indigo-800",   // Indigo chiaro
+  "bg-teal-100 border-teal-200 text-teal-800",         // Teal chiaro
 ];
 
-// Funzione per ottenere un colore consistente per una prenotazione
-const getSlotColor = (reservationId: string, userId: string): string => {
-  // Usiamo una combinazione dell'ID della prenotazione e dell'utente per un colore consistente
-  const hash = (reservationId + userId).split('').reduce((acc, char) => {
+// Funzione per raggruppare prenotazioni consecutive dello stesso utente sullo stesso campo
+const groupReservations = (reservations: ReservationRow[]): ReservationRow[] => {
+  if (reservations.length === 0) return [];
+  
+  // Ordina per campo, utente e orario di inizio
+  const sorted = [...reservations].sort((a, b) => {
+    if (a.court_id !== b.court_id) return a.court_id - b.court_id;
+    if (a.user_id !== b.user_id) return a.user_id.localeCompare(b.user_id);
+    return parseISO(a.starts_at).getTime() - parseISO(b.starts_at).getTime();
+  });
+  
+  const grouped: ReservationRow[] = [];
+  let currentGroup: ReservationRow[] = [];
+  let groupId = 1;
+  
+  for (let i = 0; i < sorted.length; i++) {
+    const current = sorted[i];
+    
+    if (currentGroup.length === 0) {
+      // Inizia un nuovo gruppo
+      currentGroup.push(current);
+    } else {
+      const lastInGroup = currentGroup[currentGroup.length - 1];
+      const lastEnd = parseISO(lastInGroup.ends_at);
+      const currentStart = parseISO(current.starts_at);
+      
+      // Controlla se è una prenotazione consecutiva:
+      // Stesso campo, stesso utente, e inizia entro 5 minuti dalla fine della precedente
+      const isConsecutive = 
+        current.court_id === lastInGroup.court_id &&
+        current.user_id === lastInGroup.user_id &&
+        Math.abs(differenceInMinutes(currentStart, lastEnd)) <= 5;
+      
+      if (isConsecutive) {
+        currentGroup.push(current);
+      } else {
+        // Assegna groupId a tutte le prenotazioni nel gruppo corrente
+        currentGroup.forEach(res => {
+          grouped.push({ ...res, groupId: `group-${groupId}` });
+        });
+        
+        // Inizia un nuovo gruppo
+        groupId++;
+        currentGroup = [current];
+      }
+    }
+  }
+  
+  // Aggiungi l'ultimo gruppo
+  if (currentGroup.length > 0) {
+    currentGroup.forEach(res => {
+      grouped.push({ ...res, groupId: `group-${groupId}` });
+    });
+  }
+  
+  return grouped;
+};
+
+// Funzione per ottenere un colore consistente per un gruppo di prenotazioni
+const getGroupColor = (groupId: string): string => {
+  if (!groupId) return SLOT_COLORS[0];
+  
+  // Crea un hash semplice dal groupId per ottenere un colore consistente
+  const hash = groupId.split('').reduce((acc, char) => {
     return acc + char.charCodeAt(0);
   }, 0);
   
@@ -139,11 +200,16 @@ export default function AdminReservations() {
       setCourts(courtsData.data || []);
       setProfiles(profilesData.data || []);
       setVisibleCourts((courtsData.data || []).map(c => c.id));
-      setReservations((resData.data || []).map(r => ({
+      
+      // Raggruppa le prenotazioni prima di impostarle
+      const reservationsWithNames = (resData.data || []).map(r => ({
         ...r,
         court: courtMap.get(r.court_id),
         bookedByName: profileMap.get(r.user_id) || "Socio",
-      })));
+      }));
+      
+      const groupedReservations = groupReservations(reservationsWithNames);
+      setReservations(groupedReservations);
     } catch (err: any) {
       showError("Errore nel caricamento: " + err.message);
     } finally {
@@ -389,7 +455,7 @@ export default function AdminReservations() {
                     const slotKey = `${court.id}-${time}`;
                     const isHovered = hoveredSlot === slotKey;
                     const isMine = reservation?.user_id === currentUserId;
-                    const slotColor = reservation ? getSlotColor(reservation.id, reservation.user_id) : "";
+                    const slotColor = reservation ? getGroupColor(reservation.groupId || '') : "";
 
                     return (
                       <div
