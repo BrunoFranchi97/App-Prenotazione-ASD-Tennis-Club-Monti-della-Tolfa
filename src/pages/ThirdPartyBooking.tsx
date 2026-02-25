@@ -34,7 +34,8 @@ const ThirdPartyBooking = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [lastBookingData, setLastBookingData] = useState<{ reservations: Reservation[], courtName: string, bookedFor: string } | null>(null);
 
-  const maxDate = useMemo(() => addDays(new Date(), 14), []);
+  const today = useMemo(() => startOfDay(new Date()), []);
+  const maxDate = useMemo(() => addDays(today, 14), [today]);
 
   const fetchData = async () => {
     if (!date || !selectedCourtId) return;
@@ -173,7 +174,8 @@ const ThirdPartyBooking = () => {
                 onSelect={setDate} 
                 locale={it} 
                 className="rounded-3xl border-none" 
-                disabled={(d) => isBefore(d, startOfDay(new Date())) || isAfter(d, maxDate)} 
+                fromDate={today}
+                toDate={maxDate}
               />
             </CardContent>
           </Card>
