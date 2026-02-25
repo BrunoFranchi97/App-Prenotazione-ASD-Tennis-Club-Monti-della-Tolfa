@@ -5,17 +5,19 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Users, User, Clock, History, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Users, User, Clock, MapPin, CalendarDays, ChevronRight, Check } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError } from '@/utils/toast';
-import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, isEqual, setSeconds, setMilliseconds, addDays, startOfDay, endOfDay, isSameDay, addMinutes } from 'date-fns';
+import { format, parseISO, addHours, setHours, setMinutes, isBefore, isEqual, setSeconds, setMilliseconds, addDays, startOfDay, endOfDay, isSameDay, addMinutes } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { useApprovalCheck } from '@/hooks/use-approval-check';
 import { Court, Reservation } from '@/types/supabase';
 import BookingSuccessDialog from '@/components/BookingSuccessDialog';
+import UserNav from '@/components/UserNav';
+import { cn } from '@/lib/utils';
 
 const ThirdPartyBooking = () => {
   const navigate = useNavigate();
@@ -24,7 +26,7 @@ const ThirdPartyBooking = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [courts, setCourts] = useState<Court[]>([]);
   const [selectedCourtId, setSelectedCourtId] = useState<string | undefined>(undefined);
-  const [existingReservations, setExistingReservations] = useState<any[]>([]);
+  const [allReservations, setAllReservations] = useState<Reservation[]>([]);
   const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
   const [bookedForFirstName, setBookedForFirstName] = useState('');
   const [bookedForLastName, setBookedForLastName] = useState('');
@@ -38,13 +40,13 @@ const ThirdPartyBooking = () => {
   const maxDate = useMemo(() => addDays(today, 14), [today]);
 
   const fetchData = async () => {
-    if (!date || !selectedCourtId) return;
+    if (!date) return;
     setFetchingData(true);
     try {
       const startRange = startOfDay(date).toISOString();
       const endRange = endOfDay(date).toISOString();
-      const { data: resData } = await supabase.from('reservations').select('*').eq('court_id', parseInt(selectedCourtId)).gte('starts_at', startRange).lte('ends_at', endRange).neq('status', 'cancelled');
-      setExistingReservations(resData || []);
+      const { data: resData } = await supabase.from('reservations').select('*').gte('starts_at', startRange).lte('ends_at', endRange).neq('status', 'cancelled');
+      setAllReservations(resData || []);
     } catch (e) { console.error(e); }
     setFetchingData(false);
   };
@@ -52,7 +54,7 @@ const ThirdPartyBooking = () => {
   useEffect(() => {
     if (!isApproved) return;
     const fetchCourts = async () => {
-      const { data } = await supabase.from('courts').select('*').eq('is_active', true);
+      const { data } = await supabase.from('courts').select('*').eq('is_active', true).order('id');
       if (data) {
         setCourts(data);
         if (data.length > 0 && !selectedCourtId) setSelectedCourtId(data[0].id.toString());
@@ -62,10 +64,10 @@ const ThirdPartyBooking = () => {
   }, [isApproved]);
 
   useEffect(() => {
-    if (!isApproved || !date || !selectedCourtId) return;
+    if (!isApproved || !date) return;
     fetchData();
     setSelectedSlots([]);
-  }, [date, selectedCourtId, isApproved]);
+  }, [date, isApproved]);
 
   const allTimeSlots = useMemo(() => {
     const slots: string[] = [];
@@ -73,26 +75,28 @@ const ThirdPartyBooking = () => {
     return slots;
   }, []);
 
-  const isSlotAvailable = (slotTime: string): boolean => {
-    if (!date || !selectedCourtId) return false;
+  const getSlotReservation = (slotTime: string, courtId: number) => {
+    const [hours, minutes] = slotTime.split(':').map(Number);
+    let slotStart = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date!), hours), minutes), 0), 0);
+    return allReservations.find(res => res.court_id === courtId && isEqual(parseISO(res.starts_at), slotStart));
+  };
+
+  const isSlotAvailable = (slotTime: string, courtId: number): boolean => {
+    if (!date) return false;
     const [hours, minutes] = slotTime.split(':').map(Number);
     let slotStart = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date), hours), minutes), 0), 0);
     const slotEnd = addHours(slotStart, 1);
     const now = new Date();
-    
-    // Past slot
     if (isBefore(slotEnd, now)) return false;
-
-    // Rule: if the current hour has started for more than 20 minutes, it's not bookable
-    if (isSameDay(date, now) && now > addMinutes(slotStart, 20)) {
-      return false;
-    }
-
-    return !existingReservations.find(res => isEqual(parseISO(res.starts_at), slotStart));
+    if (isSameDay(date, now) && now > addMinutes(slotStart, 20)) return false;
+    return !getSlotReservation(slotTime, courtId);
   };
 
   const handleSlotClick = (slotTime: string) => {
-    if (!isSlotAvailable(slotTime) && !selectedSlots.includes(slotTime)) return;
+    if (!selectedCourtId) return;
+    const courtIdNum = parseInt(selectedCourtId);
+    if (!isSlotAvailable(slotTime, courtIdNum) && !selectedSlots.includes(slotTime)) return;
+    
     const newSelected = [...selectedSlots];
     if (newSelected.includes(slotTime)) {
       setSelectedSlots(newSelected.filter(s => s !== slotTime));
@@ -102,10 +106,7 @@ const ThirdPartyBooking = () => {
         const sorted = [...newSelected, slotTime].sort();
         const firstIdx = allTimeSlots.indexOf(sorted[0]);
         const lastIdx = allTimeSlots.indexOf(sorted[sorted.length - 1]);
-        
-        // Manteniamo il limite di 3 ore per singola sessione per coerenza tecnica
         if (lastIdx - firstIdx + 1 > 3) return;
-        
         const range: string[] = [];
         for (let i = firstIdx; i <= lastIdx; i++) range.push(allTimeSlots[i]);
         setSelectedSlots(range);
@@ -135,43 +136,50 @@ const ThirdPartyBooking = () => {
       if (error) throw error;
       setLastBookingData({ reservations: inserted || reservationsToInsert as any, courtName, bookedFor: `${bookedForFirstName} ${bookedForLastName}` });
       setShowSuccessModal(true);
+      setSelectedSlots([]);
+      setBookedForFirstName('');
+      setBookedForLastName('');
     } catch (e: any) { showError(e.message); }
     finally { setLoading(false); }
+  };
+
+  const getCourtAvailability = (courtId: number) => {
+    let availableCount = 0;
+    allTimeSlots.forEach(t => {
+      if (isSlotAvailable(t, courtId)) availableCount++;
+    });
+    return availableCount;
   };
 
   if (approvalLoading) return <div className="p-8 text-center bg-[#F8FAFC]">Verifica...</div>;
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] p-6 sm:p-10 lg:p-12">
-      <header className="flex justify-between items-center mb-12 max-w-7xl mx-auto">
+      <header className="flex justify-between items-center mb-10 max-w-7xl mx-auto">
         <div className="flex items-center gap-6">
           <Link to="/dashboard">
-            <Button variant="outline" size="icon" className="rounded-2xl border-none shadow-sm bg-white text-primary hover:scale-110 active:scale-95">
+            <Button variant="outline" size="icon" className="rounded-2xl border-none shadow-sm bg-white text-primary hover:scale-110 active:scale-95 transition-transform">
               <ArrowLeft size={20} />
             </Button>
           </Link>
           <h1 className="text-3xl font-extrabold text-gray-900 tracking-tighter">Prenota per un Socio</h1>
         </div>
-        <div className="flex items-center gap-4">
-          <History 
-            className="text-gray-400 hover:text-primary cursor-pointer transition-colors hidden sm:block" 
-            onClick={() => navigate('/history')}
-            size={24}
-          />
-        </div>
+        <UserNav />
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 max-w-7xl mx-auto">
         <div className="lg:col-span-4 space-y-8">
           <Card className="border-none shadow-[0_2px_12px_rgba(0,0,0,0.04)] rounded-[2rem] bg-white overflow-hidden">
-            <CardHeader className="pb-0">
-              <CardTitle className="text-lg font-bold text-gray-800">Seleziona Data</CardTitle>
+            <CardHeader className="pb-0 pt-6">
+              <CardTitle className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <CalendarDays className="h-5 w-5 text-primary" /> Seleziona Data
+              </CardTitle>
             </CardHeader>
-            <CardContent className="p-4 bg-white flex justify-center">
+            <CardContent className="p-4 flex justify-center">
               <Calendar 
                 mode="single" 
                 selected={date} 
-                onSelect={setDate} 
+                onSelect={(d) => { setDate(d); setSelectedSlots([]); }} 
                 locale={it} 
                 className="rounded-3xl border-none" 
                 fromDate={today}
@@ -180,11 +188,11 @@ const ThirdPartyBooking = () => {
             </CardContent>
           </Card>
           
-          <div className="bg-primary/5 p-6 rounded-[2rem] border border-primary/10">
-            <h4 className="text-sm font-bold text-primary mb-2 flex items-center gap-2">
-              <Users size={16} /> Prenotazione Libera
+          <div className="bg-primary/5 p-8 rounded-[2rem] border border-primary/10">
+            <h4 className="text-sm font-bold text-primary mb-3 flex items-center gap-2">
+              <Users size={18} /> Prenotazione Libera
             </h4>
-            <p className="text-xs text-gray-500 leading-relaxed">
+            <p className="text-xs text-gray-500 leading-relaxed font-medium">
               Le prenotazioni effettuate per conto di altri soci non concorrono al tuo limite settimanale di 2 match.
             </p>
           </div>
@@ -192,34 +200,33 @@ const ThirdPartyBooking = () => {
 
         <div className="lg:col-span-8">
           <Card className="border-none shadow-[0_2px_12px_rgba(0,0,0,0.04)] rounded-[2rem] bg-white min-h-[600px] flex flex-col">
-            <CardHeader className="pb-4">
-              <div className="flex items-center gap-2 mb-2">
+            <CardHeader className="pb-4 border-b border-gray-50 pt-8">
+              <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
-                <span className="text-[11px] font-bold uppercase tracking-widest text-primary/60">Prenotazione Esterna</span>
+                <span className="text-[11px] font-bold uppercase tracking-widest text-primary/60">Disponibilità Tempo Reale</span>
               </div>
-              <CardTitle className="text-2xl font-bold text-gray-900">Dettagli del match</CardTitle>
+              <CardTitle className="text-2xl font-bold text-gray-900 capitalize">
+                {format(date || new Date(), 'EEEE d MMMM', { locale: it })}
+              </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-8 flex-grow">
+            
+            <CardContent className="py-8 space-y-10 flex-grow">
+              {/* Socio Beneficiario */}
               <div className="space-y-6">
-                <div className="flex items-center gap-2 mb-2">
-                  <User className="h-4 w-4 text-primary" />
-                  <span className="text-[11px] font-bold uppercase tracking-widest text-primary/60">Dati del Socio Beneficiario</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <Label className="text-xs font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Socio Beneficiario</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label className="text-xs font-bold text-gray-500 uppercase ml-1">Nome</Label>
                     <Input 
-                      placeholder="Es: Mario" 
-                      className="h-14 rounded-2xl border-gray-100 bg-gray-50 focus:ring-primary/20"
+                      placeholder="Nome" 
+                      className="h-14 rounded-2xl border-gray-100 bg-gray-50 focus:ring-primary/20 text-base font-medium px-6"
                       value={bookedForFirstName} 
                       onChange={e => setBookedForFirstName(e.target.value)} 
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs font-bold text-gray-500 uppercase ml-1">Cognome</Label>
                     <Input 
-                      placeholder="Es: Rossi" 
-                      className="h-14 rounded-2xl border-gray-100 bg-gray-50 focus:ring-primary/20"
+                      placeholder="Cognome" 
+                      className="h-14 rounded-2xl border-gray-100 bg-gray-50 focus:ring-primary/20 text-base font-medium px-6"
                       value={bookedForLastName} 
                       onChange={e => setBookedForLastName(e.target.value)} 
                     />
@@ -227,36 +234,62 @@ const ThirdPartyBooking = () => {
                 </div>
               </div>
 
-              <div className="pt-6 border-t border-gray-50 space-y-6">
-                <div className="space-y-3">
-                  <Label className="text-sm font-bold text-gray-700 ml-1">Campo da Gioco</Label>
-                  <Select onValueChange={setSelectedCourtId} value={selectedCourtId}>
-                    <SelectTrigger className="h-14 rounded-2xl border-gray-100 bg-gray-50/50 focus:ring-primary/20">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-2xl">
-                      {courts.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+              {/* Selezione Campo (Compact Grid) */}
+              <div className="space-y-6">
+                <Label className="text-xs font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Selezione Campo</Label>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {courts.map(court => {
+                    const isSelected = selectedCourtId === court.id.toString();
+                    const availability = getCourtAvailability(court.id);
+                    return (
+                      <button
+                        key={court.id}
+                        onClick={() => { setSelectedCourtId(court.id.toString()); setSelectedSlots([]); }}
+                        className={cn(
+                          "group relative flex flex-col items-center p-4 rounded-2xl border-2 transition-all duration-200",
+                          isSelected ? "border-primary bg-primary/[0.08]" : "border-gray-50 bg-white hover:border-primary/20 hover:bg-gray-50"
+                        )}
+                      >
+                        <h4 className={cn("font-extrabold text-sm mb-2 text-center leading-tight", isSelected ? "text-primary" : "text-gray-700")}>{court.name}</h4>
+                        <Badge className={cn("text-[9px] font-black uppercase tracking-tighter px-2 py-0", availability > 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700")}>
+                          {availability > 0 ? `${availability} slot` : 'Pieno'}
+                        </Badge>
+                      </button>
+                    );
+                  })}
                 </div>
+              </div>
 
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center ml-1">
-                    <Label className="text-sm font-bold text-gray-700">Seleziona Orario</Label>
-                    <span className="text-[11px] text-gray-400 font-medium italic">Max 3 ore consecutive</span>
+              {/* Selezione Orario */}
+              <div className="space-y-6 pt-8 border-t border-gray-50">
+                <div className="flex justify-between items-end ml-1">
+                  <Label className="text-xs font-black text-gray-400 uppercase tracking-[0.2em]">Selezione Orario</Label>
+                  {selectedSlots.length > 0 && (
+                    <span className="text-[10px] text-primary font-black uppercase tracking-widest bg-primary/5 px-2 py-1 rounded">
+                      Selezionati: {selectedSlots.length} / max 3 ore
+                    </span>
+                  )}
+                </div>
+                
+                {!selectedCourtId ? (
+                  <div className="flex flex-col items-center justify-center py-16 px-6 bg-gray-50/50 rounded-[2rem] border-2 border-dashed border-gray-100 text-gray-400">
+                    <MapPin className="h-8 w-8 mb-3 opacity-20" />
+                    <p className="text-xs font-bold uppercase tracking-widest text-center">← Seleziona prima un campo</p>
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 animate-in fade-in slide-in-from-bottom-4">
                     {allTimeSlots.map(t => {
+                      const courtIdNum = parseInt(selectedCourtId);
                       const [hours, minutes] = t.split(':').map(Number);
                       const slotStart = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date!), hours), minutes), 0), 0);
                       const slotEnd = addHours(slotStart, 1);
                       const now = new Date();
 
-                      // Hide past slots
                       if (now >= slotEnd) return null;
 
                       const isSelected = selectedSlots.includes(t);
-                      const available = isSlotAvailable(t);
+                      const res = getSlotReservation(t, courtIdNum);
+                      const available = isSlotAvailable(t, courtIdNum);
                       const endTime = format(slotEnd, 'HH:mm');
                       
                       return (
@@ -264,35 +297,34 @@ const ThirdPartyBooking = () => {
                           key={t} 
                           disabled={!available && !isSelected}
                           onClick={() => available && handleSlotClick(t)} 
-                          className={`
-                            relative h-16 rounded-2xl flex flex-col items-center justify-center p-2 transition-all duration-300
-                            ${isSelected 
-                              ? 'bg-gradient-to-br from-accent to-[#b85a20] text-white shadow-lg shadow-accent/20 scale-[0.98]' 
-                              : available 
-                                ? 'bg-gray-50 text-gray-700 hover:bg-primary/5 hover:border-primary/20 hover:text-primary border-2 border-transparent' 
-                                : 'bg-gray-100 text-gray-300 cursor-not-allowed opacity-50'
-                            }
-                          `}
+                          className={cn(
+                            "relative h-16 rounded-2xl flex flex-col items-center justify-center p-2 transition-all duration-150 border-2",
+                            isSelected ? "bg-primary border-primary text-white scale-[1.02] shadow-lg shadow-primary/10" : 
+                            available ? "bg-gray-50 border-transparent text-gray-700 hover:border-primary/20" : 
+                            "bg-gray-100 border-transparent text-gray-300 cursor-not-allowed opacity-40"
+                          )}
                         >
-                          <span className="text-sm font-bold tracking-tight">{t} - {endTime}</span>
+                          <span className="text-sm font-black tracking-tight">{t} - {endTime}</span>
+                          <span className={cn("text-[9px] font-black uppercase tracking-tighter mt-0.5", isSelected ? "text-white/60" : available ? "text-primary/30" : "text-destructive")}>
+                            {res ? 'OCCUPATO' : 'LIBERO'}
+                          </span>
                         </button>
                       );
                     })}
                   </div>
-                </div>
+                )}
               </div>
 
               <div className="pt-8">
                 <Button 
                   onClick={handleBooking} 
-                  className="w-full h-16 rounded-[1.5rem] bg-gradient-to-br from-primary to-[#23532f] hover:scale-[1.01] active:scale-[0.98] text-xl font-extrabold shadow-xl shadow-primary/20 flex items-center justify-center gap-3 transition-all"
+                  className={cn(
+                    "w-full h-16 rounded-[1.5rem] font-black text-xl shadow-xl transition-all flex items-center justify-center gap-3",
+                    (selectedSlots.length > 0 && bookedForFirstName && bookedForLastName) ? "bg-gradient-to-br from-primary to-[#23532f] text-white hover:scale-[1.01] active:scale-[0.98] shadow-primary/20" : "bg-gray-100 text-gray-400 cursor-not-allowed shadow-none"
+                  )}
                   disabled={selectedSlots.length === 0 || loading || !bookedForFirstName || !bookedForLastName}
                 >
-                  {loading ? (
-                    <div className="w-6 h-6 border-3 border-white/20 border-t-white rounded-full animate-spin"></div>
-                  ) : (
-                    <>Conferma Prenotazione <ChevronRight size={24} /></>
-                  )}
+                  {loading ? <div className="w-6 h-6 border-3 border-white/20 border-t-white rounded-full animate-spin"></div> : <>Conferma Prenotazione <ChevronRight size={24} /></>}
                 </Button>
               </div>
             </CardContent>
