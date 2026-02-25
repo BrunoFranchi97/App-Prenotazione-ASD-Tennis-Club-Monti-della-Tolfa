@@ -184,6 +184,11 @@ export default function AdminReservations() {
     return true;
   }), [groups, selectedDate, filterCourtId, search]);
 
+  // Calcola le date con prenotazioni per il calendario
+  const datesWithReservations = useMemo(() => {
+    return groups.map(g => g.date);
+  }, [groups]);
+
   const handleDeleteGroup = async (group: ReservationGroup) => {
     try {
       const ids = group.reservations.map(r => r.id);
@@ -282,7 +287,30 @@ export default function AdminReservations() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-4 bg-white">
-              <Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} locale={it} className="mx-auto" />
+              <Calendar 
+                mode="single" 
+                selected={selectedDate} 
+                onSelect={setSelectedDate} 
+                locale={it} 
+                className="mx-auto" 
+                modifiers={{ 
+                  hasReservations: datesWithReservations 
+                }}
+                modifiersStyles={{
+                  hasReservations: {
+                    position: 'relative',
+                  }
+                }}
+                modifiersClassNames={{
+                  hasReservations: 'relative after:content-[""] after:absolute after:bottom-1 after:left-1/2 after:-translate-x-1/2 after:w-1 after:h-1 after:rounded-full after:bg-club-orange'
+                }}
+              />
+              <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-center gap-2 text-xs text-gray-500">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-club-orange"></div>
+                  <span>Giorni con prenotazioni</span>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
