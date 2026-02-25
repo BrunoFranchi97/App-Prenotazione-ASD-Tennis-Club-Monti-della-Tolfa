@@ -236,7 +236,7 @@ const BookingCalendar = () => {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] p-6 sm:p-10 lg:p-12">
-      <header className="flex justify-between items-center mb-10 max-w-7xl mx-auto">
+      <header className="flex justify-between items-center mb-6 max-w-7xl mx-auto">
         <div className="flex items-center gap-6">
           <Link to="/dashboard">
             <Button variant="outline" size="icon" className="rounded-2xl border-none shadow-sm bg-white text-primary hover:scale-110 active:scale-95 transition-transform">
@@ -248,32 +248,32 @@ const BookingCalendar = () => {
         <UserNav />
       </header>
 
-      {/* Stepper Visivo Fedele allo Screenshot */}
-      <div className="max-w-7xl mx-auto mb-12 overflow-x-auto pb-4">
-        <div className="flex items-center justify-center gap-12 sm:gap-24 px-4">
+      {/* Stepper Visivo Pulito - Nessun effetto tagliato */}
+      <div className="max-w-7xl mx-auto mb-6">
+        <div className="flex items-center justify-center gap-10 sm:gap-20 px-4 py-10">
           {[
             { step: 1, label: 'DATA', icon: CalendarDays },
             { step: 2, label: 'CAMPO', icon: MapPin },
             { step: 3, label: 'ORARIO', icon: Clock }
           ].map((s) => (
-            <div key={s.step} className="flex items-center gap-4">
+            <div key={s.step} className="flex items-center gap-5">
               <div className={cn(
-                "w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300",
+                "w-14 h-14 rounded-full flex items-center justify-center transition-all duration-500 shrink-0",
                 currentStep === s.step 
-                  ? "bg-primary text-white shadow-[0_8px_16px_rgba(46,107,61,0.25)] scale-110" 
+                  ? "bg-primary text-white shadow-[0_20px_40px_rgba(46,107,61,0.2)] scale-110" 
                   : currentStep > s.step 
                     ? "bg-[#E8F0E9] text-primary" 
                     : "bg-white border-2 border-gray-100 text-gray-300"
               )}>
-                {currentStep > s.step ? <Check size={20} strokeWidth={3} /> : <s.icon size={20} />}
+                {currentStep > s.step ? <Check size={24} strokeWidth={3} /> : <s.icon size={22} />}
               </div>
-              <div className="flex flex-col">
+              <div className="flex flex-col justify-center">
                 <span className={cn(
-                  "text-[11px] font-bold tracking-widest",
+                  "text-[12px] font-bold tracking-widest leading-none mb-1",
                   currentStep >= s.step ? "text-primary/40" : "text-gray-300"
-                )}>{s.step} ·</span>
+                )}>{s.step} .</span>
                 <span className={cn(
-                  "text-sm font-black tracking-wider",
+                  "text-base font-black tracking-widest leading-none",
                   currentStep === s.step ? "text-primary" : 
                   currentStep > s.step ? "text-primary/70" : "text-gray-300"
                 )}>
