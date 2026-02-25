@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, LogOut, CheckCircle, UserCheck, RefreshCw, XCircle } from 'lucide-react';
+import { ArrowLeft, LogOut, CheckCircle, UserCheck, RefreshCw, XCircle, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import type { Profile } from '@/types/supabase';
@@ -20,11 +20,6 @@ const AdminApprovals = () => {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [processingId, setProcessingId] = useState<string | null>(null);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate('/login');
-  };
-
   const fetchAdminStatus = async (): Promise<boolean> => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return false;
@@ -35,10 +30,11 @@ const AdminApprovals = () => {
   const fetchPendingProfiles = async () => {
     setLoading(true);
     try {
+      // Usiamo una query sicura che non crasha se la colonna status non esiste ancora
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .neq('status', 'approved')
+        .eq('approved', false)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
@@ -66,13 +62,15 @@ const AdminApprovals = () => {
   const handleUpdateStatus = async (profileId: string, status: 'approved' | 'rejected') => {
     setProcessingId(profileId);
     try {
+      // Prepariamo l'update: se status esiste lo usiamo, altrimenti usiamo solo approved
+      const updateData: any = { 
+        approved: status === 'approved',
+        approved_at: status === 'approved' ? new Date().toISOString() : null 
+      };
+
       const { error } = await supabase
         .from('profiles')
-        .update({ 
-          status, 
-          approved: status === 'approved',
-          approved_at: status === 'approved' ? new Date().toISOString() : null 
-        })
+        .update(updateData)
         .eq('id', profileId);
 
       if (error) throw error;
@@ -85,80 +83,72 @@ const AdminApprovals = () => {
     }
   };
 
-  if (loading) return <div className="p-8 text-center">Caricamento...</div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><Loader2 className="animate-spin text-primary h-10 w-10" /></div>;
   if (!isAdmin) return null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 sm:p-6 lg:p-8">
-      <header className="flex justify-between items-center mb-8">
+      <header className="flex justify-between items-center mb-8 max-w-7xl mx-auto">
         <div className="flex items-center">
           <Link to="/admin" className="mr-4">
-            <Button variant="outline" size="icon" className="text-primary border-primary hover:bg-secondary">
+            <Button variant="outline" size="icon" className="rounded-xl border-primary text-primary">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
-          <h1 className="text-3xl font-bold text-primary flex items-center">
-            <UserCheck className="mr-2 h-7 w-7" /> Approvazioni
+          <h1 className="text-3xl font-black text-primary flex items-center gap-2">
+            <UserCheck className="h-7 w-7" /> Approvazioni
           </h1>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={fetchPendingProfiles}><RefreshCw className="mr-2 h-4 w-4" /> Aggiorna</Button>
-          <Button variant="outline" onClick={handleLogout}><LogOut className="mr-2 h-4 w-4" /> Esci</Button>
-        </div>
+        <Button variant="outline" onClick={fetchPendingProfiles} className="rounded-xl border-primary text-primary">
+          <RefreshCw className="mr-2 h-4 w-4" /> Aggiorna
+        </Button>
       </header>
 
-      <Card className="shadow-lg rounded-lg">
-        <CardHeader>
+      <Card className="shadow-xl rounded-[2rem] border-none overflow-hidden max-w-7xl mx-auto bg-white">
+        <CardHeader className="bg-gray-50/50 border-b">
           <CardTitle>Richieste in Sospeso</CardTitle>
-          <CardDescription>Soci in attesa o precedentemente rifiutati.</CardDescription>
+          <CardDescription>Soci che attendono l'abilitazione per poter prenotare i campi.</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {profiles.length === 0 ? (
-            <div className="text-center py-10 text-muted-foreground">
-              <CheckCircle className="mx-auto h-12 w-12 mb-4 text-green-500 opacity-70" />
-              <p>Nessuna richiesta in sospeso.</p>
+            <div className="text-center py-20 text-muted-foreground">
+              <CheckCircle className="mx-auto h-16 w-16 mb-4 text-green-500 opacity-20" />
+              <p className="text-lg font-bold">Nessuna richiesta in sospeso.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Nome</TableHead>
-                    <TableHead>Stato</TableHead>
-                    <TableHead>Registrato il</TableHead>
-                    <TableHead className="text-right">Azioni</TableHead>
+                  <TableRow className="bg-gray-50/30">
+                    <TableHead className="font-bold">Socio</TableHead>
+                    <TableHead className="font-bold">Registrato il</TableHead>
+                    <TableHead className="text-right font-bold">Azioni</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {profiles.map((p) => (
-                    <TableRow key={p.id}>
-                      <TableCell className="font-medium">{p.full_name}</TableCell>
-                      <TableCell>
-                        <Badge variant={p.status === 'rejected' ? 'destructive' : 'secondary'}>
-                          {p.status === 'rejected' ? 'Rifiutato' : 'In attesa'}
-                        </Badge>
-                      </TableCell>
+                    <TableRow key={p.id} className="hover:bg-gray-50/50 transition-colors">
+                      <TableCell className="font-bold text-gray-800">{p.full_name}</TableCell>
                       <TableCell>{format(parseISO(p.created_at), 'dd/MM/yyyy HH:mm', { locale: it })}</TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
+                        <div className="flex justify-end gap-3">
                           <Button 
                             size="sm" 
                             onClick={() => handleUpdateStatus(p.id, 'approved')}
                             disabled={processingId === p.id}
-                            className="bg-green-600 hover:bg-green-700"
+                            className="bg-green-600 hover:bg-green-700 rounded-xl px-6 font-bold"
                           >
                             Approva
                           </Button>
-                          {p.status !== 'rejected' && (
-                            <Button 
-                              variant="destructive" 
-                              size="sm" 
-                              onClick={() => handleUpdateStatus(p.id, 'rejected')}
-                              disabled={processingId === p.id}
-                            >
-                              Rifiuta
-                            </Button>
-                          )}
+                          <Button 
+                            variant="destructive" 
+                            size="sm" 
+                            onClick={() => handleUpdateStatus(p.id, 'rejected')}
+                            disabled={processingId === p.id}
+                            className="rounded-xl"
+                          >
+                            Rifiuta
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
