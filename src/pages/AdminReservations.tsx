@@ -2,26 +2,31 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { format, parseISO, isSameDay, startOfDay, isBefore } from "date-fns";
+import { format, parseISO, addDays, subDays, startOfDay, endOfDay, isSameDay, setHours, setMinutes, addHours } from "date-fns";
 import { it } from "date-fns/locale";
 import { 
-  ArrowLeft, Eye, LogOut, PlusCircle, RefreshCw, Search, Trash2, 
-  Clock, MapPin, Users, AlertCircle, ChevronDown, ChevronUp, 
-  Filter, Trophy, CalendarDays, Edit
+  ArrowLeft, ChevronLeft, ChevronRight, Eye, Edit, Trash2, Plus, X, Calendar
 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
-import { cleanReservationNotes } from "@/utils/noteCleaner";
 import { cn } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Calendar } from "@/components/ui/calendar";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,96 +36,33 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 
-import ReservationFormDialog from "@/components/admin/ReservationFormDialog";
-import ReservationDetailsDialog from "@/components/admin/ReservationDetailsDialog";
-
-import type { Court, Reservation, BookingType } from "@/types/supabase";
+import type { Court, Reservation } from "@/types/supabase";
 
 type ProfileLite = { id: string; full_name: string | null };
 
 type ReservationRow = Reservation & {
   court?: Court;
   bookedByName: string;
-  bookedForName: string;
 };
 
-interface ReservationGroup {
-  id: string;
-  user_id: string;
-  court_id: number;
-  date: Date;
-  reservations: ReservationRow[];
-  startTime: string;
-  endTime: string;
-  totalHours: number;
-  status: string;
-  bookedByName: string;
-  bookedForName: string;
-  court?: Court;
-  bookingType: BookingType;
-  notes?: string;
-}
+const TIME_SLOTS = [
+  "08:00", "09:00", "10:00", "11:00", "12:00", "13:00", 
+  "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"
+];
 
-function groupReservations(reservations: ReservationRow[]): ReservationGroup[] {
-  if (reservations.length === 0) return [];
-  
-  const sorted = [...reservations].sort((a, b) => {
-    const aDate = parseISO(a.starts_at);
-    const bDate = parseISO(b.starts_at);
-    if (!isSameDay(aDate, bDate)) return aDate.getTime() - bDate.getTime();
-    if (a.court_id !== b.court_id) return a.court_id - b.court_id;
-    return aDate.getTime() - bDate.getTime();
-  });
+const SURFACE_COLORS: Record<string, string> = {
+  "terra_rossa": "bg-orange-100 text-orange-800",
+  "erba_sintetica": "bg-green-100 text-green-800",
+  "superficie_dura": "bg-blue-100 text-blue-800",
+};
 
-  const groups: ReservationGroup[] = [];
-  let currentGroup: ReservationGroup | null = null;
-
-  for (const reservation of sorted) {
-    const startDate = parseISO(reservation.starts_at);
-    const endDate = parseISO(reservation.ends_at);
-    const dateOnly = startOfDay(startDate);
-
-    if (!currentGroup || 
-        currentGroup.court_id !== reservation.court_id || 
-        !isSameDay(currentGroup.date, dateOnly) || 
-        currentGroup.user_id !== reservation.user_id ||
-        currentGroup.bookedForName !== (reservation.booked_for_first_name ? `${reservation.booked_for_first_name} ${reservation.booked_for_last_name}` : "Se stesso")
-    ) {
-      currentGroup = {
-        id: `group_${reservation.id}`,
-        user_id: reservation.user_id,
-        court_id: reservation.court_id,
-        date: dateOnly,
-        reservations: [reservation],
-        startTime: format(startDate, 'HH:mm'),
-        endTime: format(endDate, 'HH:mm'),
-        totalHours: 1,
-        status: reservation.status,
-        bookedByName: reservation.bookedByName,
-        bookedForName: reservation.booked_for_first_name && reservation.booked_for_last_name 
-          ? `${reservation.booked_for_first_name} ${reservation.booked_for_last_name}` 
-          : "Se stesso",
-        court: reservation.court,
-        bookingType: reservation.booking_type || 'singolare',
-        notes: reservation.notes || undefined
-      };
-      groups.push(currentGroup);
-    } else {
-      currentGroup.reservations.push(reservation);
-      currentGroup.endTime = format(endDate, 'HH:mm');
-      currentGroup.totalHours = currentGroup.reservations.length;
-    }
-  }
-  return groups;
-}
+const SURFACE_LABELS: Record<string, string> = {
+  "terra_rossa": "Terra Rossa",
+  "erba_sintetica": "Erba Sint.",
+  "superficie_dura": "Sup. Dura",
+};
 
 export default function AdminReservations() {
   const navigate = useNavigate();
@@ -129,31 +71,44 @@ export default function AdminReservations() {
   const [courts, setCourts] = useState<Court[]>([]);
   const [profiles, setProfiles] = useState<ProfileLite[]>([]);
   const [reservations, setReservations] = useState<ReservationRow[]>([]);
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const [currentUserId, setCurrentUserId] = useState<string>("");
 
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [filterCourtId, setFilterCourtId] = useState<string>("all");
-  const [search, setSearch] = useState<string>("");
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [visibleCourts, setVisibleCourts] = useState<number[]>([]);
+  const [hoveredSlot, setHoveredSlot] = useState<string | null>(null);
 
-  const [formOpen, setFormOpen] = useState(false);
-  const [formMode, setFormMode] = useState<"create" | "edit">("create");
-  const [detailsOpen, setDetailsOpen] = useState(false);
-  const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
+  // CRUD Dialogs
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedReservation, setSelectedReservation] = useState<ReservationRow | null>(null);
+  const [createSlotData, setCreateSlotData] = useState<{ courtId: number; time: string } | null>(null);
+
+  // Form states
+  const [formUserId, setFormUserId] = useState("");
+  const [formCourtId, setFormCourtId] = useState("");
+  const [formStartTime, setFormStartTime] = useState("");
+  const [formDuration, setFormDuration] = useState("1");
+  const [formNotes, setFormNotes] = useState("");
+  const [formBookedForFirst, setFormBookedForFirst] = useState("");
+  const [formBookedForLast, setFormBookedForLast] = useState("");
 
   const refreshAll = async () => {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return navigate("/login");
+      setCurrentUserId(user.id);
       
       const { data: prof } = await supabase.from("profiles").select("is_admin").eq('id', user.id).single();
       if (!prof?.is_admin) return navigate("/dashboard");
       setIsAdmin(true);
 
       const [courtsData, profilesData, resData] = await Promise.all([
-        supabase.from("courts").select("*").order("name"),
+        supabase.from("courts").select("*").eq("is_active", true).order("id"),
         supabase.from("profiles").select("id, full_name").order("full_name"),
-        supabase.from("reservations").select("*").order("starts_at", { ascending: false })
+        supabase.from("reservations").select("*").gte("starts_at", startOfDay(selectedDate).toISOString()).lte("ends_at", endOfDay(selectedDate).toISOString()).neq("status", "cancelled")
       ]);
 
       const profileMap = new Map(profilesData.data?.map(p => [p.id, p.full_name || "Socio"]) || []);
@@ -161,11 +116,11 @@ export default function AdminReservations() {
 
       setCourts(courtsData.data || []);
       setProfiles(profilesData.data || []);
+      setVisibleCourts((courtsData.data || []).map(c => c.id));
       setReservations((resData.data || []).map(r => ({
         ...r,
         court: courtMap.get(r.court_id),
         bookedByName: profileMap.get(r.user_id) || "Socio",
-        bookedForName: r.booked_for_first_name && r.booked_for_last_name ? `${r.booked_for_first_name} ${r.booked_for_last_name}` : "Se stesso",
       })));
     } catch (err: any) {
       showError("Errore nel caricamento: " + err.message);
@@ -174,75 +129,129 @@ export default function AdminReservations() {
     }
   };
 
-  useEffect(() => { refreshAll(); }, []);
+  useEffect(() => { refreshAll(); }, [selectedDate]);
 
-  const groups = useMemo(() => groupReservations(reservations), [reservations]);
-  const filtered = useMemo(() => groups.filter(g => {
-    if (selectedDate && !isSameDay(g.date, selectedDate)) return false;
-    if (filterCourtId !== "all" && String(g.court_id) !== filterCourtId) return false;
-    if (search && ![g.court?.name || "", g.bookedByName, g.bookedForName].join(" ").toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  }), [groups, selectedDate, filterCourtId, search]);
+  const getReservationForSlot = (courtId: number, time: string): ReservationRow | null => {
+    const slotStart = setMinutes(setHours(startOfDay(selectedDate), parseInt(time.split(':')[0])), parseInt(time.split(':')[1] || '0'));
+    return reservations.find(r => r.court_id === courtId && isSameDay(parseISO(r.starts_at), selectedDate) && format(parseISO(r.starts_at), 'HH:mm') === time) || null;
+  };
 
-  // Calcola le date con prenotazioni per il calendario
-  const datesWithReservations = useMemo(() => {
-    return groups.map(g => g.date);
-  }, [groups]);
+  const handlePrevDay = () => setSelectedDate(subDays(selectedDate, 1));
+  const handleNextDay = () => setSelectedDate(addDays(selectedDate, 1));
+  const handleToday = () => setSelectedDate(new Date());
 
-  const handleDeleteGroup = async (group: ReservationGroup) => {
+  const toggleCourtVisibility = (courtId: number) => {
+    setVisibleCourts(prev => prev.includes(courtId) ? prev.filter(id => id !== courtId) : [...prev, courtId]);
+  };
+
+  const openViewDialog = (res: ReservationRow) => {
+    setSelectedReservation(res);
+    setViewDialogOpen(true);
+  };
+
+  const openEditDialog = (res: ReservationRow) => {
+    setSelectedReservation(res);
+    setFormUserId(res.user_id);
+    setFormCourtId(String(res.court_id));
+    setFormStartTime(format(parseISO(res.starts_at), 'HH:mm'));
+    setFormDuration("1");
+    setFormNotes(res.notes || "");
+    setFormBookedForFirst(res.booked_for_first_name || "");
+    setFormBookedForLast(res.booked_for_last_name || "");
+    setEditDialogOpen(true);
+  };
+
+  const openCreateDialog = (courtId: number, time: string) => {
+    setCreateSlotData({ courtId, time });
+    setFormUserId("");
+    setFormCourtId(String(courtId));
+    setFormStartTime(time);
+    setFormDuration("1");
+    setFormNotes("");
+    setFormBookedForFirst("");
+    setFormBookedForLast("");
+    setCreateDialogOpen(true);
+  };
+
+  const openDeleteDialog = (res: ReservationRow) => {
+    setSelectedReservation(res);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleCreate = async () => {
+    if (!formUserId || !formCourtId || !formStartTime) return showError("Compila tutti i campi obbligatori.");
+    setLoading(true);
     try {
-      const ids = group.reservations.map(r => r.id);
-      const { error } = await supabase.from('reservations').delete().in('id', ids);
+      const [hours, minutes] = formStartTime.split(':').map(Number);
+      const start = setMinutes(setHours(startOfDay(selectedDate), hours), minutes);
+      const duration = parseInt(formDuration);
+      
+      const inserts = [];
+      for (let i = 0; i < duration; i++) {
+        const s = addHours(start, i);
+        const e = addHours(s, 1);
+        inserts.push({
+          court_id: parseInt(formCourtId),
+          user_id: formUserId,
+          starts_at: s.toISOString(),
+          ends_at: e.toISOString(),
+          status: 'confirmed',
+          notes: formNotes.trim() || null,
+          booked_for_first_name: formBookedForFirst.trim() || null,
+          booked_for_last_name: formBookedForLast.trim() || null,
+        });
+      }
+      
+      const { error } = await supabase.from('reservations').insert(inserts);
       if (error) throw error;
-      showSuccess("Prenotazione eliminata con successo!");
+      showSuccess("Prenotazione creata!");
+      setCreateDialogOpen(false);
       refreshAll();
     } catch (err: any) {
       showError(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleSubmitForm = async (values: any) => {
+  const handleEdit = async () => {
+    if (!selectedReservation || !formUserId || !formCourtId || !formStartTime) return showError("Compila tutti i campi.");
     setLoading(true);
     try {
-      if (formMode === 'edit' && values.id) {
-        const { error } = await supabase.from('reservations').update({
-          court_id: values.court_id,
-          user_id: values.user_id,
-          starts_at: values.starts_at,
-          ends_at: values.ends_at,
-          booked_for_first_name: values.booked_for_first_name,
-          booked_for_last_name: values.booked_for_last_name,
-          notes: values.notes,
-          updated_at: new Date().toISOString()
-        }).eq('id', values.id);
-        if (error) throw error;
-        showSuccess("Prenotazione aggiornata!");
-      } else {
-        // Logica creazione (può gestire più ore)
-        const start = new Date(values.starts_at);
-        const end = new Date(values.ends_at);
-        const hours = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60));
-        
-        const inserts = [];
-        for (let i = 0; i < hours; i++) {
-          const s = new Date(start.getTime() + (i * 3600000));
-          const e = new Date(s.getTime() + 3600000);
-          inserts.push({
-            court_id: values.court_id,
-            user_id: values.user_id,
-            starts_at: s.toISOString(),
-            ends_at: e.toISOString(),
-            status: 'confirmed',
-            booked_for_first_name: values.booked_for_first_name,
-            booked_for_last_name: values.booked_for_last_name,
-            notes: values.notes
-          });
-        }
-        const { error } = await supabase.from('reservations').insert(inserts);
-        if (error) throw error;
-        showSuccess("Nuova prenotazione creata!");
-      }
-      setFormOpen(false);
+      const [hours, minutes] = formStartTime.split(':').map(Number);
+      const start = setMinutes(setHours(startOfDay(selectedDate), hours), minutes);
+      const end = addHours(start, 1);
+      
+      const { error } = await supabase.from('reservations').update({
+        court_id: parseInt(formCourtId),
+        user_id: formUserId,
+        starts_at: start.toISOString(),
+        ends_at: end.toISOString(),
+        notes: formNotes.trim() || null,
+        booked_for_first_name: formBookedForFirst.trim() || null,
+        booked_for_last_name: formBookedForLast.trim() || null,
+        updated_at: new Date().toISOString()
+      }).eq('id', selectedReservation.id);
+      
+      if (error) throw error;
+      showSuccess("Prenotazione aggiornata!");
+      setEditDialogOpen(false);
+      refreshAll();
+    } catch (err: any) {
+      showError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!selectedReservation) return;
+    setLoading(true);
+    try {
+      const { error } = await supabase.from('reservations').delete().eq('id', selectedReservation.id);
+      if (error) throw error;
+      showSuccess("Prenotazione eliminata!");
+      setDeleteDialogOpen(false);
       refreshAll();
     } catch (err: any) {
       showError(err.message);
@@ -253,194 +262,367 @@ export default function AdminReservations() {
 
   if (!isAdmin && !loading) return null;
 
+  const visibleCourtsList = courts.filter(c => visibleCourts.includes(c.id));
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 sm:p-6 lg:p-8">
-      <header className="mb-10 flex justify-between items-center max-w-7xl mx-auto">
-        <div className="flex items-center gap-4">
+    <div className="min-h-screen bg-[#F8FAFC] flex flex-col">
+      {/* Header con navigazione giorno - stile identico all'app */}
+      <header className="bg-primary text-white shadow-lg sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Link to="/admin">
-            <Button variant="outline" size="icon" className="rounded-xl border-primary text-primary hover:bg-primary/5">
+            <Button variant="ghost" size="icon" className="text-white hover:bg-white/10">
               <ArrowLeft className="h-5 w-5" />
             </Button>
           </Link>
-          <div>
-            <h1 className="text-3xl font-black text-primary tracking-tight">Gestione Prenotazioni</h1>
-            <p className="text-sm text-gray-500 font-medium">Pannello di controllo avanzato per l'amministratore</p>
+          
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={handlePrevDay} className="text-white hover:bg-white/10">
+              <ChevronLeft className="h-6 w-6" />
+            </Button>
+            
+            <Button 
+              variant="secondary" 
+              size="sm" 
+              onClick={handleToday}
+              className="rounded-full px-4 py-1 bg-white/20 hover:bg-white/30 text-white font-bold text-xs uppercase tracking-wider"
+            >
+              Oggi
+            </Button>
+            
+            <h1 className="text-xl font-bold capitalize min-w-[200px] text-center">
+              {format(selectedDate, 'EEEE, dd MMM', { locale: it })}
+            </h1>
+            
+            <Button variant="ghost" size="icon" onClick={handleNextDay} className="text-white hover:bg-white/10">
+              <ChevronRight className="h-6 w-6" />
+            </Button>
           </div>
-        </div>
-        <div className="flex gap-3">
-          <Button variant="outline" onClick={refreshAll} className="rounded-xl border-primary text-primary hover:bg-primary/5">
-            <RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} /> Aggiorna
-          </Button>
-          <Button onClick={() => { setFormMode("create"); setSelectedReservation(null); setFormOpen(true); }} className="rounded-xl bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20">
-            <PlusCircle className="mr-2 h-4 w-4" /> Nuova Prenotazione
-          </Button>
+          
+          <div className="w-10" /> {/* Spacer for symmetry */}
         </div>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 max-w-7xl mx-auto">
-        {/* Sidebar Filtri */}
-        <aside className="lg:col-span-4 space-y-6">
-          <Card className="border-none shadow-xl rounded-[2rem] overflow-hidden">
-            <CardHeader className="bg-primary text-white pb-6">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <CalendarDays className="h-5 w-5" /> Calendario
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 bg-white">
-              <Calendar 
-                mode="single" 
-                selected={selectedDate} 
-                onSelect={setSelectedDate} 
-                locale={it} 
-                className="mx-auto" 
-                modifiers={{ 
-                  hasReservations: datesWithReservations 
-                }}
-                modifiersStyles={{
-                  hasReservations: {
-                    position: 'relative',
-                  }
-                }}
-                modifiersClassNames={{
-                  hasReservations: 'relative after:content-[""] after:absolute after:bottom-1 after:left-1/2 after:-translate-x-1/2 after:w-1 after:h-1 after:rounded-full after:bg-club-orange'
-                }}
-              />
-              <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-center gap-2 text-xs text-gray-500">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-1.5 h-1.5 rounded-full bg-club-orange"></div>
-                  <span>Giorni con prenotazioni</span>
+      {/* Quick filter tabs */}
+      <div className="bg-white border-b border-gray-100 sticky top-[72px] z-40 shadow-sm">
+        <div className="container mx-auto px-4 py-3">
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+            <button
+              onClick={() => setVisibleCourts(courts.map(c => c.id))}
+              className={cn(
+                "px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all",
+                visibleCourts.length === courts.length 
+                  ? "bg-primary text-white shadow-md" 
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              )}
+            >
+              Tutti i Campi
+            </button>
+            {courts.map(court => (
+              <button
+                key={court.id}
+                onClick={() => toggleCourtVisibility(court.id)}
+                className={cn(
+                  "px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all",
+                  visibleCourts.includes(court.id) 
+                    ? "bg-primary text-white shadow-md" 
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                )}
+              >
+                {court.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Griglia principale */}
+      <div className="flex-1 overflow-auto">
+        <div className="container mx-auto px-4 py-6">
+          <div className="flex gap-0">
+            {/* Colonna orari sticky */}
+            <div className="sticky left-0 z-30 bg-[#F8FAFC] pr-2" style={{ width: '80px' }}>
+              <div className="h-16" /> {/* Header spacer */}
+              {TIME_SLOTS.map(time => (
+                <div key={time} className="h-24 flex items-center justify-end pr-3 text-sm font-bold text-gray-500">
+                  {time}
+                </div>
+              ))}
+            </div>
+
+            {/* Colonne campi */}
+            <div className="flex-1 flex gap-4">
+              {visibleCourtsList.map(court => (
+                <div key={court.id} className="flex-1 min-w-[200px]">
+                  {/* Header colonna campo */}
+                  <div className="h-16 mb-2 bg-white rounded-2xl shadow-sm p-3 flex flex-col justify-center border border-gray-100">
+                    <h3 className="font-black text-gray-900 text-sm mb-1">{court.name}</h3>
+                    <Badge className={cn("text-[10px] font-bold uppercase w-fit", SURFACE_COLORS[court.surface] || "bg-gray-100 text-gray-800")}>
+                      {SURFACE_LABELS[court.surface] || court.surface}
+                    </Badge>
+                  </div>
+
+                  {/* Slot orari */}
+                  {TIME_SLOTS.map(time => {
+                    const reservation = getReservationForSlot(court.id, time);
+                    const slotKey = `${court.id}-${time}`;
+                    const isHovered = hoveredSlot === slotKey;
+                    const isMine = reservation?.user_id === currentUserId;
+
+                    return (
+                      <div
+                        key={time}
+                        className={cn(
+                          "h-24 mb-2 rounded-xl transition-all duration-200 relative group",
+                          reservation 
+                            ? "bg-white shadow-md border-2 border-primary/20 cursor-pointer hover:shadow-lg hover:scale-[0.97]" 
+                            : "bg-white/40 border-2 border-dashed border-gray-200 hover:border-primary/40 hover:bg-white/60 cursor-pointer"
+                        )}
+                        onMouseEnter={() => setHoveredSlot(slotKey)}
+                        onMouseLeave={() => setHoveredSlot(null)}
+                        onClick={() => !reservation && openCreateDialog(court.id, time)}
+                      >
+                        {reservation ? (
+                          <>
+                            <div className="p-3 h-full flex flex-col justify-between">
+                              <div>
+                                <div className="flex items-center gap-1 mb-1">
+                                  {isMine && <span className="text-yellow-500">⭐</span>}
+                                  <p className="font-bold text-gray-900 text-sm truncate">
+                                    {reservation.bookedByName}
+                                  </p>
+                                </div>
+                                <p className="text-xs text-gray-500">
+                                  {format(parseISO(reservation.starts_at), 'HH:mm')} - {format(parseISO(reservation.ends_at), 'HH:mm')}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Icon overlay CRUD - appare solo su hover */}
+                            <div className={cn(
+                              "absolute top-2 right-2 flex gap-1 transition-opacity duration-200",
+                              isHovered ? "opacity-100" : "opacity-0"
+                            )}>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); openViewDialog(reservation); }}
+                                className="w-7 h-7 rounded-md bg-white/90 backdrop-blur-sm shadow-md flex items-center justify-center hover:bg-white transition-all"
+                              >
+                                <Eye className="h-3.5 w-3.5 text-gray-700" />
+                              </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); openEditDialog(reservation); }}
+                                className="w-7 h-7 rounded-md bg-white/90 backdrop-blur-sm shadow-md flex items-center justify-center hover:bg-white transition-all"
+                              >
+                                <Edit className="h-3.5 w-3.5 text-primary" />
+                              </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); openDeleteDialog(reservation); }}
+                                className="w-7 h-7 rounded-md bg-white/90 backdrop-blur-sm shadow-md flex items-center justify-center hover:bg-white transition-all"
+                              >
+                                <Trash2 className="h-3.5 w-3.5 text-red-600" />
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="h-full flex items-center justify-center">
+                            <Plus className="h-5 w-5 text-gray-300 group-hover:text-primary transition-colors" />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Dialog Visualizza */}
+      <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
+        <DialogContent className="sm:max-w-md rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-primary">Dettagli Prenotazione</DialogTitle>
+            <DialogDescription>Informazioni complete sulla prenotazione selezionata</DialogDescription>
+          </DialogHeader>
+          {selectedReservation && (
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs font-bold text-gray-400 uppercase">Prenotato da</Label>
+                  <p className="font-bold text-gray-900">{selectedReservation.bookedByName}</p>
+                </div>
+                <div>
+                  <Label className="text-xs font-bold text-gray-400 uppercase">Campo</Label>
+                  <p className="font-bold text-gray-900">{selectedReservation.court?.name}</p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs font-bold text-gray-400 uppercase">Orario</Label>
+                  <p className="font-bold text-gray-900">
+                    {format(parseISO(selectedReservation.starts_at), 'HH:mm')} - {format(parseISO(selectedReservation.ends_at), 'HH:mm')}
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-xs font-bold text-gray-400 uppercase">Data</Label>
+                  <p className="font-bold text-gray-900 capitalize">
+                    {format(parseISO(selectedReservation.starts_at), 'dd MMM yyyy', { locale: it })}
+                  </p>
+                </div>
+              </div>
+              {(selectedReservation.booked_for_first_name || selectedReservation.booked_for_last_name) && (
+                <div>
+                  <Label className="text-xs font-bold text-gray-400 uppercase">Prenotato per</Label>
+                  <p className="font-bold text-gray-900">
+                    {selectedReservation.booked_for_first_name} {selectedReservation.booked_for_last_name}
+                  </p>
+                </div>
+              )}
+              {selectedReservation.notes && (
+                <div>
+                  <Label className="text-xs font-bold text-gray-400 uppercase">Note</Label>
+                  <p className="text-sm text-gray-700 italic">{selectedReservation.notes}</p>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewDialogOpen(false)} className="rounded-xl">
+              Chiudi
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-          <Card className="border-none shadow-xl rounded-[2rem] bg-white p-6 space-y-6">
-            <div className="space-y-2">
-              <Label className="text-xs font-black uppercase text-gray-400 tracking-widest ml-1">Filtra Campo</Label>
-              <Select value={filterCourtId} onValueChange={setFilterCourtId}>
-                <SelectTrigger className="rounded-2xl h-12 bg-gray-50 border-none">
-                  <SelectValue placeholder="Tutti i campi" />
-                </SelectTrigger>
+      {/* Dialog Crea */}
+      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+        <DialogContent className="sm:max-w-md rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-primary">Nuova Prenotazione</DialogTitle>
+            <DialogDescription>Aggiungi una prenotazione per questo slot</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label>Socio *</Label>
+              <Select value={formUserId} onValueChange={setFormUserId}>
+                <SelectTrigger className="rounded-lg"><SelectValue placeholder="Seleziona socio" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Tutti i campi</SelectItem>
+                  {profiles.map(p => <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Orario Inizio</Label>
+                <Input value={formStartTime} onChange={e => setFormStartTime(e.target.value)} type="time" className="rounded-lg" />
+              </div>
+              <div>
+                <Label>Durata (ore)</Label>
+                <Select value={formDuration} onValueChange={setFormDuration}>
+                  <SelectTrigger className="rounded-lg"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1 ora</SelectItem>
+                    <SelectItem value="2">2 ore</SelectItem>
+                    <SelectItem value="3">3 ore</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Nome (Terzi)</Label>
+                <Input value={formBookedForFirst} onChange={e => setFormBookedForFirst(e.target.value)} className="rounded-lg" maxLength={50} />
+              </div>
+              <div>
+                <Label>Cognome (Terzi)</Label>
+                <Input value={formBookedForLast} onChange={e => setFormBookedForLast(e.target.value)} className="rounded-lg" maxLength={50} />
+              </div>
+            </div>
+            <div>
+              <Label>Note</Label>
+              <Textarea value={formNotes} onChange={e => setFormNotes(e.target.value)} className="rounded-lg" rows={3} maxLength={500} />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setCreateDialogOpen(false)} className="rounded-xl">Annulla</Button>
+            <Button onClick={handleCreate} disabled={loading} className="rounded-xl bg-primary hover:bg-primary/90">
+              {loading ? "Creazione..." : "Crea Prenotazione"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Modifica */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="sm:max-w-md rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-primary">Modifica Prenotazione</DialogTitle>
+            <DialogDescription>Aggiorna i dettagli della prenotazione</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label>Socio *</Label>
+              <Select value={formUserId} onValueChange={setFormUserId}>
+                <SelectTrigger className="rounded-lg"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {profiles.map(p => <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Campo *</Label>
+              <Select value={formCourtId} onValueChange={setFormCourtId}>
+                <SelectTrigger className="rounded-lg"><SelectValue /></SelectTrigger>
+                <SelectContent>
                   {courts.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label className="text-xs font-black uppercase text-gray-400 tracking-widest ml-1">Cerca Socio</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-3.5 h-4 w-4 text-gray-400" />
-                <Input 
-                  placeholder="Nome o cognome..." 
-                  className="pl-10 rounded-2xl h-12 bg-gray-50 border-none"
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  maxLength={50}
-                />
+            <div>
+              <Label>Orario Inizio</Label>
+              <Input value={formStartTime} onChange={e => setFormStartTime(e.target.value)} type="time" className="rounded-lg" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Nome (Terzi)</Label>
+                <Input value={formBookedForFirst} onChange={e => setFormBookedForFirst(e.target.value)} className="rounded-lg" maxLength={50} />
+              </div>
+              <div>
+                <Label>Cognome (Terzi)</Label>
+                <Input value={formBookedForLast} onChange={e => setFormBookedForLast(e.target.value)} className="rounded-lg" maxLength={50} />
               </div>
             </div>
-          </Card>
-        </aside>
-
-        {/* Lista Prenotazioni */}
-        <main className="lg:col-span-8 space-y-4">
-          <div className="flex justify-between items-end mb-4 px-2">
-             <h2 className="text-xl font-bold text-gray-700 capitalize">
-               {selectedDate ? format(selectedDate, 'EEEE d MMMM', { locale: it }) : 'Tutte le date'}
-             </h2>
-             <Badge variant="outline" className="rounded-full bg-white font-bold">{filtered.length} Risultati</Badge>
+            <div>
+              <Label>Note</Label>
+              <Textarea value={formNotes} onChange={e => setFormNotes(e.target.value)} className="rounded-lg" rows={3} maxLength={500} />
+            </div>
           </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)} className="rounded-xl">Annulla</Button>
+            <Button onClick={handleEdit} disabled={loading} className="rounded-xl bg-primary hover:bg-primary/90">
+              {loading ? "Salvataggio..." : "Salva Modifiche"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-          {filtered.length === 0 ? (
-            <Card className="border-2 border-dashed p-20 rounded-[2rem] text-center text-gray-400 bg-white/50">
-              <AlertCircle className="mx-auto h-12 w-12 mb-4 opacity-20" />
-              <p className="font-bold">Nessuna prenotazione trovata per i criteri selezionati.</p>
-            </Card>
-          ) : (
-            filtered.map(group => (
-              <Card key={group.id} className="border-none shadow-md rounded-3xl overflow-hidden bg-white hover:shadow-xl transition-all duration-300 group">
-                <div className={`h-2 w-full ${group.status === 'confirmed' ? 'bg-primary' : 'bg-destructive'}`}></div>
-                <CardContent className="p-6">
-                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                    <div className="flex-1 space-y-2">
-                      <div className="flex items-center gap-3">
-                        <Badge className={cn("rounded-lg capitalize font-bold", group.status === 'confirmed' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700')}>
-                          {group.status}
-                        </Badge>
-                        <span className="text-sm font-black text-gray-400 uppercase tracking-tighter flex items-center gap-1">
-                          <MapPin className="h-3 w-3" /> {group.court?.name}
-                        </span>
-                      </div>
-                      <h3 className="text-2xl font-black text-gray-900 flex items-center gap-2">
-                        <Clock className="h-6 w-6 text-club-orange" /> {group.startTime} - {group.endTime}
-                        <span className="text-xs font-medium text-gray-400">({group.totalHours}h)</span>
-                      </h3>
-                      <div className="flex items-center gap-2 text-sm text-gray-600 font-bold">
-                        <Users className="h-4 w-4 text-primary" /> {group.bookedByName} 
-                        {group.bookedForName !== "Se stesso" && <span className="text-club-orange">→ per {group.bookedForName}</span>}
-                      </div>
-                    </div>
-
-                    <div className="flex gap-2 w-full md:w-auto border-t md:border-none pt-4 md:pt-0">
-                      <Button variant="secondary" size="icon" className="rounded-xl" onClick={() => { setSelectedReservation(group.reservations[0]); setDetailsOpen(true); }}>
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="icon" className="rounded-xl border-primary text-primary" onClick={() => { setSelectedReservation(group.reservations[0]); setFormMode("edit"); setFormOpen(true); }}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="destructive" size="icon" className="rounded-xl shadow-lg shadow-red-100">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent className="rounded-3xl">
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Sei sicuro?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Stai eliminando l'intero blocco di prenotazione ({group.totalHours} ore) di {group.bookedByName}. Questa azione non è reversibile.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel className="rounded-xl">Annulla</AlertDialogCancel>
-                            <AlertDialogAction className="rounded-xl bg-destructive" onClick={() => handleDeleteGroup(group)}>Elimina Definitivamente</AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </div>
-                  {group.notes && (
-                    <div className="mt-4 pt-4 border-t border-gray-50 italic text-xs text-gray-500">
-                      Note: "{cleanReservationNotes(group.notes)}"
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </main>
-      </div>
-
-      <ReservationFormDialog 
-        open={formOpen} 
-        onOpenChange={setFormOpen} 
-        mode={formMode} 
-        initial={selectedReservation} 
-        courts={courts} 
-        profiles={profiles} 
-        onSubmit={handleSubmitForm} 
-        loading={loading}
-      />
-      
-      <ReservationDetailsDialog 
-        open={detailsOpen} 
-        onOpenChange={setDetailsOpen} 
-        reservation={selectedReservation} 
-        court={selectedReservation?.court_id ? courts.find(c => c.id === selectedReservation.court_id) : undefined} 
-        bookedByName={selectedReservation?.user_id ? profiles.find(p => p.id === selectedReservation.user_id)?.full_name || "" : ""} 
-        onEdit={() => { setDetailsOpen(false); setFormMode("edit"); setFormOpen(true); }}
-      />
+      {/* Dialog Elimina */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent className="rounded-3xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Conferma Eliminazione</AlertDialogTitle>
+            <AlertDialogDescription>
+              Sei sicuro di voler eliminare questa prenotazione? Questa azione è irreversibile.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Annulla</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="rounded-xl bg-red-600 hover:bg-red-700">
+              Elimina Definitivamente
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
