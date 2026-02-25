@@ -35,31 +35,45 @@ const MatchBooking = () => {
         const { data: court } = await supabase.from('courts').select('name').eq('id', matchRequest.court_id).single();
         if (court) setCourtName(court.name);
 
-        const start = setSeconds(setMilliseconds(setMinutes(setHours(parseISO(matchRequest.requested_date), parseInt(matchRequest.preferred_time_start.split(':')[0])), 0), 0), 0).toISOString();
-        const end = setSeconds(setMilliseconds(setMinutes(setHours(matchRequest.requested_date === 'string' ? parseISO(matchRequest.requested_date) : parseISO(matchRequest.requested_date)), parseInt(matchRequest.preferred_time_end.split(':')[0])), 0), 0), 0).toISOString();
+        const baseDate = parseISO(matchRequest.requested_date);
+        const startH = parseInt(matchRequest.preferred_time_start.split(':')[0]);
+        const endH = parseInt(matchRequest.preferred_time_end.split(':')[0]);
 
-        const { data: conflicts } = await supabase.from('reservations').select('id').eq('court_id', matchRequest.court_id).lt('starts_at', end).gt('ends_at', start).neq('status', 'cancelled');
+        const start = setSeconds(setMilliseconds(setMinutes(setHours(baseDate, startH), 0), 0), 0).toISOString();
+        const end = setSeconds(setMilliseconds(setMinutes(setHours(baseDate, endH), 0), 0), 0).toISOString();
+
+        const { data: conflicts } = await supabase
+          .from('reservations')
+          .select('id')
+          .eq('court_id', matchRequest.court_id)
+          .lt('starts_at', end)
+          .gt('ends_at', start)
+          .neq('status', 'cancelled');
+
         if (conflicts && conflicts.length > 0) {
           showError("Spiacente, il campo è stato prenotato nel frattempo.");
           navigate('/find-match');
         }
+      } catch (err) {
+        console.error("Error verifying availability:", err);
       } finally {
         setChecking(false);
       }
     };
     verifyAvailability();
-  }, [matchRequest]);
+  }, [matchRequest, navigate]);
 
   const handleConfirm = async () => {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      const baseDate = parseISO(matchRequest.requested_date);
       const startH = parseInt(matchRequest.preferred_time_start.split(':')[0]);
       const endH = parseInt(matchRequest.preferred_time_end.split(':')[0]);
       
       const reservations = [];
       for (let h = startH; h < endH; h++) {
-        let s = setSeconds(setMilliseconds(setMinutes(setHours(parseISO(matchRequest.requested_date), h), 0), 0), 0);
+        let s = setSeconds(setMilliseconds(setMinutes(setHours(baseDate, h), 0), 0), 0);
         reservations.push({
           court_id: matchRequest.court_id,
           user_id: user?.id,
