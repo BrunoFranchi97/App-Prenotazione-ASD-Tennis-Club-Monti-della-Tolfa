@@ -64,6 +64,28 @@ const SURFACE_LABELS: Record<string, string> = {
   "superficie_dura": "Sup. Dura",
 };
 
+// Palette di colori pastello per gli slot delle prenotazioni
+const SLOT_COLORS = [
+  "bg-green-100 border-green-200 text-green-800",      // Verde chiaro (coerente con il club)
+  "bg-orange-100 border-orange-200 text-orange-800",   // Arancione chiaro (coerente con club-orange)
+  "bg-blue-100 border-blue-200 text-blue-800",         // Blu chiaro
+  "bg-purple-100 border-purple-200 text-purple-800",   // Viola chiaro
+  "bg-pink-100 border-pink-200 text-pink-800",         // Rosa chiaro
+  "bg-amber-100 border-amber-200 text-amber-800",      // Ambra chiaro
+  "bg-cyan-100 border-cyan-200 text-cyan-800",         // Ciano chiaro
+  "bg-lime-100 border-lime-200 text-lime-800",         // Lime chiaro
+];
+
+// Funzione per ottenere un colore consistente per una prenotazione
+const getSlotColor = (reservationId: string, userId: string): string => {
+  // Usiamo una combinazione dell'ID della prenotazione e dell'utente per un colore consistente
+  const hash = (reservationId + userId).split('').reduce((acc, char) => {
+    return acc + char.charCodeAt(0);
+  }, 0);
+  
+  return SLOT_COLORS[hash % SLOT_COLORS.length];
+};
+
 export default function AdminReservations() {
   const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState(false);
@@ -367,6 +389,7 @@ export default function AdminReservations() {
                     const slotKey = `${court.id}-${time}`;
                     const isHovered = hoveredSlot === slotKey;
                     const isMine = reservation?.user_id === currentUserId;
+                    const slotColor = reservation ? getSlotColor(reservation.id, reservation.user_id) : "";
 
                     return (
                       <div
@@ -374,7 +397,7 @@ export default function AdminReservations() {
                         className={cn(
                           "h-24 mb-2 rounded-xl transition-all duration-200 relative group",
                           reservation 
-                            ? "bg-white shadow-md border-2 border-primary/20 cursor-pointer hover:shadow-lg hover:scale-[0.97]" 
+                            ? cn("shadow-md cursor-pointer hover:shadow-lg hover:scale-[0.97]", slotColor)
                             : "bg-white/40 border-2 border-dashed border-gray-200 hover:border-primary/40 hover:bg-white/60 cursor-pointer"
                         )}
                         onMouseEnter={() => setHoveredSlot(slotKey)}
@@ -391,9 +414,14 @@ export default function AdminReservations() {
                                     {reservation.bookedByName}
                                   </p>
                                 </div>
-                                <p className="text-xs text-gray-500">
+                                <p className="text-xs text-gray-700 font-medium">
                                   {format(parseISO(reservation.starts_at), 'HH:mm')} - {format(parseISO(reservation.ends_at), 'HH:mm')}
                                 </p>
+                                {reservation.booked_for_first_name && (
+                                  <p className="text-xs text-gray-600 mt-1">
+                                    Per: {reservation.booked_for_first_name} {reservation.booked_for_last_name}
+                                  </p>
+                                )}
                               </div>
                             </div>
 
