@@ -48,6 +48,7 @@ import { Court, Reservation, BookingType } from '@/types/supabase';
 import { getBookingLimitsStatus } from '@/utils/bookingLimits';
 import BookingLimitsBox from '@/components/BookingLimitsBox';
 import BookingSuccessDialog from '@/components/BookingSuccessDialog';
+import UserNav from '@/components/UserNav';
 import { cn } from '@/lib/utils';
 
 const bookingTypeLabels: Record<BookingType, string> = {
