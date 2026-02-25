@@ -97,7 +97,7 @@ const BookingCalendar = () => {
       supabase.from('courts').select('*').eq('is_active', true).order('id').then(({data}) => {
         if (data) {
           setCourts(data);
-          if (data.length > 0 && !selectedCourtId) setSelectedCourtId(data[0].id.toString());
+          // Rimosso l'auto-settaggio di selectedCourtId al primo elemento
         }
       });
     }
