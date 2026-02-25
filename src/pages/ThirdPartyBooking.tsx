@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { ArrowLeft, Users, User, Clock, History, ChevronRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError } from '@/utils/toast';
-import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, isEqual, setSeconds, setMilliseconds, addDays, startOfDay, endOfDay } from 'date-fns';
+import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, isEqual, setSeconds, setMilliseconds, addDays, startOfDay, endOfDay, isSameDay, addMinutes } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { useApprovalCheck } from '@/hooks/use-approval-check';
 import { Court, Reservation } from '@/types/supabase';
@@ -77,7 +77,16 @@ const ThirdPartyBooking = () => {
     const [hours, minutes] = slotTime.split(':').map(Number);
     let slotStart = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date), hours), minutes), 0), 0);
     const slotEnd = addHours(slotStart, 1);
-    if (isBefore(slotEnd, new Date())) return false;
+    const now = new Date();
+    
+    // Past slot
+    if (isBefore(slotEnd, now)) return false;
+
+    // Rule: if the current hour has started for more than 20 minutes, it's not bookable
+    if (isSameDay(date, now) && now > addMinutes(slotStart, 20)) {
+      return false;
+    }
+
     return !existingReservations.find(res => isEqual(parseISO(res.starts_at), slotStart));
   };
 
@@ -157,7 +166,7 @@ const ThirdPartyBooking = () => {
             <CardHeader className="pb-0">
               <CardTitle className="text-lg font-bold text-gray-800">Seleziona Data</CardTitle>
             </CardHeader>
-            <CardContent className="p-4 flex justify-center">
+            <CardContent className="p-4 bg-white flex justify-center">
               <Calendar 
                 mode="single" 
                 selected={date} 
@@ -236,9 +245,17 @@ const ThirdPartyBooking = () => {
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {allTimeSlots.map(t => {
+                      const [hours, minutes] = t.split(':').map(Number);
+                      const slotStart = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date!), hours), minutes), 0), 0);
+                      const slotEnd = addHours(slotStart, 1);
+                      const now = new Date();
+
+                      // Hide past slots
+                      if (now >= slotEnd) return null;
+
                       const isSelected = selectedSlots.includes(t);
                       const available = isSlotAvailable(t);
-                      const endTime = format(addHours(setMinutes(setHours(new Date(), parseInt(t.split(':')[0])), 0), 1), 'HH:mm');
+                      const endTime = format(slotEnd, 'HH:mm');
                       
                       return (
                         <button 

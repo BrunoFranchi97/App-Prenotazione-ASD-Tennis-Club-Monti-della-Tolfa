@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { ArrowLeft, LogOut, CalendarDays, Clock, MapPin, AlertCircle, CalendarCheck, History, CalendarRange, ChevronRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
-import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, isEqual, setSeconds, setMilliseconds, addDays, startOfDay, endOfDay, startOfWeek, endOfWeek } from 'date-fns';
+import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, isEqual, setSeconds, setMilliseconds, addDays, startOfDay, endOfDay, startOfWeek, endOfWeek, addMinutes, isSameDay } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { useApprovalCheck } from '@/hooks/use-approval-check';
 import { Court, Reservation, BookingType } from '@/types/supabase';
@@ -132,7 +132,16 @@ const BookingCalendar = () => {
     const [hours, minutes] = slotTime.split(':').map(Number);
     let slotStart = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date), hours), minutes), 0), 0);
     const slotEnd = addHours(slotStart, 1);
-    if (isBefore(slotEnd, new Date())) return false;
+    const now = new Date();
+    
+    // Past slot or ending too soon
+    if (isBefore(slotEnd, now)) return false;
+
+    // Rule: if the current hour has started for more than 20 minutes, it's not bookable
+    if (isSameDay(date, now) && now > addMinutes(slotStart, 20)) {
+      return false;
+    }
+
     return !getSlotReservation(slotTime);
   };
 
@@ -295,10 +304,18 @@ const BookingCalendar = () => {
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {allTimeSlots.map(t => {
+                        const [hours, minutes] = t.split(':').map(Number);
+                        const slotStart = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date!), hours), minutes), 0), 0);
+                        const slotEnd = addHours(slotStart, 1);
+                        const now = new Date();
+
+                        // If the slot is completely in the past, don't show it
+                        if (now >= slotEnd) return null;
+
                         const isSelected = selectedSlots.includes(t);
                         const res = getSlotReservation(t);
                         const available = isSlotAvailable(t);
-                        const endTime = format(addHours(setMinutes(setHours(new Date(), parseInt(t.split(':')[0])), 0), 1), 'HH:mm');
+                        const endTime = format(slotEnd, 'HH:mm');
                         
                         return (
                           <button 
