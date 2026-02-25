@@ -3,14 +3,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, History, AlertCircle, ChevronRight, Clock } from 'lucide-react';
+import { ArrowLeft, History, AlertCircle, ChevronRight, ChevronLeft, Calendar as CalendarIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { showSuccess, showError } from '@/utils/toast';
-import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, addDays, startOfDay, endOfDay, startOfWeek, endOfWeek, setSeconds, setMilliseconds, isEqual } from 'date-fns';
+import { showError } from '@/utils/toast';
+import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, addDays, startOfDay, endOfDay, startOfWeek, endOfWeek, setSeconds, setMilliseconds, isEqual, subDays } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { useApprovalCheck } from '@/hooks/use-approval-check';
 import { Court, Reservation, BookingType } from '@/types/supabase';
@@ -28,18 +26,11 @@ interface TimeSlot {
   hour: number;
 }
 
-interface CourtReservation {
-  courtId: number;
-  courtName: string;
-  surface: string;
-  reservations: Reservation[];
-}
-
 const BookingCalendar = () => {
   const navigate = useNavigate();
   const { isApproved, loading: approvalLoading } = useApprovalCheck();
 
-  const [date, setDate] = useState<Date | undefined>(new Date());
+  const [date, setDate] = useState<Date>(new Date());
   const [courts, setCourts] = useState<Court[]>([]);
   const [existingReservations, setExistingReservations] = useState<Reservation[]>([]);
   const [userReservations, setUserReservations] = useState<Reservation[]>([]);
@@ -55,6 +46,7 @@ const BookingCalendar = () => {
   const [lastBookingData, setLastBookingData] = useState<{ reservations: Reservation[], courtName: string } | null>(null);
 
   const maxDate = useMemo(() => addDays(new Date(), 14), []);
+  const minDate = useMemo(() => startOfDay(new Date()), []);
 
   const limitsStatus = useMemo(() => {
     if (!date) return { weeklyCount: 0, weeklyMax: 2, durationMax: 3, canBookMoreThisWeek: true };
@@ -77,6 +69,9 @@ const BookingCalendar = () => {
     }
     return slots;
   }, []);
+
+  const canGoBack = useMemo(() => !isBefore(subDays(date, 1), minDate), [date, minDate]);
+  const canGoForward = useMemo(() => !isAfter(addDays(date, 1), maxDate), [date, maxDate]);
 
   useEffect(() => {
     if (!isApproved) return;
@@ -143,7 +138,7 @@ const BookingCalendar = () => {
 
   const getReservationForSlot = (courtId: number, slotTime: string): Reservation | undefined => {
     const [hours] = slotTime.split(':').map(Number);
-    let slotStart = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date!), hours), 0), 0), 0);
+    let slotStart = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date), hours), 0), 0), 0);
     return existingReservations.find(res => 
       res.court_id === courtId && isEqual(parseISO(res.starts_at), slotStart)
     );
@@ -170,7 +165,7 @@ const BookingCalendar = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       const [hours] = selectedSlot.time.split(':').map(Number);
-      let slotStart = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date!), hours), 0), 0), 0);
+      let slotStart = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date), hours), 0), 0), 0);
       
       const currentCourt = courts.find(c => c.id === selectedSlot.courtId);
       const courtName = currentCourt?.name || `Campo ${selectedSlot.courtId}`;
@@ -199,11 +194,16 @@ const BookingCalendar = () => {
     }
   };
 
-  const getSlotColor = (reservation: Reservation | undefined, isSelected: boolean, isUserReservation: boolean): string => {
-    if (isSelected) return 'bg-club-orange text-white shadow-lg';
-    if (!reservation) return 'bg-gray-50 hover:bg-gray-100 border border-gray-200';
-    if (isUserReservation) return 'bg-primary text-white';
-    return 'bg-[#8B6F47] text-white'; // Colore terracotta per altri giocatori
+  const handlePreviousDay = () => {
+    if (canGoBack) setDate(subDays(date, 1));
+  };
+
+  const handleNextDay = () => {
+    if (canGoForward) setDate(addDays(date, 1));
+  };
+
+  const handleToday = () => {
+    setDate(new Date());
   };
 
   if (approvalLoading) return <div className="p-8 text-center bg-[#F8FAFC]">Verifica...</div>;
@@ -218,8 +218,8 @@ const BookingCalendar = () => {
             </Button>
           </Link>
           <div>
-            <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Vista Giornaliera</h1>
-            <p className="text-sm text-gray-500 mt-1">Tocca uno slot libero per prenotare</p>
+            <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Prenota Campo</h1>
+            <p className="text-sm text-gray-500 mt-1">Seleziona uno slot libero</p>
           </div>
         </div>
         <div className="flex items-center gap-4">
@@ -231,97 +231,71 @@ const BookingCalendar = () => {
         </div>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 max-w-[1600px] mx-auto">
-        {/* Sidebar */}
-        <div className="lg:col-span-3 space-y-6">
+      <div className="max-w-[1600px] mx-auto">
+        {showWeeklyBlock ? (
+          <Card className="border-none shadow-sm rounded-2xl bg-white p-12 text-center">
+            <AlertCircle className="h-16 w-16 text-amber-500 mx-auto mb-4" />
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">Limite Settimanale Raggiunto</h3>
+            <p className="text-gray-600 mb-6">Hai già prenotato 2 match per {weekRange}</p>
+            <div className="flex gap-3 justify-center">
+              <Button onClick={() => navigate('/history')} className="bg-primary hover:bg-primary/90">
+                Gestisci Prenotazioni
+              </Button>
+              <Button variant="outline" onClick={() => setDate(addDays(new Date(), 7))}>
+                Prossima Settimana
+              </Button>
+            </div>
+          </Card>
+        ) : (
           <Card className="border-none shadow-sm rounded-2xl bg-white overflow-hidden">
-            <CardHeader className="pb-3 bg-primary/5">
-              <CardTitle className="text-base font-bold text-gray-800">Seleziona Data</CardTitle>
-            </CardHeader>
-            <CardContent className="p-3">
-              <Calendar 
-                mode="single" 
-                selected={date} 
-                onSelect={setDate} 
-                locale={it} 
-                className="rounded-xl border-none" 
-                disabled={(d) => isBefore(d, startOfDay(new Date())) || isAfter(d, maxDate)} 
-              />
-            </CardContent>
-          </Card>
-
-          {/* Legenda */}
-          <Card className="border-none shadow-sm rounded-2xl bg-white p-4">
-            <h3 className="text-sm font-bold text-gray-700 mb-3">Legenda</h3>
-            <div className="space-y-2 text-xs">
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded bg-primary"></div>
-                <span>Le tue prenotazioni</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded bg-[#8B6F47]"></div>
-                <span>Altri giocatori</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded bg-gray-100 border border-gray-200"></div>
-                <span>Disponibile</span>
-              </div>
-            </div>
-          </Card>
-
-          {/* Stato Campi */}
-          <Card className="border-none shadow-sm rounded-2xl bg-white p-4">
-            <h3 className="text-sm font-bold text-gray-700 mb-3">Stato Campi</h3>
-            <div className="space-y-2">
-              {courts.map(court => {
-                const courtReservations = existingReservations.filter(r => r.court_id === court.id);
-                const isAvailable = courtReservations.length < timeSlots.length;
-                return (
-                  <div key={court.id} className="flex items-center justify-between text-xs">
-                    <div>
-                      <p className="font-semibold text-gray-800">{court.name}</p>
-                      <p className="text-gray-500 uppercase text-[10px]">{court.surface}</p>
-                    </div>
-                    <Badge variant={isAvailable ? "default" : "secondary"} className={isAvailable ? "bg-green-100 text-green-700 border-none" : "bg-red-100 text-red-700 border-none"}>
-                      {isAvailable ? "Libero" : "Occupato"}
-                    </Badge>
-                  </div>
-                );
-              })}
-            </div>
-          </Card>
-        </div>
-
-        {/* Griglia Principale */}
-        <div className="lg:col-span-9">
-          {showWeeklyBlock ? (
-            <Card className="border-none shadow-sm rounded-2xl bg-white p-12 text-center">
-              <AlertCircle className="h-16 w-16 text-amber-500 mx-auto mb-4" />
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">Limite Settimanale Raggiunto</h3>
-              <p className="text-gray-600 mb-6">Hai già prenotato 2 match per {weekRange}</p>
-              <div className="flex gap-3 justify-center">
-                <Button onClick={() => navigate('/history')} className="bg-primary hover:bg-primary/90">
-                  Gestisci Prenotazioni
-                </Button>
-                <Button variant="outline" onClick={() => setDate(addDays(new Date(), 7))}>
-                  Prossima Settimana
-                </Button>
-              </div>
-            </Card>
-          ) : (
-            <Card className="border-none shadow-sm rounded-2xl bg-white overflow-hidden">
-              <CardHeader className="pb-4 bg-gradient-to-r from-primary/5 to-transparent">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <CardTitle className="text-xl font-bold text-gray-900">
-                      {date ? format(date, "EEEE dd MMMM yyyy", { locale: it }) : "Seleziona una data"}
+            <CardHeader className="pb-4 bg-gradient-to-r from-primary/5 to-transparent">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div className="flex items-center gap-4">
+                  <Button 
+                    variant="outline" 
+                    size="icon" 
+                    onClick={handlePreviousDay}
+                    disabled={!canGoBack}
+                    className="rounded-xl"
+                  >
+                    <ChevronLeft size={20} />
+                  </Button>
+                  
+                  <div className="text-center">
+                    <CardTitle className="text-2xl font-bold text-gray-900 capitalize">
+                      {format(date, "EEEE dd MMMM", { locale: it })}
                     </CardTitle>
                     <p className="text-sm text-gray-500 mt-1">
-                      {selectedSlot ? `Slot selezionato: ${courts.find(c => c.id === selectedSlot.courtId)?.name} alle ${selectedSlot.time}` : "Nessuno slot selezionato"}
+                      {selectedSlot 
+                        ? `${courts.find(c => c.id === selectedSlot.courtId)?.name} alle ${selectedSlot.time}` 
+                        : "Nessuno slot selezionato"}
                     </p>
                   </div>
+
+                  <Button 
+                    variant="outline" 
+                    size="icon" 
+                    onClick={handleNextDay}
+                    disabled={!canGoForward}
+                    className="rounded-xl"
+                  >
+                    <ChevronRight size={20} />
+                  </Button>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={handleToday}
+                    className="rounded-xl"
+                  >
+                    <CalendarIcon size={16} className="mr-2" />
+                    Oggi
+                  </Button>
+
                   {selectedSlot && (
-                    <div className="flex items-center gap-3">
+                    <>
                       <Select onValueChange={(v) => setBookingType(v as BookingType)} value={bookingType}>
                         <SelectTrigger className="w-40 h-10 rounded-xl border-gray-200">
                           <SelectValue />
@@ -335,79 +309,92 @@ const BookingCalendar = () => {
                       <Button 
                         onClick={handleBooking} 
                         disabled={loading}
-                        className="bg-club-orange hover:bg-club-orange/90 text-white h-10 px-6 rounded-xl font-bold"
+                        className="bg-primary hover:bg-primary/90 text-white h-10 px-6 rounded-xl font-bold"
                       >
                         {loading ? "..." : "Conferma"}
                         <ChevronRight size={18} className="ml-1" />
                       </Button>
-                    </div>
+                    </>
                   )}
                 </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <div className="min-w-[800px]">
-                    {/* Header Campi */}
-                    <div className="grid grid-cols-[80px_repeat(auto-fit,minmax(150px,1fr))] gap-0 border-b border-gray-200 bg-gray-50">
-                      <div className="p-3 text-xs font-bold text-gray-500 uppercase tracking-wider"></div>
-                      {courts.map(court => (
-                        <div key={court.id} className="p-3 text-center border-l border-gray-200">
-                          <p className="font-bold text-sm text-gray-900">{court.name}</p>
-                          <p className="text-[10px] text-gray-500 uppercase tracking-wider mt-0.5">{court.surface}</p>
-                        </div>
-                      ))}
-                    </div>
+              </div>
+            </CardHeader>
+            
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <div className="min-w-[800px]">
+                  {/* Header Campi */}
+                  <div className="grid grid-cols-[80px_repeat(auto-fit,minmax(150px,1fr))] gap-0 border-b border-gray-200 bg-gray-50">
+                    <div className="p-3 text-xs font-bold text-gray-500 uppercase tracking-wider"></div>
+                    {courts.map(court => (
+                      <div key={court.id} className="p-3 text-center border-l border-gray-200">
+                        <p className="font-bold text-sm text-gray-900">{court.name}</p>
+                        <p className="text-[10px] text-gray-500 uppercase tracking-wider mt-0.5">{court.surface}</p>
+                      </div>
+                    ))}
+                  </div>
 
-                    {/* Griglia Orari */}
-                    <div className="divide-y divide-gray-100">
-                      {timeSlots.map(slot => (
-                        <div key={slot.time} className="grid grid-cols-[80px_repeat(auto-fit,minmax(150px,1fr))] gap-0 hover:bg-gray-50/50 transition-colors">
-                          <div className="p-3 flex items-center justify-center border-r border-gray-100">
-                            <span className="text-sm font-semibold text-gray-600">{slot.time}</span>
-                          </div>
-                          {courts.map(court => {
-                            const reservation = getReservationForSlot(court.id, slot.time);
-                            const isAvailable = isSlotAvailable(court.id, slot.time);
-                            const isUserReservation = reservation?.user_id === currentUserId;
-                            const isSelected = selectedSlot?.courtId === court.id && selectedSlot?.time === slot.time;
-                            
-                            return (
-                              <div 
-                                key={`${court.id}-${slot.time}`}
-                                className="p-2 border-l border-gray-100 min-h-[60px] flex items-center justify-center"
-                              >
-                                {reservation ? (
-                                  <div className={`w-full h-full rounded-lg p-2 flex flex-col justify-center ${getSlotColor(reservation, false, isUserReservation)}`}>
-                                    <p className="text-xs font-bold truncate">
-                                      {isUserReservation ? "Tu" : profiles[reservation.user_id]?.split(' ')[0] || "Prenotato"}
-                                    </p>
-                                    <p className="text-[10px] opacity-80">
-                                      {format(parseISO(reservation.starts_at), 'HH:mm')} - {format(parseISO(reservation.ends_at), 'HH:mm')}
-                                    </p>
-                                  </div>
-                                ) : isAvailable ? (
-                                  <button
-                                    onClick={() => handleSlotClick(court.id, slot.time)}
-                                    disabled={!limitsStatus.canBookMoreThisWeek}
-                                    className={`w-full h-full rounded-lg transition-all ${getSlotColor(undefined, isSelected, false)} ${!limitsStatus.canBookMoreThisWeek ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105 active:scale-95'}`}
-                                  >
-                                    {isSelected && <span className="text-xs font-bold">Selezionato</span>}
-                                  </button>
-                                ) : (
-                                  <div className="w-full h-full rounded-lg bg-gray-200 opacity-50"></div>
-                                )}
-                              </div>
-                            );
-                          })}
+                  {/* Griglia Orari */}
+                  <div className="divide-y divide-gray-100">
+                    {timeSlots.map(slot => (
+                      <div key={slot.time} className="grid grid-cols-[80px_repeat(auto-fit,minmax(150px,1fr))] gap-0 hover:bg-gray-50/50 transition-colors">
+                        <div className="p-3 flex items-center justify-center border-r border-gray-100">
+                          <span className="text-sm font-semibold text-gray-600">{slot.time}</span>
                         </div>
-                      ))}
-                    </div>
+                        {courts.map(court => {
+                          const reservation = getReservationForSlot(court.id, slot.time);
+                          const isAvailable = isSlotAvailable(court.id, slot.time);
+                          const isUserReservation = reservation?.user_id === currentUserId;
+                          const isSelected = selectedSlot?.courtId === court.id && selectedSlot?.time === slot.time;
+                          
+                          return (
+                            <div 
+                              key={`${court.id}-${slot.time}`}
+                              className="p-2 border-l border-gray-100 min-h-[60px] flex items-center justify-center"
+                            >
+                              {reservation ? (
+                                <div className={`w-full h-full rounded-lg p-2 flex flex-col justify-center ${
+                                  isUserReservation 
+                                    ? 'bg-primary text-white' 
+                                    : 'bg-club-orange text-white'
+                                }`}>
+                                  <p className="text-xs font-bold truncate">
+                                    {isUserReservation ? "Tu" : profiles[reservation.user_id]?.split(' ')[0] || "Prenotato"}
+                                  </p>
+                                  <p className="text-[10px] opacity-80">
+                                    {format(parseISO(reservation.starts_at), 'HH:mm')} - {format(parseISO(reservation.ends_at), 'HH:mm')}
+                                  </p>
+                                </div>
+                              ) : isAvailable ? (
+                                <button
+                                  onClick={() => handleSlotClick(court.id, slot.time)}
+                                  disabled={!limitsStatus.canBookMoreThisWeek}
+                                  className={`w-full h-full rounded-lg transition-all ${
+                                    isSelected 
+                                      ? 'bg-primary text-white shadow-lg scale-105' 
+                                      : 'bg-gray-50 hover:bg-gray-100 border border-gray-200'
+                                  } ${
+                                    !limitsStatus.canBookMoreThisWeek 
+                                      ? 'opacity-50 cursor-not-allowed' 
+                                      : 'cursor-pointer hover:scale-105 active:scale-95'
+                                  }`}
+                                >
+                                  {isSelected && <span className="text-xs font-bold">✓</span>}
+                                </button>
+                              ) : (
+                                <div className="w-full h-full rounded-lg bg-gray-200 opacity-50"></div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <BookingSuccessDialog 
