@@ -5,7 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { format, parseISO, addDays, subDays, startOfDay, endOfDay, isSameDay, setHours, setMinutes, addHours, differenceInMinutes } from "date-fns";
 import { it } from "date-fns/locale";
 import { 
-  ArrowLeft, ChevronLeft, ChevronRight, Eye, Edit, Trash2, Plus, X, Calendar
+  ArrowLeft, ChevronLeft, ChevronRight, Eye, Edit, Trash2, Plus, X, Calendar, Clock, User
 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -168,14 +168,13 @@ export default function AdminReservations() {
   const [selectedReservation, setSelectedReservation] = useState<ReservationRow | null>(null);
   const [createSlotData, setCreateSlotData] = useState<{ courtId: number; time: string } | null>(null);
 
-  // Form states
-  const [formUserId, setFormUserId] = useState("");
+  // Form states - MODIFICATO: rimossa formUserId, aggiunti firstName e lastName
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [formCourtId, setFormCourtId] = useState("");
   const [formStartTime, setFormStartTime] = useState("");
   const [formDuration, setFormDuration] = useState("1");
   const [formNotes, setFormNotes] = useState("");
-  const [formBookedForFirst, setFormBookedForFirst] = useState("");
-  const [formBookedForLast, setFormBookedForLast] = useState("");
 
   const refreshAll = async () => {
     setLoading(true);
@@ -239,25 +238,24 @@ export default function AdminReservations() {
 
   const openEditDialog = (res: ReservationRow) => {
     setSelectedReservation(res);
-    setFormUserId(res.user_id);
+    // Per la modifica, precompiliamo con i dati esistenti
+    setFirstName(res.booked_for_first_name || "");
+    setLastName(res.booked_for_last_name || "");
     setFormCourtId(String(res.court_id));
     setFormStartTime(format(parseISO(res.starts_at), 'HH:mm'));
     setFormDuration("1");
     setFormNotes(res.notes || "");
-    setFormBookedForFirst(res.booked_for_first_name || "");
-    setFormBookedForLast(res.booked_for_last_name || "");
     setEditDialogOpen(true);
   };
 
   const openCreateDialog = (courtId: number, time: string) => {
     setCreateSlotData({ courtId, time });
-    setFormUserId("");
+    setFirstName("");
+    setLastName("");
     setFormCourtId(String(courtId));
     setFormStartTime(time);
     setFormDuration("1");
     setFormNotes("");
-    setFormBookedForFirst("");
-    setFormBookedForLast("");
     setCreateDialogOpen(true);
   };
 
@@ -267,7 +265,11 @@ export default function AdminReservations() {
   };
 
   const handleCreate = async () => {
-    if (!formUserId || !formCourtId || !formStartTime) return showError("Compila tutti i campi obbligatori.");
+    if (!firstName || !lastName || !formCourtId || !formStartTime) {
+      showError("Compila tutti i campi obbligatori: Nome, Cognome e Orario.");
+      return;
+    }
+    
     setLoading(true);
     try {
       const [hours, minutes] = formStartTime.split(':').map(Number);
@@ -280,13 +282,13 @@ export default function AdminReservations() {
         const e = addHours(s, 1);
         inserts.push({
           court_id: parseInt(formCourtId),
-          user_id: formUserId,
+          user_id: currentUserId, // Usa l'ID dell'amministratore corrente
           starts_at: s.toISOString(),
           ends_at: e.toISOString(),
           status: 'confirmed',
           notes: formNotes.trim() || null,
-          booked_for_first_name: formBookedForFirst.trim() || null,
-          booked_for_last_name: formBookedForLast.trim() || null,
+          booked_for_first_name: firstName.trim(),
+          booked_for_last_name: lastName.trim(),
         });
       }
       
@@ -303,7 +305,11 @@ export default function AdminReservations() {
   };
 
   const handleEdit = async () => {
-    if (!selectedReservation || !formUserId || !formCourtId || !formStartTime) return showError("Compila tutti i campi.");
+    if (!selectedReservation || !firstName || !lastName || !formCourtId || !formStartTime) {
+      showError("Compila tutti i campi obbligatori.");
+      return;
+    }
+    
     setLoading(true);
     try {
       const [hours, minutes] = formStartTime.split(':').map(Number);
@@ -312,12 +318,11 @@ export default function AdminReservations() {
       
       const { error } = await supabase.from('reservations').update({
         court_id: parseInt(formCourtId),
-        user_id: formUserId,
+        booked_for_first_name: firstName.trim(),
+        booked_for_last_name: lastName.trim(),
         starts_at: start.toISOString(),
         ends_at: end.toISOString(),
         notes: formNotes.trim() || null,
-        booked_for_first_name: formBookedForFirst.trim() || null,
-        booked_for_last_name: formBookedForLast.trim() || null,
         updated_at: new Date().toISOString()
       }).eq('id', selectedReservation.id);
       
@@ -388,8 +393,7 @@ export default function AdminReservations() {
           
           <div className="w-10" /> {/* Spacer for symmetry */}
         </div>
-      </header>
-
+      </header<dyad-write path="src/pages/AdminReservations.tsx" description="Continua il file AdminReservations.tsx con il resto del codice">
       {/* Quick filter tabs */}
       <div className="bg-white border-b border-gray-100 sticky top-[72px] z-40 shadow-sm">
         <div className="container mx-auto px-4 py-3">
@@ -588,112 +592,255 @@ export default function AdminReservations() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog Crea */}
+      {/* Dialog Crea - MODIFICATO: rimossa selezione soci, aggiunti campi Nome e Cognome */}
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-        <DialogContent className="sm:max-w-md rounded-3xl">
-          <DialogHeader>
-            <DialogTitle className="text-primary">Nuova Prenotazione</DialogTitle>
-            <DialogDescription>Aggiungi una prenotazione per questo slot</DialogDescription>
+        <DialogContent className="sm:max-w-md rounded-3xl border-t-8 border-t-primary">
+          <DialogHeader className="pb-4">
+            <DialogTitle className="text-primary text-2xl font-bold flex items-center gap-2">
+              <User className="h-6 w-6" /> Nuova Prenotazione
+            </DialogTitle>
+            <DialogDescription className="text-gray-600">
+              Aggiungi una prenotazione per questo slot
+            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div>
-              <Label>Socio *</Label>
-              <Select value={formUserId} onValueChange={setFormUserId}>
-                <SelectTrigger className="rounded-lg"><SelectValue placeholder="Seleziona socio" /></SelectTrigger>
-                <SelectContent>
-                  {profiles.map(p => <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>)}
+          
+          <div className="space-y-6 py-2">
+            {/* Nome e Cognome */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold text-gray-700">Nome *</Label>
+                <Input 
+                  value={firstName} 
+                  onChange={e => setFirstName(e.target.value)} 
+                  className="h-12 rounded-xl border-gray-200 focus:ring-primary/20 focus:border-primary"
+                  placeholder="Mario"
+                  maxLength={50}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold text-gray-700">Cognome *</Label>
+                <Input 
+                  value={lastName} 
+                  onChange={e => setLastName(e.target.value)} 
+                  className="h-12 rounded-xl border-gray-200 focus:ring-primary/20 focus:border-primary"
+                  placeholder="Rossi"
+                  maxLength={50}
+                />
+              </div>
+            </div>
+
+            {/* Campo */}
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold text-gray-700">Campo *</Label>
+              <Select value={formCourtId} onValueChange={setFormCourtId}>
+                <SelectTrigger className="h-12 rounded-xl border-gray-200 focus:ring-primary/20 focus:border-primary">
+                  <SelectValue placeholder="Seleziona campo" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  {courts.map(c => (
+                    <SelectItem key={c.id} value={String(c.id)} className="py-3">
+                      {c.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Orario e Durata */}
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Orario Inizio</Label>
-                <Input value={formStartTime} onChange={e => setFormStartTime(e.target.value)} type="time" className="rounded-lg" />
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-club-orange" /> Orario Inizio *
+                </Label>
+                <div className="relative">
+                  <Select value={formStartTime} onValueChange={setFormStartTime}>
+                    <SelectTrigger className="h-12 rounded-xl border-gray-200 focus:ring-primary/20 focus:border-primary bg-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl max-h-60">
+                      {TIME_SLOTS.map(time => (
+                        <SelectItem 
+                          key={time} 
+                          value={time}
+                          className="py-3 hover:bg-primary/5 data-[state=checked]:bg-primary/10 data-[state=checked]:text-primary"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium">{time}</span>
+                            <span className="text-xs text-gray-400">ora</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div>
-                <Label>Durata (ore)</Label>
+              
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold text-gray-700">Durata *</Label>
                 <Select value={formDuration} onValueChange={setFormDuration}>
-                  <SelectTrigger className="rounded-lg"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">1 ora</SelectItem>
-                    <SelectItem value="2">2 ore</SelectItem>
-                    <SelectItem value="3">3 ore</SelectItem>
+                  <SelectTrigger className="h-12 rounded-xl border-gray-200 focus:ring-primary/20 focus:border-primary">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    <SelectItem value="1" className="py-3">1 ora</SelectItem>
+                    <SelectItem value="2" className="py-3">2 ore</SelectItem>
+                    <SelectItem value="3" className="py-3">3 ore</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Nome (Terzi)</Label>
-                <Input value={formBookedForFirst} onChange={e => setFormBookedForFirst(e.target.value)} className="rounded-lg" maxLength={50} />
-              </div>
-              <div>
-                <Label>Cognome (Terzi)</Label>
-                <Input value={formBookedForLast} onChange={e => setFormBookedForLast(e.target.value)} className="rounded-lg" maxLength={50} />
-              </div>
-            </div>
-            <div>
-              <Label>Note</Label>
-              <Textarea value={formNotes} onChange={e => setFormNotes(e.target.value)} className="rounded-lg" rows={3} maxLength={500} />
+
+            {/* Note */}
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold text-gray-700">Note (opzionale)</Label>
+              <Textarea 
+                value={formNotes} 
+                onChange={e => setFormNotes(e.target.value)} 
+                className="rounded-xl border-gray-200 focus:ring-primary/20 focus:border-primary min-h-[100px]"
+                placeholder="Aggiungi note sulla prenotazione..."
+                maxLength={500}
+              />
             </div>
           </div>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setCreateDialogOpen(false)} className="rounded-xl">Annulla</Button>
-            <Button onClick={handleCreate} disabled={loading} className="rounded-xl bg-primary hover:bg-primary/90">
+
+          <DialogFooter className="gap-3 pt-4">
+            <Button 
+              variant="outline" 
+              onClick={() => setCreateDialogOpen(false)} 
+              className="rounded-xl border-gray-200 hover:bg-gray-50 h-12 font-semibold"
+            >
+              Annulla
+            </Button>
+            <Button 
+              onClick={handleCreate} 
+              disabled={loading || !firstName || !lastName || !formCourtId || !formStartTime}
+              className={cn(
+                "rounded-xl h-12 font-bold transition-all",
+                loading || !firstName || !lastName || !formCourtId || !formStartTime
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  : "bg-gradient-to-br from-primary to-[#23532f] hover:from-[#357a46] hover:to-[#23532f] text-white shadow-lg shadow-primary/20 hover:shadow-primary/30"
+              )}
+            >
               {loading ? "Creazione..." : "Crea Prenotazione"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Dialog Modifica */}
+      {/* Dialog Modifica - MODIFICATO: simile al create */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="sm:max-w-md rounded-3xl">
-          <DialogHeader>
-            <DialogTitle className="text-primary">Modifica Prenotazione</DialogTitle>
-            <DialogDescription>Aggiorna i dettagli della prenotazione</DialogDescription>
+        <DialogContent className="sm:max-w-md rounded-3xl border-t-8 border-t-primary">
+          <DialogHeader className="pb-4">
+            <DialogTitle className="text-primary text-2xl font-bold flex items-center gap-2">
+              <Edit className="h-6 w-6" /> Modifica Prenotazione
+            </DialogTitle>
+            <DialogDescription className="text-gray-600">
+              Aggiorna i dettagli della prenotazione
+            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div>
-              <Label>Socio *</Label>
-              <Select value={formUserId} onValueChange={setFormUserId}>
-                <SelectTrigger className="rounded-lg"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {profiles.map(p => <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Campo *</Label>
-              <Select value={formCourtId} onValueChange={setFormCourtId}>
-                <SelectTrigger className="rounded-lg"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {courts.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Orario Inizio</Label>
-              <Input value={formStartTime} onChange={e => setFormStartTime(e.target.value)} type="time" className="rounded-lg" />
-            </div>
+          
+          <div className="space-y-6 py-2">
+            {/* Nome e Cognome */}
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Nome (Terzi)</Label>
-                <Input value={formBookedForFirst} onChange={e => setFormBookedForFirst(e.target.value)} className="rounded-lg" maxLength={50} />
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold text-gray-700">Nome *</Label>
+                <Input 
+                  value={firstName} 
+                  onChange={e => setFirstName(e.target.value)} 
+                  className="h-12 rounded-xl border-gray-200 focus:ring-primary/20 focus:border-primary"
+                  placeholder="Mario"
+                  maxLength={50}
+                />
               </div>
-              <div>
-                <Label>Cognome (Terzi)</Label>
-                <Input value={formBookedForLast} onChange={e => setFormBookedForLast(e.target.value)} className="rounded-lg" maxLength={50} />
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold text-gray-700">Cognome *</Label>
+                <Input 
+                  value={lastName} 
+                  onChange={e => setLastName(e.target.value)} 
+                  className="h-12 rounded-xl border-gray-200 focus:ring-primary/20 focus:border-primary"
+                  placeholder="Rossi"
+                  maxLength={50}
+                />
               </div>
             </div>
-            <div>
-              <Label>Note</Label>
-              <Textarea value={formNotes} onChange={e => setFormNotes(e.target.value)} className="rounded-lg" rows={3} maxLength={500} />
+
+            {/* Campo */}
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold text-gray-700">Campo *</Label>
+              <Select value={formCourtId} onValueChange={setFormCourtId}>
+                <SelectTrigger className="h-12 rounded-xl border-gray-200 focus:ring-primary/20 focus:border-primary">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  {courts.map(c => (
+                    <SelectItem key={c.id} value={String(c.id)} className="py-3">
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Orario */}
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                <Clock className="h-4 w-4 text-club-orange" /> Orario Inizio *
+              </Label>
+              <div className="relative">
+                <Select value={formStartTime} onValueChange={setFormStartTime}>
+                  <SelectTrigger className="h-<dyad-write path="src/pages/AdminReservations.tsx" description="Completa il file AdminReservations.tsx con la parte finale del dialog modifica">
+                  <SelectTrigger className="h-12 rounded-xl border-gray-200 focus:ring-primary/20 focus:border-primary bg-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl max-h-60">
+                    {TIME_SLOTS.map(time => (
+                      <SelectItem 
+                        key={time} 
+                        value={time}
+                        className="py-3 hover:bg-primary/5 data-[state=checked]:bg-primary/10 data-[state=checked]:text-primary"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">{time}</span>
+                          <span className="text-xs text-gray-400">ora</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Note */}
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold text-gray-700">Note (opzionale)</Label>
+              <Textarea 
+                value={formNotes} 
+                onChange={e => setFormNotes(e.target.value)} 
+                className="rounded-xl border-gray-200 focus:ring-primary/20 focus:border-primary min-h-[100px]"
+                placeholder="Aggiungi note sulla prenotazione..."
+                maxLength={500}
+              />
             </div>
           </div>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setEditDialogOpen(false)} className="rounded-xl">Annulla</Button>
-            <Button onClick={handleEdit} disabled={loading} className="rounded-xl bg-primary hover:bg-primary/90">
+
+          <DialogFooter className="gap-3 pt-4">
+            <Button 
+              variant="outline" 
+              onClick={() => setEditDialogOpen(false)} 
+              className="rounded-xl border-gray-200 hover:bg-gray-50 h-12 font-semibold"
+            >
+              Annulla
+            </Button>
+            <Button 
+              onClick={handleEdit} 
+              disabled={loading || !firstName || !lastName || !formCourtId || !formStartTime}
+              className={cn(
+                "rounded-xl h-12 font-bold transition-all",
+                loading || !firstName || !lastName || !formCourtId || !formStartTime
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  : "bg-gradient-to-br from-primary to-[#23532f] hover:from-[#357a46] hover:to-[#23532f] text-white shadow-lg shadow-primary/20 hover:shadow-primary/30"
+              )}
+            >
               {loading ? "Salvataggio..." : "Salva Modifiche"}
             </Button>
           </DialogFooter>
