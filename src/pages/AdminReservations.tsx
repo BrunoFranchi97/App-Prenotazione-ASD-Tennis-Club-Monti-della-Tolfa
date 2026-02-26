@@ -393,7 +393,8 @@ export default function AdminReservations() {
           
           <div className="w-10" /> {/* Spacer for symmetry */}
         </div>
-      </header<dyad-write path="src/pages/AdminReservations.tsx" description="Continua il file AdminReservations.tsx con il resto del codice">
+      </header>
+
       {/* Quick filter tabs */}
       <div className="bg-white border-b border-gray-100 sticky top-[72px] z-40 shadow-sm">
         <div className="container mx-auto px-4 py-3">
@@ -788,7 +789,6 @@ export default function AdminReservations() {
               </Label>
               <div className="relative">
                 <Select value={formStartTime} onValueChange={setFormStartTime}>
-                  <SelectTrigger className="h-<dyad-write path="src/pages/AdminReservations.tsx" description="Completa il file AdminReservations.tsx con la parte finale del dialog modifica">
                   <SelectTrigger className="h-12 rounded-xl border-gray-200 focus:ring-primary/20 focus:border-primary bg-white">
                     <SelectValue />
                   </SelectTrigger>
