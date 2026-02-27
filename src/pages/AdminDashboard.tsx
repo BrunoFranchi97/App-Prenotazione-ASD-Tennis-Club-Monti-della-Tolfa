@@ -1,18 +1,18 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CalendarPlus, Lock, BarChart2, LogOut, BookOpen, ArrowLeft, Users, CheckCircle, UserCog } from 'lucide-react';
+import { CalendarPlus, Lock, BarChart2, LogOut, BookOpen, ArrowLeft, Users, CheckCircle, UserCog, ChevronRight, ShieldCheck } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import Footer from '@/components/Footer';
+import UserNav from '@/components/UserNav';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [unapprovedCount, setUnapprovedCount] = useState(0);
@@ -56,20 +56,6 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        showError(error.message);
-      } else {
-        showSuccess("Disconnessione effettuata con successo!");
-        navigate('/login');
-      }
-    } catch (error: any) {
-      showError(error.message || "Errore durante la disconnessione.");
-    }
-  };
-
   useEffect(() => {
     let isMounted = true;
     
@@ -86,7 +72,6 @@ const AdminDashboard = () => {
     
     initialize();
 
-    // Realtime subscription for unapproved users count
     const channel = supabase
       .channel('schema-profiles-changes')
       .on(
@@ -110,142 +95,125 @@ const AdminDashboard = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col bg-gradient-to-br from-green-50 to-white">
-        <div className="flex-grow p-4 sm:p-6 lg:p-8">
-          <header className="flex justify-between items-center mb-8">
-            <div className="flex items-center">
-              <Skeleton className="h-10 w-10 mr-4" />
-              <Skeleton className="h-10 w-64" />
-            </div>
-            <Skeleton className="h-10 w-24" />
+      <div className="min-h-screen flex flex-col bg-[#F8FAFC]">
+        <div className="flex-grow p-6 sm:p-10 lg:p-12 max-w-7xl mx-auto w-full">
+          <header className="flex justify-between items-end mb-12">
+            <Skeleton className="h-12 w-64" />
+            <Skeleton className="h-10 w-10 rounded-full" />
           </header>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {[1, 2, 3, 4, 5, 6].map(i => (
-              <Card key={i} className="shadow-lg rounded-lg">
-                <CardHeader><Skeleton className="h-6 w-32" /></CardHeader>
-                <CardContent className="space-y-4">
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-10 w-full" />
-                </CardContent>
-              </Card>
+              <Skeleton key={i} className="h-64 w-full rounded-[1.5rem]" />
             ))}
           </div>
         </div>
-        <Footer />
       </div>
     );
   }
 
   if (!isAdmin) return null;
 
+  const adminTools = [
+    { 
+      path: "/admin/approvals", 
+      title: "Approvazioni", 
+      icon: CheckCircle, 
+      description: "Abilita i nuovi soci a prenotare i campi.",
+      buttonText: "Gestisci Richieste",
+      badge: unapprovedCount > 0 ? unapprovedCount : undefined,
+      isUrgent: unapprovedCount > 0
+    },
+    { 
+      path: "/admin/users", 
+      title: "Anagrafica Soci", 
+      icon: UserCog, 
+      description: "Gestisci i profili e i ruoli amministrativi.",
+      buttonText: "Vedi Elenco"
+    },
+    { 
+      path: "/admin/reservations", 
+      title: "Prenotazioni", 
+      icon: BookOpen, 
+      description: "Visualizza e gestisci tutti i campi prenotati.",
+      buttonText: "Apri Tabellone"
+    },
+    { 
+      path: "/admin/block-slots", 
+      title: "Blocca Slot", 
+      icon: Lock, 
+      description: "Riserva campi per manutenzione o tornei.",
+      buttonText: "Aggiungi Blocco"
+    },
+    { 
+      path: "/admin/manage-schedules", 
+      title: "Asset Campi", 
+      icon: CalendarPlus, 
+      description: "Attiva o disattiva la visibilità dei campi.",
+      buttonText: "Configura"
+    },
+    { 
+      path: "/admin/usage-stats", 
+      title: "Statistiche", 
+      icon: BarChart2, 
+      description: "Analizza l'utilizzo e le ore giocate nel club.",
+      buttonText: "Vedi Report"
+    },
+  ];
+
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-green-50 to-white">
-      <div className="flex-grow p-4 sm:p-6 lg:p-8">
-        <header className="flex justify-between items-center mb-8">
-          <div className="flex items-center">
-            <Link to="/dashboard" className="mr-4">
-              <Button variant="outline" size="icon" className="text-primary border-primary hover:bg-secondary">
-                <ArrowLeft className="h-4 w-4" />
+    <div className="min-h-screen flex flex-col bg-[#F8FAFC]">
+      <div className="flex-grow p-6 sm:p-10 lg:p-12 max-w-7xl mx-auto w-full">
+        <header className="flex justify-between items-end mb-12">
+          <div className="flex items-center gap-6">
+            <Link to="/dashboard">
+              <Button variant="outline" size="icon" className="rounded-2xl border-none shadow-sm bg-white text-primary hover:scale-110 active:scale-95 transition-transform">
+                <ArrowLeft size={20} />
               </Button>
             </Link>
-            <h1 className="text-3xl font-bold text-primary">Pannello Amministrativo</h1>
+            <div className="space-y-1">
+              <p className="text-sm font-bold text-club-orange uppercase tracking-[0.2em] mb-1">Amministrazione</p>
+              <h1 className="text-4xl font-extrabold text-gray-900 tracking-tighter">Pannello Controllo</h1>
+            </div>
           </div>
-          <Button variant="outline" className="text-primary border-primary hover:bg-secondary" onClick={handleLogout}>
-            <LogOut className="mr-2 h-4 w-4" /> Esci
-          </Button>
+          <UserNav />
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <Card className={`shadow-lg rounded-lg ${unapprovedCount > 0 ? 'border-2 border-red-500' : ''}`}>
-            <CardHeader>
-              <CardTitle className="text-primary flex items-center">
-                <CheckCircle className="mr-2 h-5 w-5" /> Gestisci Approvazioni
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-700 mb-4">
-                {unapprovedCount > 0 
-                  ? <span className="font-bold text-red-600">{unapprovedCount} soci in attesa di approvazione.</span>
-                  : "Nessun socio in attesa di approvazione."
-                }
-              </p>
-              <Link to="/admin/approvals">
-                <Button className="w-full bg-club-orange hover:bg-club-orange/80 text-club-orange-foreground">
-                  <Users className="mr-2 h-4 w-4" /> Approva Soci
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-lg rounded-lg">
-            <CardHeader>
-              <CardTitle className="text-primary flex items-center">
-                <UserCog className="mr-2 h-5 w-5" /> Gestione Soci
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-700 mb-4">Gestisci i ruoli dei soci e promuovi nuovi amministratori.</p>
-              <Link to="/admin/users">
-                <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">Gestisci Ruoli</Button>
-              </Link>
-            </CardContent>
-          </Card>
-          
-          <Card className="shadow-lg rounded-lg">
-            <CardHeader>
-              <CardTitle className="text-primary flex items-center">
-                <BookOpen className="mr-2 h-5 w-5" /> Gestisci Prenotazioni
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-700 mb-4">Visualizza, modifica, elimina e crea nuove prenotazioni.</p>
-              <Link to="/admin/reservations">
-                <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">Gestisci</Button>
-              </Link>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-lg rounded-lg">
-            <CardHeader>
-              <CardTitle className="text-primary flex items-center">
-                <CalendarPlus className="mr-2 h-5 w-5" /> Gestisci Campi
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-700 mb-4">Attiva o disattiva i campi per renderli prenotabili.</p>
-              <Link to="/admin/manage-schedules">
-                <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">Gestisci</Button>
-              </Link>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-lg rounded-lg">
-            <CardHeader>
-              <CardTitle className="text-primary flex items-center">
-                <Lock className="mr-2 h-5 w-5" /> Blocca Slot
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-700 mb-4">Blocca fasce orarie per manutenzione o tornei.</p>
-              <Link to="/admin/block-slots">
-                <Button variant="outline" className="w-full text-primary border-primary hover:bg-secondary">Blocca</Button>
-              </Link>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-lg rounded-lg">
-            <CardHeader>
-              <CardTitle className="text-primary flex items-center">
-                <BarChart2 className="mr-2 h-5 w-5" /> Statistiche Utilizzo
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-700 mb-4">Visualizza le statistiche di utilizzo per ciascun campo.</p>
-              <Link to="/admin/usage-stats">
-                <Button variant="outline" className="w-full text-primary border-primary hover:bg-secondary">Vedi Statistiche</Button>
-              </Link>
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {adminTools.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Card key={item.path} className={`group relative border-none shadow-[0_2px_12px_rgba(0,0,0,0.06)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] rounded-[1.5rem] transition-all duration-500 overflow-hidden bg-white hover:-translate-y-2`}>
+                <div className={`h-1.5 w-full ${item.isUrgent ? 'bg-destructive' : 'bg-club-orange'}`}></div>
+                <CardHeader className="pb-2">
+                  <div className="flex justify-between items-start">
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-2 ${item.isUrgent ? 'bg-destructive/10 text-destructive' : 'bg-club-orange/10 text-club-orange'}`}>
+                      <Icon size={24} />
+                    </div>
+                    {item.badge && (
+                      <div className="bg-destructive text-white text-[10px] font-black px-2.5 py-1 rounded-full animate-pulse shadow-md shadow-destructive/20">
+                        {item.badge} AZIONI
+                      </div>
+                    )}
+                  </div>
+                  <CardTitle className="text-xl font-bold tracking-tight text-gray-900">
+                    {item.title}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-gray-500 text-sm mb-6 leading-relaxed">{item.description}</p>
+                  <Link to={item.path} className="block">
+                    <Button 
+                      className={`w-full h-12 rounded-xl font-bold transition-all flex items-center justify-between px-5 bg-white border-2 border-gray-100 text-gray-700 hover:border-club-orange/20 hover:bg-club-orange/5 hover:text-club-orange`}
+                      variant="outline"
+                    >
+                      {item.buttonText}
+                      <ChevronRight size={18} className="transition-transform group-hover:translate-x-1" />
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       </div>
       <Footer />

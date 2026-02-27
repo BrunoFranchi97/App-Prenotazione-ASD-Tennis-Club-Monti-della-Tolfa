@@ -8,10 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, LogOut, CheckCircle, UserCheck, RefreshCw, XCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, UserCheck, RefreshCw, CheckCircle, XCircle, Loader2, ChevronRight, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import type { Profile } from '@/types/supabase';
+import UserNav from '@/components/UserNav';
 
 const AdminApprovals = () => {
   const navigate = useNavigate();
@@ -30,7 +31,6 @@ const AdminApprovals = () => {
   const fetchPendingProfiles = async () => {
     setLoading(true);
     try {
-      // Usiamo una query sicura che non crasha se la colonna status non esiste ancora
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -62,7 +62,6 @@ const AdminApprovals = () => {
   const handleUpdateStatus = async (profileId: string, status: 'approved' | 'rejected') => {
     setProcessingId(profileId);
     try {
-      // Prepariamo l'update: se status esiste lo usiamo, altrimenti usiamo solo approved
       const updateData: any = { 
         approved: status === 'approved',
         approved_at: status === 'approved' ? new Date().toISOString() : null 
@@ -83,60 +82,92 @@ const AdminApprovals = () => {
     }
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><Loader2 className="animate-spin text-primary h-10 w-10" /></div>;
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
+      <Loader2 className="animate-spin text-primary h-12 w-12" />
+    </div>
+  );
+  
   if (!isAdmin) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 sm:p-6 lg:p-8">
-      <header className="flex justify-between items-center mb-8 max-w-7xl mx-auto">
-        <div className="flex items-center">
-          <Link to="/admin" className="mr-4">
-            <Button variant="outline" size="icon" className="rounded-xl border-primary text-primary">
-              <ArrowLeft className="h-4 w-4" />
+    <div className="min-h-screen bg-[#F8FAFC] p-6 sm:p-10 lg:p-12">
+      <header className="flex justify-between items-end mb-12 max-w-7xl mx-auto w-full">
+        <div className="flex items-center gap-6">
+          <Link to="/admin">
+            <Button variant="outline" size="icon" className="rounded-2xl border-none shadow-sm bg-white text-primary hover:scale-110 active:scale-95 transition-transform">
+              <ArrowLeft size={20} />
             </Button>
           </Link>
-          <h1 className="text-3xl font-black text-primary flex items-center gap-2">
-            <UserCheck className="h-7 w-7" /> Approvazioni
-          </h1>
+          <div className="space-y-1">
+            <p className="text-sm font-bold text-club-orange uppercase tracking-[0.2em] mb-1">Amministrazione</p>
+            <h1 className="text-4xl font-extrabold text-gray-900 tracking-tighter flex items-center gap-3">
+              Approvazioni <Badge className="bg-destructive text-white border-none font-black px-3">{profiles.length}</Badge>
+            </h1>
+          </div>
         </div>
-        <Button variant="outline" onClick={fetchPendingProfiles} className="rounded-xl border-primary text-primary">
-          <RefreshCw className="mr-2 h-4 w-4" /> Aggiorna
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button variant="outline" onClick={fetchPendingProfiles} className="rounded-xl border-none shadow-sm bg-white text-primary">
+            <RefreshCw className="mr-2 h-4 w-4" /> Aggiorna
+          </Button>
+          <UserNav />
+        </div>
       </header>
 
-      <Card className="shadow-xl rounded-[2rem] border-none overflow-hidden max-w-7xl mx-auto bg-white">
-        <CardHeader className="bg-gray-50/50 border-b">
-          <CardTitle>Richieste in Sospeso</CardTitle>
-          <CardDescription>Soci che attendono l'abilitazione per poter prenotare i campi.</CardDescription>
+      <Card className="shadow-[0_2px_12px_rgba(0,0,0,0.06)] rounded-[2.5rem] border-none overflow-hidden max-w-7xl mx-auto bg-white">
+        <CardHeader className="bg-gray-50/50 border-b border-gray-100 p-8">
+          <CardTitle className="text-2xl font-black text-gray-900">Soci in Sospeso</CardTitle>
+          <CardDescription className="text-base font-medium">Abilita i nuovi soci registrati per permettere loro di prenotare i campi.</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           {profiles.length === 0 ? (
-            <div className="text-center py-20 text-muted-foreground">
-              <CheckCircle className="mx-auto h-16 w-16 mb-4 text-green-500 opacity-20" />
-              <p className="text-lg font-bold">Nessuna richiesta in sospeso.</p>
+            <div className="text-center py-24 px-6 text-muted-foreground">
+              <div className="bg-green-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+                <CheckCircle className="h-10 w-10 text-green-500" />
+              </div>
+              <p className="text-xl font-bold text-gray-900">Ottimo lavoro!</p>
+              <p className="text-gray-500 font-medium mt-2">Nessun socio attende l'approvazione al momento.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-gray-50/30">
-                    <TableHead className="font-bold">Socio</TableHead>
-                    <TableHead className="font-bold">Registrato il</TableHead>
-                    <TableHead className="text-right font-bold">Azioni</TableHead>
+                  <TableRow className="bg-gray-50/30 hover:bg-gray-50/30">
+                    <TableHead className="font-black text-gray-800 py-6 px-8">Socio</TableHead>
+                    <TableHead className="font-black text-gray-800">Registrato il</TableHead>
+                    <TableHead className="font-black text-gray-800">Livello</TableHead>
+                    <TableHead className="text-right font-black text-gray-800 px-8">Azioni</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {profiles.map((p) => (
-                    <TableRow key={p.id} className="hover:bg-gray-50/50 transition-colors">
-                      <TableCell className="font-bold text-gray-800">{p.full_name}</TableCell>
-                      <TableCell>{format(parseISO(p.created_at), 'dd/MM/yyyy HH:mm', { locale: it })}</TableCell>
-                      <TableCell className="text-right">
+                    <TableRow key={p.id} className="hover:bg-primary/[0.02] transition-colors border-b border-gray-50">
+                      <TableCell className="px-8 py-6">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                            {p.full_name?.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="font-bold text-gray-900 text-lg">{p.full_name}</span>
+                            <span className="text-[10px] text-gray-400 uppercase font-black tracking-widest">{p.phone || "No telefono"}</span>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-medium text-gray-500">
+                        {format(parseISO(p.created_at), 'dd MMMM yyyy', { locale: it })}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="capitalize border-primary/20 text-primary font-bold">
+                          {p.skill_level}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right px-8">
                         <div className="flex justify-end gap-3">
                           <Button 
                             size="sm" 
                             onClick={() => handleUpdateStatus(p.id, 'approved')}
                             disabled={processingId === p.id}
-                            className="bg-green-600 hover:bg-green-700 rounded-xl px-6 font-bold"
+                            className="bg-gradient-to-br from-primary to-[#23532f] hover:from-[#357a46] hover:to-[#23532f] rounded-xl px-6 font-bold shadow-md shadow-primary/10"
                           >
                             Approva
                           </Button>
@@ -145,7 +176,7 @@ const AdminApprovals = () => {
                             size="sm" 
                             onClick={() => handleUpdateStatus(p.id, 'rejected')}
                             disabled={processingId === p.id}
-                            className="rounded-xl"
+                            className="rounded-xl font-bold"
                           >
                             Rifiuta
                           </Button>

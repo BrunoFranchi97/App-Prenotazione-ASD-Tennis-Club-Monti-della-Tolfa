@@ -9,10 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, LogOut, Users, Search, ShieldCheck, Loader2, Filter, UserCog } from 'lucide-react';
+import { ArrowLeft, Search, Loader2, UserCog } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
-import type { Profile, ProfileStatus } from '@/types/supabase';
+import type { Profile } from '@/types/supabase';
 import UserNav from '@/components/UserNav';
 
 const AdminUserManagement = () => {
@@ -82,75 +82,93 @@ const AdminUserManagement = () => {
     return matchesSearch && matchesStatus;
   });
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><Loader2 className="animate-spin text-primary h-12 w-12" /></div>;
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
+      <Loader2 className="animate-spin text-primary h-12 w-12" />
+    </div>
+  );
+  
   if (!isAdmin) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 sm:p-6 lg:p-8">
-      <header className="flex justify-between items-center mb-10 max-w-7xl mx-auto">
-        <div className="flex items-center gap-4">
+    <div className="min-h-screen bg-[#F8FAFC] p-6 sm:p-10 lg:p-12">
+      <header className="flex justify-between items-end mb-12 max-w-7xl mx-auto w-full">
+        <div className="flex items-center gap-6">
           <Link to="/admin">
-            <Button variant="outline" size="icon" className="rounded-xl border-primary text-primary">
-              <ArrowLeft className="h-5 w-5" />
+            <Button variant="outline" size="icon" className="rounded-2xl border-none shadow-sm bg-white text-primary hover:scale-110 active:scale-95 transition-transform">
+              <ArrowLeft size={20} />
             </Button>
           </Link>
-          <div>
-            <h1 className="text-3xl font-black text-primary tracking-tight flex items-center gap-2">
-              <UserCog className="h-8 w-8" /> Anagrafica Soci
+          <div className="space-y-1">
+            <p className="text-sm font-bold text-club-orange uppercase tracking-[0.2em] mb-1">Amministrazione</p>
+            <h1 className="text-4xl font-extrabold text-gray-900 tracking-tighter flex items-center gap-3">
+              Anagrafica Soci
             </h1>
           </div>
         </div>
         <UserNav />
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 max-w-7xl mx-auto">
-        <Card className="border-none shadow-lg rounded-2xl bg-white">
-          <CardHeader className="pb-3"><CardTitle className="text-xs font-black uppercase text-gray-400">Ricerca Rapida</CardTitle></CardHeader>
-          <CardContent>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10 max-w-7xl mx-auto">
+        <Card className="border-none shadow-[0_2px_12px_rgba(0,0,0,0.06)] rounded-[2rem] bg-white p-6">
+          <div className="flex flex-col gap-3">
+            <Label className="text-xs font-black uppercase text-gray-400 tracking-widest ml-1">Ricerca Rapida</Label>
             <div className="relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-              <Input maxLength={50} className="pl-10 rounded-xl bg-gray-50 border-none h-11" placeholder="Nome o cognome..." value={search} onChange={(e) => setSearch(e.target.value)} />
+              <Search className="absolute left-4 top-4 h-5 w-5 text-gray-400" />
+              <Input 
+                className="pl-12 h-14 rounded-2xl bg-gray-50 border-none text-base font-medium focus:ring-primary/20" 
+                placeholder="Cerca per nome o cognome..." 
+                value={search} 
+                onChange={(e) => setSearch(e.target.value)} 
+              />
             </div>
-          </CardContent>
+          </div>
         </Card>
-        <Card className="border-none shadow-lg rounded-2xl bg-white">
-          <CardHeader className="pb-3"><CardTitle className="text-xs font-black uppercase text-gray-400">Stato Approvazione</CardTitle></CardHeader>
-          <CardContent>
+        <Card className="border-none shadow-[0_2px_12px_rgba(0,0,0,0.06)] rounded-[2rem] bg-white p-6">
+          <div className="flex flex-col gap-3">
+            <Label className="text-xs font-black uppercase text-gray-400 tracking-widest ml-1">Filtro Stato</Label>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="rounded-xl bg-gray-50 border-none h-11"><SelectValue /></SelectTrigger>
-              <SelectContent>
+              <SelectTrigger className="h-14 rounded-2xl bg-gray-50 border-none text-base font-medium focus:ring-primary/20">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl">
                 <SelectItem value="all">Tutti i soci</SelectItem>
-                <SelectItem value="approved">Abilitati</SelectItem>
-                <SelectItem value="pending">In attesa / Revocati</SelectItem>
+                <SelectItem value="approved">Abilitati alle prenotazioni</SelectItem>
+                <SelectItem value="pending">In attesa o Revocati</SelectItem>
               </SelectContent>
             </Select>
-          </CardContent>
+          </div>
         </Card>
       </div>
 
-      <Card className="shadow-2xl rounded-[2.5rem] border-none overflow-hidden max-w-7xl mx-auto bg-white">
+      <Card className="shadow-[0_2px_12px_rgba(0,0,0,0.06)] rounded-[2.5rem] border-none overflow-hidden max-w-7xl mx-auto bg-white">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow className="bg-gray-50/50 hover:bg-gray-50/50">
-                  <TableHead className="font-black text-gray-800 py-6 px-8">Socio</TableHead>
-                  <TableHead className="font-black text-gray-800">Livello</TableHead>
-                  <TableHead className="text-center font-black text-gray-800">Abilitato</TableHead>
-                  <TableHead className="text-center font-black text-gray-800">Amministratore</TableHead>
+                <TableRow className="bg-gray-50/30 hover:bg-gray-50/30">
+                  <TableHead className="font-black text-gray-800 py-8 px-10 text-base">Socio</TableHead>
+                  <TableHead className="font-black text-gray-800 text-base">Livello</TableHead>
+                  <TableHead className="text-center font-black text-gray-800 text-base">Abilitato</TableHead>
+                  <TableHead className="text-center font-black text-gray-800 text-base px-10">Amministratore</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredProfiles.map((p) => (
-                  <TableRow key={p.id} className="hover:bg-primary/[0.02] transition-colors">
-                    <TableCell className="px-8">
-                       <div className="flex flex-col">
-                         <span className="font-bold text-gray-900">{p.full_name || "Senza Nome"}</span>
-                         <span className="text-[10px] text-gray-400 uppercase font-black">{p.phone || "No telefono"}</span>
+                  <TableRow key={p.id} className="hover:bg-primary/[0.02] transition-colors border-b border-gray-50">
+                    <TableCell className="px-10 py-6">
+                       <div className="flex items-center gap-4">
+                         <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-bold text-xl">
+                           {p.full_name?.charAt(0).toUpperCase()}
+                         </div>
+                         <div className="flex flex-col">
+                           <span className="font-bold text-gray-900 text-lg leading-tight">{p.full_name || "Senza Nome"}</span>
+                           <span className="text-[10px] text-gray-400 uppercase font-black tracking-widest">{p.phone || "Nessun telefono"}</span>
+                         </div>
                        </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="capitalize font-bold border-primary/20 text-primary">
+                      <Badge variant="outline" className="capitalize font-bold border-primary/20 text-primary py-1 px-3">
                         {p.skill_level}
                       </Badge>
                     </TableCell>
@@ -160,11 +178,11 @@ const AdminUserManagement = () => {
                           checked={p.approved} 
                           onCheckedChange={() => handleToggleApproval(p.id, p.approved)} 
                           disabled={processingId === p.id}
-                          className="data-[state=checked]:bg-green-500"
+                          className="data-[state=checked]:bg-primary"
                         />
                       </div>
                     </TableCell>
-                    <TableCell className="text-center">
+                    <TableCell className="text-center px-10">
                       <div className="flex justify-center">
                         <Switch 
                           checked={p.is_admin} 
@@ -179,7 +197,7 @@ const AdminUserManagement = () => {
               </TableBody>
             </Table>
             {filteredProfiles.length === 0 && (
-              <div className="text-center py-20 text-gray-400 font-bold">Nessun socio trovato.</div>
+              <div className="text-center py-24 text-gray-400 font-bold">Nessun socio corrisponde ai criteri di ricerca.</div>
             )}
           </div>
         </CardContent>
