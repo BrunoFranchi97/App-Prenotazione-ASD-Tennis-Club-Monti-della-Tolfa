@@ -55,7 +55,7 @@ const TIME_SLOTS = [
 
 const SURFACE_LABELS: Record<string, string> = {
   "terra_rossa": "Terra Rossa",
-  "erba_sintetica": "Erba Sint.",
+  "erba_sintetica": "Sintetico",
   "superficie_dura": "Sup. Dura",
 };
 
@@ -69,6 +69,17 @@ const SLOT_COLORS = [
   "bg-indigo-100 border-indigo-200 text-indigo-800",
   "bg-teal-100 border-teal-200 text-teal-800",
 ];
+
+// Helper per formattare i nomi dei campi nei filtri in modo premium e chiaro
+const formatCourtLabel = (name: string) => {
+  // Se è solo un numero, aggiungi "C. "
+  if (/^\d+$/.test(name)) return `C. ${name}`;
+  // Se contiene "Campo", abbrevia a "C. "
+  if (name.toLowerCase().startsWith('campo')) return name.replace(/campo/i, 'C.');
+  // Se è "Sintetica", rendiamolo più maschile/standard come nel tennis
+  if (name.toLowerCase() === 'sintetica') return 'SINTETICO';
+  return name.toUpperCase();
+};
 
 const groupReservations = (reservations: ReservationRow[]): ReservationRow[] => {
   if (reservations.length === 0) return [];
@@ -305,10 +316,10 @@ export default function AdminReservations() {
         </div>
       </header>
 
-      {/* Filtri Campi Capsule Style */}
-      <div className="bg-white/80 backdrop-blur-md border-b border-gray-50 sticky top-[65px] z-40">
+      {/* Filtri Campi Capsule Style con Testi Ottimizzati */}
+      <div className="bg-white/80 backdrop-blur-md border-b border-gray-50 sticky top-[65px] z-40 shadow-sm">
         <div className="px-4 py-2.5 overflow-x-auto scrollbar-hide">
-          <div className="flex gap-2 items-center">
+          <div className="flex gap-2.5 items-center">
             <button
               onClick={() => handleCourtFilter('all')}
               className={cn(
@@ -318,23 +329,24 @@ export default function AdminReservations() {
                   : "bg-gray-100 text-gray-400 hover:bg-gray-200"
               )}
             >
-              TUTTI I CAMPI
+              TUTTI
             </button>
             <div className="w-px h-6 bg-gray-200 flex-shrink-0" />
             {courts.map(court => {
               const isSelected = visibleCourts.length === 1 && visibleCourts.includes(court.id);
+              const formattedName = formatCourtLabel(court.name);
               return (
                 <button
                   key={court.id}
                   onClick={() => handleCourtFilter(court.id)}
                   className={cn(
-                    "px-5 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all duration-300 flex-shrink-0 border",
+                    "px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-[0.1em] transition-all duration-300 flex-shrink-0 border",
                     isSelected 
                       ? "bg-club-orange border-club-orange text-white shadow-lg shadow-club-orange/20 scale-105" 
-                      : "bg-white border-gray-100 text-gray-400 hover:bg-gray-50"
+                      : "bg-white border-gray-100 text-gray-500 hover:bg-gray-50"
                   )}
                 >
-                  {court.name.split(' ').pop()}
+                  {formattedName}
                 </button>
               );
             })}
@@ -388,8 +400,8 @@ export default function AdminReservations() {
                               <p className="font-black text-gray-900 text-[11px] truncate uppercase">
                                 {res.booked_for_first_name} {res.booked_for_last_name}
                               </p>
-                              <p className="text-[9px] font-bold opacity-60 mt-0.5">
-                                {time} - {format(parseISO(res.ends_at), 'HH:mm')}
+                              <p className="text-[9px] font-bold opacity-60 mt-0.5 flex items-center gap-1">
+                                <Clock size={8} /> {time} - {format(parseISO(res.ends_at), 'HH:mm')}
                               </p>
                             </div>
 
