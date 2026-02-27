@@ -10,11 +10,22 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Search, Loader2, UserCog } from 'lucide-react';
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { ArrowLeft, Search, Loader2, UserCog, Trash2, UserMinus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import type { Profile } from '@/types/supabase';
 import UserNav from '@/components/UserNav';
+import { cn } from '@/lib/utils';
 
 const AdminUserManagement = () => {
   const navigate = useNavigate();
@@ -25,6 +36,10 @@ const AdminUserManagement = () => {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [currentAdminId, setCurrentAdminId] = useState<string | null>(null);
+  
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [profileToDelete, setProfileToDelete] = useState<Profile | null>(null);
 
   const fetchProfiles = async () => {
     setLoading(true);
@@ -73,6 +88,28 @@ const AdminUserManagement = () => {
       setProfiles(prev => prev.map(p => p.id === profileId ? { ...p, approved: !currentStatus } : p));
     } catch (err: any) { showError(err.message); }
     finally { setProcessingId(null); }
+  };
+
+  const handleDeleteProfile = async () => {
+    if (!profileToDelete) return;
+    if (profileToDelete.id === currentAdminId) return showError("Non puoi eliminare il tuo profilo.");
+    
+    setProcessingId(profileToDelete.id);
+    try {
+      // Nota: Questa azione rimuove solo il profilo dal DB. 
+      // La rimozione dall'auth richiederebbe un edge function con service role key.
+      const { error } = await supabase.from('profiles').delete().eq('id', profileToDelete.id);
+      if (error) throw error;
+      
+      showSuccess("Profilo socio rimosso con successo.");
+      setProfiles(prev => prev.filter(p => p.id !== profileToDelete.id));
+      setDeleteDialogOpen(false);
+    } catch (err: any) {
+      showError("Errore durante l'eliminazione: " + err.message);
+    } finally {
+      setProcessingId(null);
+      setProfileToDelete(null);
+    }
   };
 
   const filteredProfiles = profiles.filter(p => {
@@ -151,25 +188,21 @@ const AdminUserManagement = () => {
                   <TableHead className="font-black text-gray-800 py-8 px-10 text-base">Socio</TableHead>
                   <TableHead className="font-black text-gray-800 text-base">Livello</TableHead>
                   <TableHead className="text-center font-black text-gray-800 text-base">Abilitato</TableHead>
-                  <TableHead className="text-center font-black text-gray-800 text-base px-10">Amministratore</TableHead>
+                  <TableHead className="text-center font-black text-gray-800 text-base">Admin</TableHead>
+                  <TableHead className="text-right font-black text-gray-800 text-base px-10">Azioni</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredProfiles.map((p) => (
-                  <TableRow key={p.id} className="hover:bg-primary/[0.02] transition-colors border-b border-gray-50">
+                  <TableRow key={p.id} className="hover:bg-primary/[0.02] transition-colors border-b border-gray-50 group">
                     <TableCell className="px-10 py-6">
-                       <div className="flex items-center gap-4">
-                         <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-bold text-xl">
-                           {p.full_name?.charAt(0).toUpperCase()}
-                         </div>
-                         <div className="flex flex-col">
-                           <span className="font-bold text-gray-900 text-lg leading-tight">{p.full_name || "Senza Nome"}</span>
-                           <span className="text-[10px] text-gray-400 uppercase font-black tracking-widest">{p.phone || "Nessun telefono"}</span>
-                         </div>
+                       <div className="flex flex-col">
+                         <span className="font-bold text-gray-900 text-lg leading-tight">{p.full_name || "Senza Nome"}</span>
+                         <span className="text-[10px] text-gray-400 uppercase font-black tracking-widest mt-1">Registrato il {new Date(p.created_at).toLocaleDateString()}</span>
                        </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="capitalize font-bold border-primary/20 text-primary py-1 px-3">
+                      <Badge variant="outline" className="capitalize font-bold border-primary/20 text-primary py-1 px-3 bg-primary/5">
                         {p.skill_level}
                       </Badge>
                     </TableCell>
@@ -183,7 +216,7 @@ const AdminUserManagement = () => {
                         />
                       </div>
                     </TableCell>
-                    <TableCell className="text-center px-10">
+                    <TableCell className="text-center">
                       <div className="flex justify-center">
                         <Switch 
                           checked={p.is_admin} 
@@ -192,6 +225,20 @@ const AdminUserManagement = () => {
                           className="data-[state=checked]:bg-club-orange"
                         />
                       </div>
+                    </TableCell>
+                    <TableCell className="text-right px-10">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={() => {
+                          setProfileToDelete(p);
+                          setDeleteDialogOpen(true);
+                        }}
+                        disabled={p.id === currentAdminId || processingId === p.id}
+                        className="rounded-xl text-gray-400 hover:text-destructive hover:bg-destructive/5 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <Trash2 className="h-5 w-5" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -203,6 +250,33 @@ const AdminUserManagement = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent className="rounded-[2rem] border-none shadow-2xl">
+          <AlertDialogHeader>
+            <div className="mx-auto w-16 h-16 rounded-2xl bg-destructive/10 flex items-center justify-center mb-4">
+              <UserMinus className="h-8 w-8 text-destructive" />
+            </div>
+            <AlertDialogTitle className="text-2xl font-black text-center text-gray-900">Rimuovere Socio?</AlertDialogTitle>
+            <AlertDialogDescription className="text-center text-base font-medium text-gray-500 px-4">
+              Stai per rimuovere il profilo di <span className="font-bold text-gray-900">{profileToDelete?.full_name}</span>. 
+              Questa azione revocherà l'accesso al sistema ma non eliminerà le credenziali di accesso (email).
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex flex-col sm:flex-row gap-3 pt-6 px-4">
+            <AlertDialogCancel className="w-full sm:flex-1 h-14 rounded-2xl border-gray-100 font-bold text-gray-500 hover:bg-gray-50 m-0">
+              Annulla
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteProfile}
+              className="w-full sm:flex-1 h-14 rounded-2xl bg-destructive hover:bg-destructive/90 text-white font-bold shadow-lg shadow-destructive/20 m-0"
+            >
+              Conferma Rimozione
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
