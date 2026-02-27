@@ -5,7 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { format, parseISO, addDays, subDays, startOfDay, endOfDay, isSameDay, setHours, setMinutes, addHours, differenceInMinutes } from "date-fns";
 import { it } from "date-fns/locale";
 import { 
-  ArrowLeft, ChevronLeft, ChevronRight, Eye, Edit, Trash2, Plus, X, Calendar, Clock, User
+  ArrowLeft, ChevronLeft, ChevronRight, Eye, Edit, Trash2, Plus, Clock, MapPin
 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -52,12 +52,6 @@ const TIME_SLOTS = [
   "08:00", "09:00", "10:00", "11:00", "12:00", "13:00", 
   "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"
 ];
-
-const SURFACE_COLORS: Record<string, string> = {
-  "terra_rossa": "bg-orange-100 text-orange-800",
-  "erba_sintetica": "bg-green-100 text-green-800",
-  "superficie_dura": "bg-blue-100 text-blue-800",
-};
 
 const SURFACE_LABELS: Record<string, string> = {
   "terra_rossa": "Terra Rossa",
@@ -164,7 +158,6 @@ export default function AdminReservations() {
       setCourts(courtsData.data || []);
       setProfiles(profilesData.data || []);
       
-      // Solo all'inizializzazione o se la lista visibile è vuota, mostriamo tutti
       if (visibleCourts.length === 0) {
         setVisibleCourts((courtsData.data || []).map(c => c.id));
       }
@@ -193,7 +186,6 @@ export default function AdminReservations() {
   const handleNextDay = () => setSelectedDate(addDays(selectedDate, 1));
   const handleToday = () => setSelectedDate(new Date());
 
-  // Nuova logica: Se clicchi un campo specifico, vedi solo quello. Se clicchi "Tutti", vedi tutti.
   const handleCourtFilter = (courtId: number | 'all') => {
     if (courtId === 'all') {
       setVisibleCourts(courts.map(c => c.id));
@@ -278,100 +270,97 @@ export default function AdminReservations() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col">
-      {/* Header Premium con Navigazione Distinta */}
-      <header className="bg-white border-b border-gray-100 shadow-sm sticky top-0 z-50">
-        <div className="container mx-auto px-6 py-4 flex items-center">
-          {/* Back button isolato */}
-          <Link to="/admin" className="mr-auto group">
-            <Button variant="ghost" size="sm" className="rounded-xl text-gray-500 hover:text-primary hover:bg-primary/5 px-3">
-              <ArrowLeft className="h-5 w-5 mr-2 group-hover:-translate-x-1 transition-transform" />
-              <span className="font-bold">Admin</span>
+      {/* Header Mobile-Optimized con Navigazione Centrata */}
+      <header className="bg-white/90 backdrop-blur-md border-b border-gray-100 shadow-sm sticky top-0 z-50 px-4 py-3">
+        <div className="flex items-center justify-between max-w-7xl mx-auto">
+          {/* Back Icon Button */}
+          <Link to="/admin">
+            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full text-gray-400 hover:text-primary hover:bg-gray-100">
+              <ArrowLeft className="h-5 w-5" />
             </Button>
           </Link>
           
-          {/* Blocco Navigazione Calendario Centrato */}
-          <div className="flex items-center gap-2 bg-gray-50 p-1.5 rounded-2xl border border-gray-100">
-            <Button variant="ghost" size="icon" onClick={handlePrevDay} className="h-10 w-10 text-primary hover:bg-white hover:shadow-sm rounded-xl">
-              <ChevronLeft className="h-6 w-6" />
+          {/* Selettore Data Centrato e Compatto */}
+          <div className="flex items-center gap-1 bg-gray-50/80 p-1 rounded-2xl border border-gray-100 shadow-inner">
+            <Button variant="ghost" size="icon" onClick={handlePrevDay} className="h-9 w-9 text-primary hover:bg-white hover:shadow-sm rounded-xl">
+              <ChevronLeft className="h-5 w-5" />
             </Button>
             
-            <div className="flex flex-col items-center min-w-[180px] px-4 cursor-pointer" onClick={handleToday}>
-              <span className="text-[10px] font-black uppercase tracking-widest text-primary/60 leading-none mb-1">
+            <div className="flex flex-col items-center min-w-[110px] px-2 cursor-pointer select-none" onClick={handleToday}>
+              <span className="text-[9px] font-black uppercase tracking-widest text-primary/50 leading-none mb-0.5">
                 {isSameDay(selectedDate, new Date()) ? 'OGGI' : 'DATA'}
               </span>
               <span className="text-sm font-black text-gray-900 capitalize">
-                {format(selectedDate, 'EEEE, dd MMMM', { locale: it })}
+                {format(selectedDate, 'EEE d MMM', { locale: it })}
               </span>
             </div>
             
-            <Button variant="ghost" size="icon" onClick={handleNextDay} className="h-10 w-10 text-primary hover:bg-white hover:shadow-sm rounded-xl">
-              <ChevronRight className="h-6 w-6" />
+            <Button variant="ghost" size="icon" onClick={handleNextDay} className="h-9 w-9 text-primary hover:bg-white hover:shadow-sm rounded-xl">
+              <ChevronRight className="h-5 w-5" />
             </Button>
           </div>
           
-          {/* Spacer per bilanciamento */}
-          <div className="ml-auto w-[100px]" />
+          {/* Empty Space for Balance */}
+          <div className="w-10" />
         </div>
       </header>
 
-      {/* Filtri Campi con Logica Switch */}
-      <div className="bg-white/80 backdrop-blur-md border-b border-gray-100 sticky top-[73px] z-40 shadow-sm">
-        <div className="container mx-auto px-6 py-3">
-          <div className="flex gap-2 overflow-x-auto scrollbar-hide py-1">
+      {/* Filtri Campi Capsule Style */}
+      <div className="bg-white/80 backdrop-blur-md border-b border-gray-50 sticky top-[65px] z-40">
+        <div className="px-4 py-2.5 overflow-x-auto scrollbar-hide">
+          <div className="flex gap-2 items-center">
             <button
               onClick={() => handleCourtFilter('all')}
               className={cn(
-                "px-6 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest transition-all duration-300",
+                "px-5 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all duration-300 flex-shrink-0",
                 visibleCourts.length === courts.length 
                   ? "bg-primary text-white shadow-lg shadow-primary/20 scale-105" 
-                  : "bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600"
+                  : "bg-gray-100 text-gray-400 hover:bg-gray-200"
               )}
             >
-              Tutti i Campi
+              TUTTI I CAMPI
             </button>
-            <div className="w-px h-8 bg-gray-100 mx-2 self-center" />
-            {courts.map(court => (
-              <button
-                key={court.id}
-                onClick={() => handleCourtFilter(court.id)}
-                className={cn(
-                  "px-6 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest transition-all duration-300",
-                  visibleCourts.length === 1 && visibleCourts.includes(court.id) 
-                    ? "bg-club-orange text-white shadow-lg shadow-club-orange/20 scale-105" 
-                    : "bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-600 border border-gray-100"
-                )}
-              >
-                {court.name}
-              </button>
-            ))}
+            <div className="w-px h-6 bg-gray-200 flex-shrink-0" />
+            {courts.map(court => {
+              const isSelected = visibleCourts.length === 1 && visibleCourts.includes(court.id);
+              return (
+                <button
+                  key={court.id}
+                  onClick={() => handleCourtFilter(court.id)}
+                  className={cn(
+                    "px-5 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all duration-300 flex-shrink-0 border",
+                    isSelected 
+                      ? "bg-club-orange border-club-orange text-white shadow-lg shadow-club-orange/20 scale-105" 
+                      : "bg-white border-gray-100 text-gray-400 hover:bg-gray-50"
+                  )}
+                >
+                  {court.name.split(' ').pop()}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
 
       <div className="flex-1 overflow-auto">
-        <div className="container mx-auto px-6 py-8">
+        <div className="container mx-auto px-4 py-6">
           <div className="flex gap-2">
             {/* Timeline */}
-            <div className="sticky left-0 z-30 bg-[#F8FAFC]/80 backdrop-blur-sm pr-4 pt-16" style={{ width: '80px' }}>
+            <div className="sticky left-0 z-30 bg-[#F8FAFC]/80 backdrop-blur-sm pr-3 pt-14" style={{ width: '60px' }}>
               {TIME_SLOTS.map(time => (
-                <div key={time} className="h-28 flex items-start justify-end pr-3 text-[11px] font-black text-gray-400 tracking-tighter">
+                <div key={time} className="h-28 flex items-start justify-end pr-2 text-[10px] font-black text-gray-400">
                   {time}
                 </div>
               ))}
             </div>
 
             {/* Grid */}
-            <div className="flex-1 flex gap-6">
+            <div className="flex-1 flex gap-4 overflow-x-auto">
               {visibleCourtsList.map(court => (
-                <div key={court.id} className="flex-1 min-w-[240px] animate-in fade-in slide-in-from-bottom-4 duration-500">
-                  <div className="h-14 mb-4 bg-white rounded-2xl shadow-sm p-3 flex items-center justify-between border border-gray-50 group hover:border-primary/20 transition-all">
-                    <div>
-                      <h3 className="font-black text-gray-900 text-sm leading-none">{court.name}</h3>
-                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">
-                        {SURFACE_LABELS[court.surface] || court.surface}
-                      </p>
-                    </div>
-                    <div className={cn("w-2 h-2 rounded-full", court.is_active ? "bg-green-500" : "bg-gray-300")} />
+                <div key={court.id} className="flex-1 min-w-[220px] animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  <div className="h-12 mb-3 bg-white rounded-2xl shadow-sm p-3 flex items-center justify-between border border-gray-100">
+                    <h3 className="font-black text-gray-900 text-[11px] uppercase tracking-wider">{court.name}</h3>
+                    <div className={cn("w-1.5 h-1.5 rounded-full", court.is_active ? "bg-green-500" : "bg-gray-300")} />
                   </div>
 
                   {TIME_SLOTS.map(time => {
@@ -384,10 +373,10 @@ export default function AdminReservations() {
                       <div
                         key={time}
                         className={cn(
-                          "h-28 mb-3 rounded-[1.5rem] transition-all duration-300 relative overflow-hidden",
+                          "h-28 mb-2 rounded-2xl transition-all duration-300 relative overflow-hidden",
                           res 
-                            ? cn("shadow-md border border-white/20 cursor-pointer", slotColor)
-                            : "bg-white/50 border-2 border-dashed border-gray-100 hover:border-primary/30 hover:bg-white cursor-pointer group"
+                            ? cn("shadow-sm border border-white/20 cursor-pointer", slotColor)
+                            : "bg-white/40 border-2 border-dashed border-gray-100 hover:border-primary/20 hover:bg-white cursor-pointer group"
                         )}
                         onMouseEnter={() => setHoveredSlot(slotKey)}
                         onMouseLeave={() => setHoveredSlot(null)}
@@ -395,39 +384,33 @@ export default function AdminReservations() {
                       >
                         {res ? (
                           <>
-                            <div className="p-4 h-full flex flex-col">
-                              <div className="flex items-center justify-between mb-1">
-                                <p className="font-black text-gray-900 text-sm truncate uppercase tracking-tight">
-                                  {res.booked_for_first_name} {res.booked_for_last_name}
-                                </p>
-                              </div>
-                              <p className="text-[10px] font-bold opacity-70 flex items-center gap-1">
-                                <Clock size={10} /> {time} - {format(parseISO(res.ends_at), 'HH:mm')}
+                            <div className="p-3 h-full flex flex-col">
+                              <p className="font-black text-gray-900 text-[11px] truncate uppercase">
+                                {res.booked_for_first_name} {res.booked_for_last_name}
                               </p>
-                              <div className="mt-auto flex items-center gap-1.5">
-                                <div className="w-1.5 h-1.5 rounded-full bg-black/20" />
-                                <span className="text-[9px] font-black uppercase opacity-40">Prenotazione Socio</span>
-                              </div>
+                              <p className="text-[9px] font-bold opacity-60 mt-0.5">
+                                {time} - {format(parseISO(res.ends_at), 'HH:mm')}
+                              </p>
                             </div>
 
                             <div className={cn(
-                              "absolute bottom-2 right-2 flex gap-1.5 transition-all duration-300",
+                              "absolute bottom-2 right-2 flex gap-1 transition-all duration-300",
                               isHovered ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
                             )}>
-                              <button onClick={(e) => { e.stopPropagation(); openViewDialog(res); }} className="w-8 h-8 rounded-xl bg-white/90 shadow-sm flex items-center justify-center hover:scale-110 active:scale-95 text-gray-700">
-                                <Eye className="h-4 w-4" />
+                              <button onClick={(e) => { e.stopPropagation(); openViewDialog(res); }} className="w-7 h-7 rounded-lg bg-white/90 shadow-sm flex items-center justify-center text-gray-700">
+                                <Eye className="h-3.5 w-3.5" />
                               </button>
-                              <button onClick={(e) => { e.stopPropagation(); openEditDialog(res); }} className="w-8 h-8 rounded-xl bg-white/90 shadow-sm flex items-center justify-center hover:scale-110 active:scale-95 text-primary">
-                                <Edit className="h-4 w-4" />
+                              <button onClick={(e) => { e.stopPropagation(); openEditDialog(res); }} className="w-7 h-7 rounded-lg bg-white/90 shadow-sm flex items-center justify-center text-primary">
+                                <Edit className="h-3.5 w-3.5" />
                               </button>
-                              <button onClick={(e) => { e.stopPropagation(); openDeleteDialog(res); }} className="w-8 h-8 rounded-xl bg-white/90 shadow-sm flex items-center justify-center hover:scale-110 active:scale-95 text-red-600">
-                                <Trash2 className="h-4 w-4" />
+                              <button onClick={(e) => { e.stopPropagation(); openDeleteDialog(res); }} className="w-7 h-7 rounded-lg bg-white/90 shadow-sm flex items-center justify-center text-red-600">
+                                <Trash2 className="h-3.5 w-3.5" />
                               </button>
                             </div>
                           </>
                         ) : (
                           <div className="h-full flex items-center justify-center">
-                            <Plus className="h-6 w-6 text-gray-200 group-hover:text-primary/40 group-hover:scale-125 transition-all duration-500" />
+                            <Plus className="h-5 w-5 text-gray-200 group-hover:text-primary/30" />
                           </div>
                         )}
                       </div>
@@ -440,138 +423,70 @@ export default function AdminReservations() {
         </div>
       </div>
 
-      {/* CRUD Dialogs rimangono invariati nella logica ma con stile premium */}
+      {/* CRUD Dialogs */}
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-        <DialogContent className="sm:max-w-md rounded-[2.5rem] border-none shadow-2xl p-8">
+        <DialogContent className="max-w-[90vw] rounded-[2rem] border-none shadow-2xl p-6">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-black text-primary uppercase tracking-tight">Scheda Prenotazione</DialogTitle>
-            <DialogDescription className="text-sm font-medium text-gray-500">Dettagli completi del match selezionato</DialogDescription>
+            <DialogTitle className="text-xl font-black text-primary uppercase">Dettaglio Match</DialogTitle>
           </DialogHeader>
           {selectedReservation && (
-            <div className="space-y-6 py-4">
-              <div className="bg-gray-50 rounded-2xl p-6 grid grid-cols-2 gap-6 border border-gray-100">
-                <div>
-                  <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Socio</Label>
-                  <p className="font-bold text-gray-900 text-lg">{selectedReservation.booked_for_first_name} {selectedReservation.booked_for_last_name}</p>
-                </div>
-                <div>
-                  <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Campo</Label>
-                  <p className="font-bold text-gray-900 text-lg">{selectedReservation.court?.name}</p>
-                </div>
-                <div>
-                  <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Orario</Label>
-                  <p className="font-bold text-primary text-lg">
-                    {format(parseISO(selectedReservation.starts_at), 'HH:mm')} - {format(parseISO(selectedReservation.ends_at), 'HH:mm')}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Creato da</Label>
-                  <p className="font-bold text-gray-700 text-sm">{selectedReservation.bookedByName}</p>
-                </div>
+            <div className="space-y-4 py-2">
+              <div className="bg-gray-50 rounded-2xl p-4 grid grid-cols-2 gap-4 border border-gray-100">
+                <div><Label className="text-[9px] font-black text-gray-400 uppercase">Socio</Label><p className="font-bold text-gray-900 text-sm">{selectedReservation.booked_for_first_name} {selectedReservation.booked_for_last_name}</p></div>
+                <div><Label className="text-[9px] font-black text-gray-400 uppercase">Campo</Label><p className="font-bold text-gray-900 text-sm">{selectedReservation.court?.name}</p></div>
+                <div><Label className="text-[9px] font-black text-gray-400 uppercase">Orario</Label><p className="font-bold text-primary text-sm">{format(parseISO(selectedReservation.starts_at), 'HH:mm')} - {format(parseISO(selectedReservation.ends_at), 'HH:mm')}</p></div>
+                <div><Label className="text-[9px] font-black text-gray-400 uppercase">Creato da</Label><p className="font-bold text-gray-700 text-[10px]">{selectedReservation.bookedByName}</p></div>
               </div>
-              {selectedReservation.notes && (
-                <div className="px-4">
-                  <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Note Amministrative</Label>
-                  <p className="text-sm text-gray-600 italic mt-1 leading-relaxed">"{selectedReservation.notes}"</p>
-                </div>
-              )}
+              {selectedReservation.notes && <p className="text-xs text-gray-500 italic px-2">"{selectedReservation.notes}"</p>}
             </div>
           )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setViewDialogOpen(false)} className="rounded-xl font-bold h-12 w-full border-gray-200">Chiudi</Button>
-          </DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setViewDialogOpen(false)} className="rounded-xl h-12 w-full">Chiudi</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-        <DialogContent className="sm:max-w-md rounded-[2.5rem] border-t-8 border-t-primary shadow-2xl p-8">
-          <DialogHeader className="pb-4">
-            <DialogTitle className="text-2xl font-black text-primary uppercase tracking-tight">Nuova Prenotazione</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-xs font-bold text-gray-500 ml-1">Nome</Label>
-                <Input value={firstName} onChange={e => setFirstName(e.target.value)} className="h-12 rounded-xl border-gray-200 focus:ring-primary/20" placeholder="Mario" />
+        <DialogContent className="max-w-[90vw] rounded-[2rem] border-t-4 border-t-primary shadow-2xl p-6">
+          <DialogHeader className="pb-2"><DialogTitle className="text-xl font-black text-primary uppercase">Nuova Prenotazione</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1"><Label className="text-[10px] font-bold text-gray-400">Nome</Label><Input value={firstName} onChange={e => setFirstName(e.target.value)} className="h-10 rounded-xl" /></div>
+              <div className="space-y-1"><Label className="text-[10px] font-bold text-gray-400">Cognome</Label><Input value={lastName} onChange={e => setLastName(e.target.value)} className="h-10 rounded-xl" /></div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-[10px] font-bold text-gray-400">Inizio</Label>
+                <Select value={formStartTime} onValueChange={setFormStartTime}><SelectTrigger className="h-10 rounded-xl"><SelectValue /></SelectTrigger><SelectContent className="rounded-xl">{TIME_SLOTS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent></Select>
               </div>
-              <div className="space-y-2">
-                <Label className="text-xs font-bold text-gray-500 ml-1">Cognome</Label>
-                <Input value={lastName} onChange={e => setLastName(e.target.value)} className="h-12 rounded-xl border-gray-200 focus:ring-primary/20" placeholder="Rossi" />
+              <div className="space-y-1">
+                <Label className="text-[10px] font-bold text-gray-400">Durata</Label>
+                <Select value={formDuration} onValueChange={setFormDuration}><SelectTrigger className="h-10 rounded-xl"><SelectValue /></SelectTrigger><SelectContent className="rounded-xl"><SelectItem value="1">1 ora</SelectItem><SelectItem value="2">2 ore</SelectItem><SelectItem value="3">3 ore</SelectItem></SelectContent></Select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-xs font-bold text-gray-500 ml-1">Inizio</Label>
-                <Select value={formStartTime} onValueChange={setFormStartTime}>
-                  <SelectTrigger className="h-12 rounded-xl border-gray-200"><SelectValue /></SelectTrigger>
-                  <SelectContent className="rounded-xl">{TIME_SLOTS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs font-bold text-gray-500 ml-1">Durata</Label>
-                <Select value={formDuration} onValueChange={setFormDuration}>
-                  <SelectTrigger className="h-12 rounded-xl border-gray-200"><SelectValue /></SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    <SelectItem value="1">1 ora</SelectItem><SelectItem value="2">2 ore</SelectItem><SelectItem value="3">3 ore</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs font-bold text-gray-500 ml-1">Note</Label>
-              <Textarea value={formNotes} onChange={e => setFormNotes(e.target.value)} className="rounded-xl border-gray-200 min-h-[80px]" placeholder="Aggiungi info..." />
-            </div>
+            <div className="space-y-1"><Label className="text-[10px] font-bold text-gray-400">Note</Label><Textarea value={formNotes} onChange={e => setFormNotes(e.target.value)} className="rounded-xl min-h-[60px] text-xs" /></div>
           </div>
-          <DialogFooter className="gap-3 pt-6">
-            <Button variant="outline" onClick={() => setCreateDialogOpen(false)} className="h-12 flex-1 rounded-xl font-bold">Annulla</Button>
-            <Button onClick={handleCreate} disabled={loading || !firstName || !lastName} className="h-12 flex-1 rounded-xl bg-primary hover:bg-[#357a46] font-bold shadow-lg shadow-primary/20">Crea</Button>
-          </DialogFooter>
+          <DialogFooter className="gap-2 pt-4"><Button variant="outline" onClick={() => setCreateDialogOpen(false)} className="h-11 flex-1 rounded-xl">Annulla</Button><Button onClick={handleCreate} disabled={loading || !firstName} className="h-11 flex-1 rounded-xl bg-primary">Crea</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="sm:max-w-md rounded-[2.5rem] border-t-8 border-t-club-orange shadow-2xl p-8">
-          <DialogHeader className="pb-4"><DialogTitle className="text-2xl font-black text-club-orange uppercase tracking-tight">Modifica Match</DialogTitle></DialogHeader>
-          <div className="space-y-6">
-             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-xs font-bold text-gray-500 ml-1">Nome</Label>
-                <Input value={firstName} onChange={e => setFirstName(e.target.value)} className="h-12 rounded-xl border-gray-200" />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs font-bold text-gray-500 ml-1">Cognome</Label>
-                <Input value={lastName} onChange={e => setLastName(e.target.value)} className="h-12 rounded-xl border-gray-200" />
-              </div>
+        <DialogContent className="max-w-[90vw] rounded-[2rem] border-t-4 border-t-club-orange shadow-2xl p-6">
+          <DialogHeader className="pb-2"><DialogTitle className="text-xl font-black text-club-orange uppercase">Modifica Match</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+             <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1"><Label className="text-[10px] font-bold text-gray-400">Nome</Label><Input value={firstName} onChange={e => setFirstName(e.target.value)} className="h-10 rounded-xl" /></div>
+              <div className="space-y-1"><Label className="text-[10px] font-bold text-gray-400">Cognome</Label><Input value={lastName} onChange={e => setLastName(e.target.value)} className="h-10 rounded-xl" /></div>
             </div>
-            <div className="space-y-2">
-              <Label className="text-xs font-bold text-gray-500 ml-1">Orario Inizio</Label>
-              <Select value={formStartTime} onValueChange={setFormStartTime}>
-                <SelectTrigger className="h-12 rounded-xl border-gray-200"><SelectValue /></SelectTrigger>
-                <SelectContent className="rounded-xl">{TIME_SLOTS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs font-bold text-gray-500 ml-1">Note</Label>
-              <Textarea value={formNotes} onChange={e => setFormNotes(e.target.value)} className="rounded-xl border-gray-200 min-h-[80px]" />
-            </div>
+            <div className="space-y-1"><Label className="text-[10px] font-bold text-gray-400">Orario</Label><Select value={formStartTime} onValueChange={setFormStartTime}><SelectTrigger className="h-10 rounded-xl"><SelectValue /></SelectTrigger><SelectContent className="rounded-xl">{TIME_SLOTS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent></Select></div>
+            <div className="space-y-1"><Label className="text-[10px] font-bold text-gray-400">Note</Label><Textarea value={formNotes} onChange={e => setFormNotes(e.target.value)} className="rounded-xl min-h-[60px] text-xs" /></div>
           </div>
-          <DialogFooter className="gap-3 pt-6">
-            <Button variant="outline" onClick={() => setEditDialogOpen(false)} className="h-12 flex-1 rounded-xl font-bold">Annulla</Button>
-            <Button onClick={handleEdit} disabled={loading} className="h-12 flex-1 rounded-xl bg-club-orange hover:bg-orange-600 font-bold shadow-lg shadow-club-orange/20">Salva</Button>
-          </DialogFooter>
+          <DialogFooter className="gap-2 pt-4"><Button variant="outline" onClick={() => setEditDialogOpen(false)} className="h-11 flex-1 rounded-xl">Annulla</Button><Button onClick={handleEdit} className="h-11 flex-1 rounded-xl bg-club-orange">Salva</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent className="rounded-[2.5rem] p-8">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-2xl font-black text-gray-900">Eliminare Prenotazione?</AlertDialogTitle>
-            <AlertDialogDescription className="text-base font-medium">L'azione è definitiva e lo slot tornerà disponibile per tutti i soci.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="gap-3 mt-4">
-            <AlertDialogCancel className="h-12 flex-1 rounded-xl font-bold">Annulla</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="h-12 flex-1 rounded-xl bg-red-600 hover:bg-red-700 font-bold">Elimina</AlertDialogAction>
-          </AlertDialogFooter>
+        <AlertDialogContent className="max-w-[90vw] rounded-[2rem] p-6 text-center">
+          <AlertDialogHeader><AlertDialogTitle className="text-xl font-black">Eliminare?</AlertDialogTitle><AlertDialogDescription className="text-sm">L'azione è definitiva.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 mt-4"><AlertDialogCancel className="h-11 flex-1 rounded-xl">No</AlertDialogCancel><AlertDialogAction onClick={handleDelete} className="h-11 flex-1 rounded-xl bg-red-600">Sì, elimina</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
