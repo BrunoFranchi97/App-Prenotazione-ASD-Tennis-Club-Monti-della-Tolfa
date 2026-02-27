@@ -69,7 +69,8 @@ export default function ReservationFormDialog(props: {
 
   const timeSlots = useMemo(() => {
     const slots: string[] = [];
-    for (let h = 8; h < 20; h++) slots.push(`${String(h).padStart(2, "0")}:00`);
+    // Orario esteso fino alle 22:00 (ultimo slot parte alle 21:00)
+    for (let h = 8; h < 22; h++) slots.push(`${String(h).padStart(2, "0")}:00`);
     return slots;
   }, []);
 
