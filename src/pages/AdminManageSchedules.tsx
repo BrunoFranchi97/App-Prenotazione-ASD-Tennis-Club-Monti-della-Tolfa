@@ -4,34 +4,22 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, LogOut, CheckCircle, XCircle } from 'lucide-react';
+import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, MapPin, Loader2, ChevronRight, Activity } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { Court } from '@/types/supabase';
+import UserNav from '@/components/UserNav';
+import { cn } from '@/lib/utils';
 
 const AdminManageSchedules = () => {
   const navigate = useNavigate();
   const [courts, setCourts] = useState<Court[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [processingId, setProcessingId] = useState<number | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-
-  const handleLogout = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        showError(error.message);
-      } else {
-        showSuccess("Disconnessione effettuata con successo!");
-        navigate('/login');
-      }
-    } catch (error: any) {
-      showError(error.message || "Errore durante la disconnessione.");
-    }
-  };
 
   const fetchAdminStatus = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -44,7 +32,7 @@ const AdminManageSchedules = () => {
 
       if (error || !profile?.is_admin) {
         setIsAdmin(false);
-        showError("Accesso negato. Non sei un amministratore.");
+        showError("Accesso negato.");
         navigate('/dashboard');
       } else {
         setIsAdmin(true);
@@ -57,20 +45,15 @@ const AdminManageSchedules = () => {
 
   const fetchCourts = async () => {
     setLoading(true);
-    setError(null);
     try {
       const { data, error } = await supabase
         .from('courts')
         .select('*')
         .order('name', { ascending: true });
 
-      if (error) {
-        throw new Error(error.message);
-      }
+      if (error) throw error;
       setCourts(data || []);
     } catch (err: any) {
-      console.error("Errore nel caricamento dei campi:", err.message);
-      setError("Errore nel caricamento dei campi: " + err.message);
       showError("Errore nel caricamento dei campi.");
     } finally {
       setLoading(false);
@@ -83,133 +66,138 @@ const AdminManageSchedules = () => {
   }, [navigate]);
 
   const handleToggleCourtActive = async (courtId: number, currentStatus: boolean) => {
-    setLoading(true);
+    setProcessingId(courtId);
     try {
       const { error } = await supabase
         .from('courts')
         .update({ is_active: !currentStatus })
         .eq('id', courtId);
 
-      if (error) {
-        showError("Errore nell'aggiornamento dello stato del campo: " + error.message);
-      } else {
-        showSuccess(`Campo aggiornato con successo!`);
-        fetchCourts(); // Refresh the list
-      }
+      if (error) throw error;
+      
+      showSuccess(`Stato campo aggiornato!`);
+      setCourts(prev => prev.map(c => c.id === courtId ? { ...c, is_active: !currentStatus } : c));
     } catch (err: any) {
-      showError(err.message || "Errore inaspettato durante l'aggiornamento.");
+      showError("Errore durante l'aggiornamento.");
     } finally {
-      setLoading(false);
+      setProcessingId(null);
     }
   };
 
-  if (!isAdmin) {
+  if (loading && courts.length === 0) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold mb-4">Accesso Negato</h1>
-          <p className="text-xl text-gray-600">Non hai i permessi per accedere a questa pagina.</p>
-          <Link to="/dashboard" className="text-blue-500 hover:text-blue-700 underline mt-4 block">
-            Torna alla Dashboard
-          </Link>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
+        <Loader2 className="animate-spin text-primary h-12 w-12" />
       </div>
     );
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-white p-4">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold mb-4 text-primary">Caricamento...</h1>
-          <p className="text-xl text-gray-600">Recupero campi.</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-white p-4">
-        <Card className="w-full max-w-md shadow-lg rounded-lg text-center">
-          <CardHeader>
-            <CardTitle className="text-destructive text-3xl font-bold">Errore</CardTitle>
-            <CardDescription className="text-gray-600 mt-2">
-              {error}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={() => window.location.reload()} className="bg-primary hover:bg-primary/90 text-primary-foreground">
-              Riprova
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  if (!isAdmin) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 sm:p-6 lg:p-8">
-      <header className="flex justify-between items-center mb-8">
-        <div className="flex items-center">
-          <Link to="/admin" className="mr-4">
-            <Button variant="outline" size="icon" className="text-primary border-primary hover:bg-secondary">
-              <ArrowLeft className="h-4 w-4" />
+    <div className="min-h-screen bg-[#F8FAFC] p-6 sm:p-10 lg:p-12">
+      <header className="flex justify-between items-end mb-12 max-w-4xl mx-auto w-full">
+        <div className="flex items-center gap-6">
+          <Link to="/admin">
+            <Button variant="outline" size="icon" className="rounded-2xl border-none shadow-sm bg-white text-primary hover:scale-110 active:scale-95 transition-transform">
+              <ArrowLeft size={20} />
             </Button>
           </Link>
-          <h1 className="text-3xl font-bold text-primary">Gestione Campi</h1>
+          <div className="space-y-1">
+            <p className="text-sm font-bold text-club-orange uppercase tracking-[0.2em] mb-1">Configurazione</p>
+            <h1 className="text-4xl font-extrabold text-gray-900 tracking-tighter">Asset Campi</h1>
+          </div>
         </div>
-        <Button variant="outline" className="text-primary border-primary hover:bg-secondary" onClick={handleLogout}>
-          <LogOut className="mr-2 h-4 w-4" /> Esci
-        </Button>
+        <UserNav />
       </header>
 
-      <Card className="shadow-lg rounded-lg">
-        <CardHeader>
-          <CardTitle className="text-primary">Stato Campi</CardTitle>
-          <CardDescription>Attiva o disattiva i campi per renderli prenotabili o meno.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome Campo</TableHead>
-                  <TableHead>Superficie</TableHead>
-                  <TableHead>Stato</TableHead>
-                  <TableHead className="text-right">Azioni</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {courts.map((court) => (
-                  <TableRow key={court.id}>
-                    <TableCell className="font-medium">{court.name}</TableCell>
-                    <TableCell>{court.surface}</TableCell>
-                    <TableCell>
-                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                        court.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                      }`}>
-                        {court.is_active ? 'Attivo' : 'Disattivo'}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end space-x-2">
-                        <Label htmlFor={`toggle-${court.id}`} className="sr-only">Attiva/Disattiva {court.name}</Label>
-                        <Switch
-                          id={`toggle-${court.id}`}
-                          checked={court.is_active}
-                          onCheckedChange={() => handleToggleCourtActive(court.id, court.is_active)}
-                          disabled={loading}
-                        />
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+      <Card className="max-w-4xl mx-auto border-none shadow-[0_8px_30px_rgba(0,0,0,0.04)] rounded-[2.5rem] bg-white overflow-hidden">
+        <CardHeader className="bg-gray-50/50 border-b border-gray-100 p-8 sm:p-10">
+          <div className="flex items-center gap-3 mb-2">
+            <Activity className="text-primary h-5 w-5" />
+            <CardTitle className="text-2xl font-black text-gray-900">Visibilità Calendario</CardTitle>
           </div>
+          <CardDescription className="text-base font-medium text-gray-500">
+            Attiva o disattiva i campi per renderli immediatamente prenotabili dai soci o nasconderli per manutenzione.
+          </CardDescription>
+        </CardHeader>
+        
+        <CardContent className="p-4 sm:p-8">
+          <div className="space-y-3">
+            {courts.map((court) => (
+              <div 
+                key={court.id} 
+                className={cn(
+                  "flex items-center justify-between p-6 rounded-[1.5rem] border-2 transition-all duration-300",
+                  court.is_active 
+                    ? "bg-white border-gray-50 hover:border-primary/20 hover:shadow-md" 
+                    : "bg-gray-50/50 border-transparent opacity-70"
+                )}
+              >
+                <div className="flex items-center gap-5">
+                  <div className={cn(
+                    "w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm",
+                    court.is_active ? "bg-primary text-white" : "bg-gray-200 text-gray-400"
+                  )}>
+                    <MapPin size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">{court.name}</h3>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Badge 
+                        variant="secondary" 
+                        className={cn(
+                          "text-[10px] font-black uppercase tracking-widest px-2 py-0.5",
+                          court.is_active 
+                            ? "bg-green-100 text-green-700" 
+                            : "bg-red-100 text-red-700"
+                        )}
+                      >
+                        {court.is_active ? 'Disponibile' : 'Fuori Servizio'}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <div className="text-right hidden sm:block">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Stato</p>
+                    <p className={cn(
+                      "text-sm font-bold",
+                      court.is_active ? "text-primary" : "text-gray-400"
+                    )}>
+                      {court.is_active ? 'Attivo' : 'Nascosto'}
+                    </p>
+                  </div>
+                  <div className="bg-gray-50 p-3 rounded-2xl">
+                    <Switch
+                      checked={court.is_active}
+                      onCheckedChange={() => handleToggleCourtActive(court.id, court.is_active)}
+                      disabled={processingId === court.id}
+                      className="data-[state=checked]:bg-primary"
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          {courts.length === 0 && (
+            <div className="text-center py-20 text-gray-400 font-bold uppercase tracking-widest">
+              Nessun campo configurato nel database.
+            </div>
+          )}
         </CardContent>
       </Card>
+      
+      <div className="max-w-4xl mx-auto mt-8 bg-amber-50 p-6 rounded-[2rem] border border-amber-100 flex gap-4">
+        <div className="bg-white p-2 rounded-xl shadow-sm h-fit">
+          <Activity className="text-amber-600 h-5 w-5" />
+        </div>
+        <p className="text-sm text-amber-800 leading-relaxed font-medium">
+          <strong>Nota:</strong> Disattivare un campo non cancella le prenotazioni esistenti, ma impedisce ai soci di effettuarne di nuove su quel campo finché non viene riattivato.
+        </p>
+      </div>
     </div>
   );
 };
