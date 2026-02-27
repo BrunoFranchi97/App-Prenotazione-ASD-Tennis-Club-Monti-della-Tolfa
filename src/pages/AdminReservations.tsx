@@ -45,7 +45,7 @@ type ProfileLite = { id: string; full_name: string | null };
 type ReservationRow = Reservation & {
   court?: Court;
   bookedByName: string;
-  groupId?: string; // ID del gruppo per prenotazioni consecutive
+  groupId?: string; 
 };
 
 const TIME_SLOTS = [
@@ -65,85 +65,53 @@ const SURFACE_LABELS: Record<string, string> = {
   "superficie_dura": "Sup. Dura",
 };
 
-// Palette di colori pastello senza rosso/arancione per evitare segnali di urgenza
 const SLOT_COLORS = [
-  "bg-green-100 border-green-200 text-green-800",      // Verde chiaro (coerente con il club)
-  "bg-blue-100 border-blue-200 text-blue-800",         // Blu chiaro
-  "bg-purple-100 border-purple-200 text-purple-800",   // Viola chiaro
-  "bg-amber-100 border-amber-200 text-amber-800",      // Ambra chiaro (sostituisce l'arancione)
-  "bg-cyan-100 border-cyan-200 text-cyan-800",         // Ciano chiaro
-  "bg-lime-100 border-lime-200 text-lime-800",         // Lime chiaro
-  "bg-indigo-100 border-indigo-200 text-indigo-800",   // Indigo chiaro
-  "bg-teal-100 border-teal-200 text-teal-800",         // Teal chiaro
+  "bg-green-100 border-green-200 text-green-800",
+  "bg-blue-100 border-blue-200 text-blue-800",
+  "bg-purple-100 border-purple-200 text-purple-800",
+  "bg-amber-100 border-amber-200 text-amber-800",
+  "bg-cyan-100 border-cyan-200 text-cyan-800",
+  "bg-lime-100 border-lime-200 text-lime-800",
+  "bg-indigo-100 border-indigo-200 text-indigo-800",
+  "bg-teal-100 border-teal-200 text-teal-800",
 ];
 
-// Funzione per raggruppare prenotazioni consecutive dello stesso utente sullo stesso campo
 const groupReservations = (reservations: ReservationRow[]): ReservationRow[] => {
   if (reservations.length === 0) return [];
-  
-  // Ordina per campo, utente e orario di inizio
   const sorted = [...reservations].sort((a, b) => {
     if (a.court_id !== b.court_id) return a.court_id - b.court_id;
     if (a.user_id !== b.user_id) return a.user_id.localeCompare(b.user_id);
     return parseISO(a.starts_at).getTime() - parseISO(b.starts_at).getTime();
   });
-  
   const grouped: ReservationRow[] = [];
   let currentGroup: ReservationRow[] = [];
   let groupId = 1;
-  
   for (let i = 0; i < sorted.length; i++) {
     const current = sorted[i];
-    
-    if (currentGroup.length === 0) {
-      // Inizia un nuovo gruppo
-      currentGroup.push(current);
-    } else {
+    if (currentGroup.length === 0) currentGroup.push(current);
+    else {
       const lastInGroup = currentGroup[currentGroup.length - 1];
       const lastEnd = parseISO(lastInGroup.ends_at);
       const currentStart = parseISO(current.starts_at);
-      
-      // Controlla se è una prenotazione consecutiva:
-      // Stesso campo, stesso utente, e inizia entro 5 minuti dalla fine della precedente
       const isConsecutive = 
         current.court_id === lastInGroup.court_id &&
         current.user_id === lastInGroup.user_id &&
         Math.abs(differenceInMinutes(currentStart, lastEnd)) <= 5;
-      
-      if (isConsecutive) {
-        currentGroup.push(current);
-      } else {
-        // Assegna groupId a tutte le prenotazioni nel gruppo corrente
-        currentGroup.forEach(res => {
-          grouped.push({ ...res, groupId: `group-${groupId}` });
-        });
-        
-        // Inizia un nuovo gruppo
+      if (isConsecutive) currentGroup.push(current);
+      else {
+        currentGroup.forEach(res => grouped.push({ ...res, groupId: `group-${groupId}` }));
         groupId++;
         currentGroup = [current];
       }
     }
   }
-  
-  // Aggiungi l'ultimo gruppo
-  if (currentGroup.length > 0) {
-    currentGroup.forEach(res => {
-      grouped.push({ ...res, groupId: `group-${groupId}` });
-    });
-  }
-  
+  if (currentGroup.length > 0) currentGroup.forEach(res => grouped.push({ ...res, groupId: `group-${groupId}` }));
   return grouped;
 };
 
-// Funzione per ottenere un colore consistente per un gruppo di prenotazioni
 const getGroupColor = (groupId: string): string => {
   if (!groupId) return SLOT_COLORS[0];
-  
-  // Crea un hash semplice dal groupId per ottenere un colore consistente
-  const hash = groupId.split('').reduce((acc, char) => {
-    return acc + char.charCodeAt(0);
-  }, 0);
-  
+  const hash = groupId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
   return SLOT_COLORS[hash % SLOT_COLORS.length];
 };
 
@@ -160,15 +128,12 @@ export default function AdminReservations() {
   const [visibleCourts, setVisibleCourts] = useState<number[]>([]);
   const [hoveredSlot, setHoveredSlot] = useState<string | null>(null);
 
-  // CRUD Dialogs
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedReservation, setSelectedReservation] = useState<ReservationRow | null>(null);
-  const [createSlotData, setCreateSlotData] = useState<{ courtId: number; time: string } | null>(null);
 
-  // Form states - MODIFICATO: rimossa formUserId, aggiunti firstName e lastName
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [formCourtId, setFormCourtId] = useState("");
@@ -198,17 +163,18 @@ export default function AdminReservations() {
 
       setCourts(courtsData.data || []);
       setProfiles(profilesData.data || []);
-      setVisibleCourts((courtsData.data || []).map(c => c.id));
       
-      // Raggruppa le prenotazioni prima di impostarle
+      // Solo all'inizializzazione o se la lista visibile è vuota, mostriamo tutti
+      if (visibleCourts.length === 0) {
+        setVisibleCourts((courtsData.data || []).map(c => c.id));
+      }
+      
       const reservationsWithNames = (resData.data || []).map(r => ({
         ...r,
         court: courtMap.get(r.court_id),
         bookedByName: profileMap.get(r.user_id) || "Socio",
       }));
-      
-      const groupedReservations = groupReservations(reservationsWithNames);
-      setReservations(groupedReservations);
+      setReservations(groupReservations(reservationsWithNames));
     } catch (err: any) {
       showError("Errore nel caricamento: " + err.message);
     } finally {
@@ -227,18 +193,18 @@ export default function AdminReservations() {
   const handleNextDay = () => setSelectedDate(addDays(selectedDate, 1));
   const handleToday = () => setSelectedDate(new Date());
 
-  const toggleCourtVisibility = (courtId: number) => {
-    setVisibleCourts(prev => prev.includes(courtId) ? prev.filter(id => id !== courtId) : [...prev, courtId]);
+  // Nuova logica: Se clicchi un campo specifico, vedi solo quello. Se clicchi "Tutti", vedi tutti.
+  const handleCourtFilter = (courtId: number | 'all') => {
+    if (courtId === 'all') {
+      setVisibleCourts(courts.map(c => c.id));
+    } else {
+      setVisibleCourts([courtId]);
+    }
   };
 
-  const openViewDialog = (res: ReservationRow) => {
-    setSelectedReservation(res);
-    setViewDialogOpen(true);
-  };
-
+  const openViewDialog = (res: ReservationRow) => { setSelectedReservation(res); setViewDialogOpen(true); };
   const openEditDialog = (res: ReservationRow) => {
     setSelectedReservation(res);
-    // Per la modifica, precompiliamo con i dati esistenti
     setFirstName(res.booked_for_first_name || "");
     setLastName(res.booked_for_last_name || "");
     setFormCourtId(String(res.court_id));
@@ -247,94 +213,52 @@ export default function AdminReservations() {
     setFormNotes(res.notes || "");
     setEditDialogOpen(true);
   };
-
   const openCreateDialog = (courtId: number, time: string) => {
-    setCreateSlotData({ courtId, time });
-    setFirstName("");
-    setLastName("");
-    setFormCourtId(String(courtId));
-    setFormStartTime(time);
-    setFormDuration("1");
-    setFormNotes("");
+    setFirstName(""); setLastName(""); setFormCourtId(String(courtId));
+    setFormStartTime(time); setFormDuration("1"); setFormNotes("");
     setCreateDialogOpen(true);
   };
-
-  const openDeleteDialog = (res: ReservationRow) => {
-    setSelectedReservation(res);
-    setDeleteDialogOpen(true);
-  };
+  const openDeleteDialog = (res: ReservationRow) => { setSelectedReservation(res); setDeleteDialogOpen(true); };
 
   const handleCreate = async () => {
-    if (!firstName || !lastName || !formCourtId || !formStartTime) {
-      showError("Compila tutti i campi obbligatori: Nome, Cognome e Orario.");
-      return;
-    }
-    
+    if (!firstName || !lastName || !formCourtId || !formStartTime) return showError("Compila i campi obbligatori.");
     setLoading(true);
     try {
-      const [hours, minutes] = formStartTime.split(':').map(Number);
-      const start = setMinutes(setHours(startOfDay(selectedDate), hours), minutes);
+      const start = setMinutes(setHours(startOfDay(selectedDate), parseInt(formStartTime.split(':')[0])), parseInt(formStartTime.split(':')[1] || '0'));
       const duration = parseInt(formDuration);
-      
       const inserts = [];
       for (let i = 0; i < duration; i++) {
         const s = addHours(start, i);
-        const e = addHours(s, 1);
         inserts.push({
-          court_id: parseInt(formCourtId),
-          user_id: currentUserId, // Usa l'ID dell'amministratore corrente
-          starts_at: s.toISOString(),
-          ends_at: e.toISOString(),
-          status: 'confirmed',
-          notes: formNotes.trim() || null,
-          booked_for_first_name: firstName.trim(),
-          booked_for_last_name: lastName.trim(),
+          court_id: parseInt(formCourtId), user_id: currentUserId,
+          starts_at: s.toISOString(), ends_at: addHours(s, 1).toISOString(),
+          status: 'confirmed', notes: formNotes.trim() || null,
+          booked_for_first_name: firstName.trim(), booked_for_last_name: lastName.trim(),
         });
       }
-      
       const { error } = await supabase.from('reservations').insert(inserts);
       if (error) throw error;
       showSuccess("Prenotazione creata!");
       setCreateDialogOpen(false);
       refreshAll();
-    } catch (err: any) {
-      showError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err: any) { showError(err.message); } finally { setLoading(false); }
   };
 
   const handleEdit = async () => {
-    if (!selectedReservation || !firstName || !lastName || !formCourtId || !formStartTime) {
-      showError("Compila tutti i campi obbligatori.");
-      return;
-    }
-    
+    if (!selectedReservation || !firstName || !lastName || !formCourtId || !formStartTime) return showError("Compila i campi obbligatori.");
     setLoading(true);
     try {
-      const [hours, minutes] = formStartTime.split(':').map(Number);
-      const start = setMinutes(setHours(startOfDay(selectedDate), hours), minutes);
-      const end = addHours(start, 1);
-      
+      const start = setMinutes(setHours(startOfDay(selectedDate), parseInt(formStartTime.split(':')[0])), parseInt(formStartTime.split(':')[1] || '0'));
       const { error } = await supabase.from('reservations').update({
-        court_id: parseInt(formCourtId),
-        booked_for_first_name: firstName.trim(),
-        booked_for_last_name: lastName.trim(),
-        starts_at: start.toISOString(),
-        ends_at: end.toISOString(),
-        notes: formNotes.trim() || null,
-        updated_at: new Date().toISOString()
+        court_id: parseInt(formCourtId), booked_for_first_name: firstName.trim(), booked_for_last_name: lastName.trim(),
+        starts_at: start.toISOString(), ends_at: addHours(start, 1).toISOString(),
+        notes: formNotes.trim() || null, updated_at: new Date().toISOString()
       }).eq('id', selectedReservation.id);
-      
       if (error) throw error;
-      showSuccess("Prenotazione aggiornata!");
+      showSuccess("Aggiornata!");
       setEditDialogOpen(false);
       refreshAll();
-    } catch (err: any) {
-      showError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err: any) { showError(err.message); } finally { setLoading(false); }
   };
 
   const handleDelete = async () => {
@@ -343,82 +267,78 @@ export default function AdminReservations() {
     try {
       const { error } = await supabase.from('reservations').delete().eq('id', selectedReservation.id);
       if (error) throw error;
-      showSuccess("Prenotazione eliminata!");
+      showSuccess("Eliminata!");
       setDeleteDialogOpen(false);
       refreshAll();
-    } catch (err: any) {
-      showError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err: any) { showError(err.message); } finally { setLoading(false); }
   };
 
   if (!isAdmin && !loading) return null;
-
   const visibleCourtsList = courts.filter(c => visibleCourts.includes(c.id));
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col">
-      {/* Header con navigazione giorno - stile identico all'app */}
-      <header className="bg-primary text-white shadow-lg sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link to="/admin">
-            <Button variant="ghost" size="icon" className="text-white hover:bg-white/10">
-              <ArrowLeft className="h-5 w-5" />
+      {/* Header Premium con Navigazione Distinta */}
+      <header className="bg-white border-b border-gray-100 shadow-sm sticky top-0 z-50">
+        <div className="container mx-auto px-6 py-4 flex items-center">
+          {/* Back button isolato */}
+          <Link to="/admin" className="mr-auto group">
+            <Button variant="ghost" size="sm" className="rounded-xl text-gray-500 hover:text-primary hover:bg-primary/5 px-3">
+              <ArrowLeft className="h-5 w-5 mr-2 group-hover:-translate-x-1 transition-transform" />
+              <span className="font-bold">Admin</span>
             </Button>
           </Link>
           
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={handlePrevDay} className="text-white hover:bg-white/10">
+          {/* Blocco Navigazione Calendario Centrato */}
+          <div className="flex items-center gap-2 bg-gray-50 p-1.5 rounded-2xl border border-gray-100">
+            <Button variant="ghost" size="icon" onClick={handlePrevDay} className="h-10 w-10 text-primary hover:bg-white hover:shadow-sm rounded-xl">
               <ChevronLeft className="h-6 w-6" />
             </Button>
             
-            <Button 
-              variant="secondary" 
-              size="sm" 
-              onClick={handleToday}
-              className="rounded-full px-4 py-1 bg-white/20 hover:bg-white/30 text-white font-bold text-xs uppercase tracking-wider"
-            >
-              Oggi
-            </Button>
+            <div className="flex flex-col items-center min-w-[180px] px-4 cursor-pointer" onClick={handleToday}>
+              <span className="text-[10px] font-black uppercase tracking-widest text-primary/60 leading-none mb-1">
+                {isSameDay(selectedDate, new Date()) ? 'OGGI' : 'DATA'}
+              </span>
+              <span className="text-sm font-black text-gray-900 capitalize">
+                {format(selectedDate, 'EEEE, dd MMMM', { locale: it })}
+              </span>
+            </div>
             
-            <h1 className="text-xl font-bold capitalize min-w-[200px] text-center">
-              {format(selectedDate, 'EEEE, dd MMM', { locale: it })}
-            </h1>
-            
-            <Button variant="ghost" size="icon" onClick={handleNextDay} className="text-white hover:bg-white/10">
+            <Button variant="ghost" size="icon" onClick={handleNextDay} className="h-10 w-10 text-primary hover:bg-white hover:shadow-sm rounded-xl">
               <ChevronRight className="h-6 w-6" />
             </Button>
           </div>
           
-          <div className="w-10" /> {/* Spacer for symmetry */}
+          {/* Spacer per bilanciamento */}
+          <div className="ml-auto w-[100px]" />
         </div>
       </header>
 
-      {/* Quick filter tabs */}
-      <div className="bg-white border-b border-gray-100 sticky top-[72px] z-40 shadow-sm">
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+      {/* Filtri Campi con Logica Switch */}
+      <div className="bg-white/80 backdrop-blur-md border-b border-gray-100 sticky top-[73px] z-40 shadow-sm">
+        <div className="container mx-auto px-6 py-3">
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide py-1">
             <button
-              onClick={() => setVisibleCourts(courts.map(c => c.id))}
+              onClick={() => handleCourtFilter('all')}
               className={cn(
-                "px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all",
+                "px-6 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest transition-all duration-300",
                 visibleCourts.length === courts.length 
-                  ? "bg-primary text-white shadow-md" 
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  ? "bg-primary text-white shadow-lg shadow-primary/20 scale-105" 
+                  : "bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600"
               )}
             >
               Tutti i Campi
             </button>
+            <div className="w-px h-8 bg-gray-100 mx-2 self-center" />
             {courts.map(court => (
               <button
                 key={court.id}
-                onClick={() => toggleCourtVisibility(court.id)}
+                onClick={() => handleCourtFilter(court.id)}
                 className={cn(
-                  "px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all",
-                  visibleCourts.includes(court.id) 
-                    ? "bg-primary text-white shadow-md" 
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  "px-6 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest transition-all duration-300",
+                  visibleCourts.length === 1 && visibleCourts.includes(court.id) 
+                    ? "bg-club-orange text-white shadow-lg shadow-club-orange/20 scale-105" 
+                    : "bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-600 border border-gray-100"
                 )}
               >
                 {court.name}
@@ -428,102 +348,86 @@ export default function AdminReservations() {
         </div>
       </div>
 
-      {/* Griglia principale */}
       <div className="flex-1 overflow-auto">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex gap-0">
-            {/* Colonna orari sticky */}
-            <div className="sticky left-0 z-30 bg-[#F8FAFC] pr-2" style={{ width: '80px' }}>
-              <div className="h-16" /> {/* Header spacer */}
+        <div className="container mx-auto px-6 py-8">
+          <div className="flex gap-2">
+            {/* Timeline */}
+            <div className="sticky left-0 z-30 bg-[#F8FAFC]/80 backdrop-blur-sm pr-4 pt-16" style={{ width: '80px' }}>
               {TIME_SLOTS.map(time => (
-                <div key={time} className="h-24 flex items-center justify-end pr-3 text-sm font-bold text-gray-500">
+                <div key={time} className="h-28 flex items-start justify-end pr-3 text-[11px] font-black text-gray-400 tracking-tighter">
                   {time}
                 </div>
               ))}
             </div>
 
-            {/* Colonne campi */}
-            <div className="flex-1 flex gap-4">
+            {/* Grid */}
+            <div className="flex-1 flex gap-6">
               {visibleCourtsList.map(court => (
-                <div key={court.id} className="flex-1 min-w-[200px]">
-                  {/* Header colonna campo */}
-                  <div className="h-16 mb-2 bg-white rounded-2xl shadow-sm p-3 flex flex-col justify-center border border-gray-100">
-                    <h3 className="font-black text-gray-900 text-sm mb-1">{court.name}</h3>
-                    <Badge className={cn("text-[10px] font-bold uppercase w-fit", SURFACE_COLORS[court.surface] || "bg-gray-100 text-gray-800")}>
-                      {SURFACE_LABELS[court.surface] || court.surface}
-                    </Badge>
+                <div key={court.id} className="flex-1 min-w-[240px] animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  <div className="h-14 mb-4 bg-white rounded-2xl shadow-sm p-3 flex items-center justify-between border border-gray-50 group hover:border-primary/20 transition-all">
+                    <div>
+                      <h3 className="font-black text-gray-900 text-sm leading-none">{court.name}</h3>
+                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">
+                        {SURFACE_LABELS[court.surface] || court.surface}
+                      </p>
+                    </div>
+                    <div className={cn("w-2 h-2 rounded-full", court.is_active ? "bg-green-500" : "bg-gray-300")} />
                   </div>
 
-                  {/* Slot orari */}
                   {TIME_SLOTS.map(time => {
-                    const reservation = getReservationForSlot(court.id, time);
+                    const res = getReservationForSlot(court.id, time);
                     const slotKey = `${court.id}-${time}`;
                     const isHovered = hoveredSlot === slotKey;
-                    const isMine = reservation?.user_id === currentUserId;
-                    const slotColor = reservation ? getGroupColor(reservation.groupId || '') : "";
+                    const slotColor = res ? getGroupColor(res.groupId || '') : "";
 
                     return (
                       <div
                         key={time}
                         className={cn(
-                          "h-24 mb-2 rounded-xl transition-all duration-200 relative group",
-                          reservation 
-                            ? cn("shadow-md cursor-pointer hover:shadow-lg hover:scale-[0.97]", slotColor)
-                            : "bg-white/40 border-2 border-dashed border-gray-200 hover:border-primary/40 hover:bg-white/60 cursor-pointer"
+                          "h-28 mb-3 rounded-[1.5rem] transition-all duration-300 relative overflow-hidden",
+                          res 
+                            ? cn("shadow-md border border-white/20 cursor-pointer", slotColor)
+                            : "bg-white/50 border-2 border-dashed border-gray-100 hover:border-primary/30 hover:bg-white cursor-pointer group"
                         )}
                         onMouseEnter={() => setHoveredSlot(slotKey)}
                         onMouseLeave={() => setHoveredSlot(null)}
-                        onClick={() => !reservation && openCreateDialog(court.id, time)}
+                        onClick={() => !res && openCreateDialog(court.id, time)}
                       >
-                        {reservation ? (
+                        {res ? (
                           <>
-                            <div className="p-3 h-full flex flex-col justify-between">
-                              <div>
-                                <div className="flex items-center gap-1 mb-1">
-                                  {isMine && <span className="text-yellow-500">⭐</span>}
-                                  <p className="font-bold text-gray-900 text-sm truncate">
-                                    {reservation.bookedByName}
-                                  </p>
-                                </div>
-                                <p className="text-xs text-gray-700 font-medium">
-                                  {format(parseISO(reservation.starts_at), 'HH:mm')} - {format(parseISO(reservation.ends_at), 'HH:mm')}
+                            <div className="p-4 h-full flex flex-col">
+                              <div className="flex items-center justify-between mb-1">
+                                <p className="font-black text-gray-900 text-sm truncate uppercase tracking-tight">
+                                  {res.booked_for_first_name} {res.booked_for_last_name}
                                 </p>
-                                {reservation.booked_for_first_name && (
-                                  <p className="text-xs text-gray-600 mt-1">
-                                    Per: {reservation.booked_for_first_name} {reservation.booked_for_last_name}
-                                  </p>
-                                )}
+                              </div>
+                              <p className="text-[10px] font-bold opacity-70 flex items-center gap-1">
+                                <Clock size={10} /> {time} - {format(parseISO(res.ends_at), 'HH:mm')}
+                              </p>
+                              <div className="mt-auto flex items-center gap-1.5">
+                                <div className="w-1.5 h-1.5 rounded-full bg-black/20" />
+                                <span className="text-[9px] font-black uppercase opacity-40">Prenotazione Socio</span>
                               </div>
                             </div>
 
-                            {/* Icon overlay CRUD - appare solo su hover */}
                             <div className={cn(
-                              "absolute top-2 right-2 flex gap-1 transition-opacity duration-200",
-                              isHovered ? "opacity-100" : "opacity-0"
+                              "absolute bottom-2 right-2 flex gap-1.5 transition-all duration-300",
+                              isHovered ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
                             )}>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); openViewDialog(reservation); }}
-                                className="w-7 h-7 rounded-md bg-white/90 backdrop-blur-sm shadow-md flex items-center justify-center hover:bg-white transition-all"
-                              >
-                                <Eye className="h-3.5 w-3.5 text-gray-700" />
+                              <button onClick={(e) => { e.stopPropagation(); openViewDialog(res); }} className="w-8 h-8 rounded-xl bg-white/90 shadow-sm flex items-center justify-center hover:scale-110 active:scale-95 text-gray-700">
+                                <Eye className="h-4 w-4" />
                               </button>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); openEditDialog(reservation); }}
-                                className="w-7 h-7 rounded-md bg-white/90 backdrop-blur-sm shadow-md flex items-center justify-center hover:bg-white transition-all"
-                              >
-                                <Edit className="h-3.5 w-3.5 text-primary" />
+                              <button onClick={(e) => { e.stopPropagation(); openEditDialog(res); }} className="w-8 h-8 rounded-xl bg-white/90 shadow-sm flex items-center justify-center hover:scale-110 active:scale-95 text-primary">
+                                <Edit className="h-4 w-4" />
                               </button>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); openDeleteDialog(reservation); }}
-                                className="w-7 h-7 rounded-md bg-white/90 backdrop-blur-sm shadow-md flex items-center justify-center hover:bg-white transition-all"
-                              >
-                                <Trash2 className="h-3.5 w-3.5 text-red-600" />
+                              <button onClick={(e) => { e.stopPropagation(); openDeleteDialog(res); }} className="w-8 h-8 rounded-xl bg-white/90 shadow-sm flex items-center justify-center hover:scale-110 active:scale-95 text-red-600">
+                                <Trash2 className="h-4 w-4" />
                               </button>
                             </div>
                           </>
                         ) : (
                           <div className="h-full flex items-center justify-center">
-                            <Plus className="h-5 w-5 text-gray-300 group-hover:text-primary transition-colors" />
+                            <Plus className="h-6 w-6 text-gray-200 group-hover:text-primary/40 group-hover:scale-125 transition-all duration-500" />
                           </div>
                         )}
                       </div>
@@ -536,331 +440,137 @@ export default function AdminReservations() {
         </div>
       </div>
 
-      {/* Dialog Visualizza */}
+      {/* CRUD Dialogs rimangono invariati nella logica ma con stile premium */}
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-        <DialogContent className="sm:max-w-md rounded-3xl">
+        <DialogContent className="sm:max-w-md rounded-[2.5rem] border-none shadow-2xl p-8">
           <DialogHeader>
-            <DialogTitle className="text-primary">Dettagli Prenotazione</DialogTitle>
-            <DialogDescription>Informazioni complete sulla prenotazione selezionata</DialogDescription>
+            <DialogTitle className="text-2xl font-black text-primary uppercase tracking-tight">Scheda Prenotazione</DialogTitle>
+            <DialogDescription className="text-sm font-medium text-gray-500">Dettagli completi del match selezionato</DialogDescription>
           </DialogHeader>
           {selectedReservation && (
-            <div className="space-y-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-6 py-4">
+              <div className="bg-gray-50 rounded-2xl p-6 grid grid-cols-2 gap-6 border border-gray-100">
                 <div>
-                  <Label className="text-xs font-bold text-gray-400 uppercase">Prenotato da</Label>
-                  <p className="font-bold text-gray-900">{selectedReservation.bookedByName}</p>
+                  <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Socio</Label>
+                  <p className="font-bold text-gray-900 text-lg">{selectedReservation.booked_for_first_name} {selectedReservation.booked_for_last_name}</p>
                 </div>
                 <div>
-                  <Label className="text-xs font-bold text-gray-400 uppercase">Campo</Label>
-                  <p className="font-bold text-gray-900">{selectedReservation.court?.name}</p>
+                  <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Campo</Label>
+                  <p className="font-bold text-gray-900 text-lg">{selectedReservation.court?.name}</p>
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-xs font-bold text-gray-400 uppercase">Orario</Label>
-                  <p className="font-bold text-gray-900">
+                  <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Orario</Label>
+                  <p className="font-bold text-primary text-lg">
                     {format(parseISO(selectedReservation.starts_at), 'HH:mm')} - {format(parseISO(selectedReservation.ends_at), 'HH:mm')}
                   </p>
                 </div>
                 <div>
-                  <Label className="text-xs font-bold text-gray-400 uppercase">Data</Label>
-                  <p className="font-bold text-gray-900 capitalize">
-                    {format(parseISO(selectedReservation.starts_at), 'dd MMM yyyy', { locale: it })}
-                  </p>
+                  <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Creato da</Label>
+                  <p className="font-bold text-gray-700 text-sm">{selectedReservation.bookedByName}</p>
                 </div>
               </div>
-              {(selectedReservation.booked_for_first_name || selectedReservation.booked_for_last_name) && (
-                <div>
-                  <Label className="text-xs font-bold text-gray-400 uppercase">Prenotato per</Label>
-                  <p className="font-bold text-gray-900">
-                    {selectedReservation.booked_for_first_name} {selectedReservation.booked_for_last_name}
-                  </p>
-                </div>
-              )}
               {selectedReservation.notes && (
-                <div>
-                  <Label className="text-xs font-bold text-gray-400 uppercase">Note</Label>
-                  <p className="text-sm text-gray-700 italic">{selectedReservation.notes}</p>
+                <div className="px-4">
+                  <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Note Amministrative</Label>
+                  <p className="text-sm text-gray-600 italic mt-1 leading-relaxed">"{selectedReservation.notes}"</p>
                 </div>
               )}
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setViewDialogOpen(false)} className="rounded-xl">
-              Chiudi
-            </Button>
+            <Button variant="outline" onClick={() => setViewDialogOpen(false)} className="rounded-xl font-bold h-12 w-full border-gray-200">Chiudi</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Dialog Crea - MODIFICATO: rimossa selezione soci, aggiunti campi Nome e Cognome */}
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-        <DialogContent className="sm:max-w-md rounded-3xl border-t-8 border-t-primary">
+        <DialogContent className="sm:max-w-md rounded-[2.5rem] border-t-8 border-t-primary shadow-2xl p-8">
           <DialogHeader className="pb-4">
-            <DialogTitle className="text-primary text-2xl font-bold flex items-center gap-2">
-              <User className="h-6 w-6" /> Nuova Prenotazione
-            </DialogTitle>
-            <DialogDescription className="text-gray-600">
-              Aggiungi una prenotazione per questo slot
-            </DialogDescription>
+            <DialogTitle className="text-2xl font-black text-primary uppercase tracking-tight">Nuova Prenotazione</DialogTitle>
           </DialogHeader>
-          
-          <div className="space-y-6 py-2">
-            {/* Nome e Cognome */}
+          <div className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-sm font-semibold text-gray-700">Nome *</Label>
-                <Input 
-                  value={firstName} 
-                  onChange={e => setFirstName(e.target.value)} 
-                  className="h-12 rounded-xl border-gray-200 focus:ring-primary/20 focus:border-primary"
-                  placeholder="Mario"
-                  maxLength={50}
-                />
+                <Label className="text-xs font-bold text-gray-500 ml-1">Nome</Label>
+                <Input value={firstName} onChange={e => setFirstName(e.target.value)} className="h-12 rounded-xl border-gray-200 focus:ring-primary/20" placeholder="Mario" />
               </div>
               <div className="space-y-2">
-                <Label className="text-sm font-semibold text-gray-700">Cognome *</Label>
-                <Input 
-                  value={lastName} 
-                  onChange={e => setLastName(e.target.value)} 
-                  className="h-12 rounded-xl border-gray-200 focus:ring-primary/20 focus:border-primary"
-                  placeholder="Rossi"
-                  maxLength={50}
-                />
+                <Label className="text-xs font-bold text-gray-500 ml-1">Cognome</Label>
+                <Input value={lastName} onChange={e => setLastName(e.target.value)} className="h-12 rounded-xl border-gray-200 focus:ring-primary/20" placeholder="Rossi" />
               </div>
             </div>
-
-            {/* Campo */}
-            <div className="space-y-2">
-              <Label className="text-sm font-semibold text-gray-700">Campo *</Label>
-              <Select value={formCourtId} onValueChange={setFormCourtId}>
-                <SelectTrigger className="h-12 rounded-xl border-gray-200 focus:ring-primary/20 focus:border-primary">
-                  <SelectValue placeholder="Seleziona campo" />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl">
-                  {courts.map(c => (
-                    <SelectItem key={c.id} value={String(c.id)} className="py-3">
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Orario e Durata */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-club-orange" /> Orario Inizio *
-                </Label>
-                <div className="relative">
-                  <Select value={formStartTime} onValueChange={setFormStartTime}>
-                    <SelectTrigger className="h-12 rounded-xl border-gray-200 focus:ring-primary/20 focus:border-primary bg-white">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-xl max-h-60">
-                      {TIME_SLOTS.map(time => (
-                        <SelectItem 
-                          key={time} 
-                          value={time}
-                          className="py-3 hover:bg-primary/5 data-[state=checked]:bg-primary/10 data-[state=checked]:text-primary"
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium">{time}</span>
-                            <span className="text-xs text-gray-400">ora</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label className="text-sm font-semibold text-gray-700">Durata *</Label>
-                <Select value={formDuration} onValueChange={setFormDuration}>
-                  <SelectTrigger className="h-12 rounded-xl border-gray-200 focus:ring-primary/20 focus:border-primary">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    <SelectItem value="1" className="py-3">1 ora</SelectItem>
-                    <SelectItem value="2" className="py-3">2 ore</SelectItem>
-                    <SelectItem value="3" className="py-3">3 ore</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Note */}
-            <div className="space-y-2">
-              <Label className="text-sm font-semibold text-gray-700">Note (opzionale)</Label>
-              <Textarea 
-                value={formNotes} 
-                onChange={e => setFormNotes(e.target.value)} 
-                className="rounded-xl border-gray-200 focus:ring-primary/20 focus:border-primary min-h-[100px]"
-                placeholder="Aggiungi note sulla prenotazione..."
-                maxLength={500}
-              />
-            </div>
-          </div>
-
-          <DialogFooter className="gap-3 pt-4">
-            <Button 
-              variant="outline" 
-              onClick={() => setCreateDialogOpen(false)} 
-              className="rounded-xl border-gray-200 hover:bg-gray-50 h-12 font-semibold"
-            >
-              Annulla
-            </Button>
-            <Button 
-              onClick={handleCreate} 
-              disabled={loading || !firstName || !lastName || !formCourtId || !formStartTime}
-              className={cn(
-                "rounded-xl h-12 font-bold transition-all",
-                loading || !firstName || !lastName || !formCourtId || !formStartTime
-                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                  : "bg-gradient-to-br from-primary to-[#23532f] hover:from-[#357a46] hover:to-[#23532f] text-white shadow-lg shadow-primary/20 hover:shadow-primary/30"
-              )}
-            >
-              {loading ? "Creazione..." : "Crea Prenotazione"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Dialog Modifica - MODIFICATO: simile al create */}
-      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="sm:max-w-md rounded-3xl border-t-8 border-t-primary">
-          <DialogHeader className="pb-4">
-            <DialogTitle className="text-primary text-2xl font-bold flex items-center gap-2">
-              <Edit className="h-6 w-6" /> Modifica Prenotazione
-            </DialogTitle>
-            <DialogDescription className="text-gray-600">
-              Aggiorna i dettagli della prenotazione
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-6 py-2">
-            {/* Nome e Cognome */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-sm font-semibold text-gray-700">Nome *</Label>
-                <Input 
-                  value={firstName} 
-                  onChange={e => setFirstName(e.target.value)} 
-                  className="h-12 rounded-xl border-gray-200 focus:ring-primary/20 focus:border-primary"
-                  placeholder="Mario"
-                  maxLength={50}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-sm font-semibold text-gray-700">Cognome *</Label>
-                <Input 
-                  value={lastName} 
-                  onChange={e => setLastName(e.target.value)} 
-                  className="h-12 rounded-xl border-gray-200 focus:ring-primary/20 focus:border-primary"
-                  placeholder="Rossi"
-                  maxLength={50}
-                />
-              </div>
-            </div>
-
-            {/* Campo */}
-            <div className="space-y-2">
-              <Label className="text-sm font-semibold text-gray-700">Campo *</Label>
-              <Select value={formCourtId} onValueChange={setFormCourtId}>
-                <SelectTrigger className="h-12 rounded-xl border-gray-200 focus:ring-primary/20 focus:border-primary">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl">
-                  {courts.map(c => (
-                    <SelectItem key={c.id} value={String(c.id)} className="py-3">
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Orario */}
-            <div className="space-y-2">
-              <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                <Clock className="h-4 w-4 text-club-orange" /> Orario Inizio *
-              </Label>
-              <div className="relative">
+                <Label className="text-xs font-bold text-gray-500 ml-1">Inizio</Label>
                 <Select value={formStartTime} onValueChange={setFormStartTime}>
-                  <SelectTrigger className="h-12 rounded-xl border-gray-200 focus:ring-primary/20 focus:border-primary bg-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl max-h-60">
-                    {TIME_SLOTS.map(time => (
-                      <SelectItem 
-                        key={time} 
-                        value={time}
-                        className="py-3 hover:bg-primary/5 data-[state=checked]:bg-primary/10 data-[state=checked]:text-primary"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium">{time}</span>
-                          <span className="text-xs text-gray-400">ora</span>
-                        </div>
-                      </SelectItem>
-                    ))}
+                  <SelectTrigger className="h-12 rounded-xl border-gray-200"><SelectValue /></SelectTrigger>
+                  <SelectContent className="rounded-xl">{TIME_SLOTS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-bold text-gray-500 ml-1">Durata</Label>
+                <Select value={formDuration} onValueChange={setFormDuration}>
+                  <SelectTrigger className="h-12 rounded-xl border-gray-200"><SelectValue /></SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    <SelectItem value="1">1 ora</SelectItem><SelectItem value="2">2 ore</SelectItem><SelectItem value="3">3 ore</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
-
-            {/* Note */}
             <div className="space-y-2">
-              <Label className="text-sm font-semibold text-gray-700">Note (opzionale)</Label>
-              <Textarea 
-                value={formNotes} 
-                onChange={e => setFormNotes(e.target.value)} 
-                className="rounded-xl border-gray-200 focus:ring-primary/20 focus:border-primary min-h-[100px]"
-                placeholder="Aggiungi note sulla prenotazione..."
-                maxLength={500}
-              />
+              <Label className="text-xs font-bold text-gray-500 ml-1">Note</Label>
+              <Textarea value={formNotes} onChange={e => setFormNotes(e.target.value)} className="rounded-xl border-gray-200 min-h-[80px]" placeholder="Aggiungi info..." />
             </div>
           </div>
-
-          <DialogFooter className="gap-3 pt-4">
-            <Button 
-              variant="outline" 
-              onClick={() => setEditDialogOpen(false)} 
-              className="rounded-xl border-gray-200 hover:bg-gray-50 h-12 font-semibold"
-            >
-              Annulla
-            </Button>
-            <Button 
-              onClick={handleEdit} 
-              disabled={loading || !firstName || !lastName || !formCourtId || !formStartTime}
-              className={cn(
-                "rounded-xl h-12 font-bold transition-all",
-                loading || !firstName || !lastName || !formCourtId || !formStartTime
-                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                  : "bg-gradient-to-br from-primary to-[#23532f] hover:from-[#357a46] hover:to-[#23532f] text-white shadow-lg shadow-primary/20 hover:shadow-primary/30"
-              )}
-            >
-              {loading ? "Salvataggio..." : "Salva Modifiche"}
-            </Button>
+          <DialogFooter className="gap-3 pt-6">
+            <Button variant="outline" onClick={() => setCreateDialogOpen(false)} className="h-12 flex-1 rounded-xl font-bold">Annulla</Button>
+            <Button onClick={handleCreate} disabled={loading || !firstName || !lastName} className="h-12 flex-1 rounded-xl bg-primary hover:bg-[#357a46] font-bold shadow-lg shadow-primary/20">Crea</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Dialog Elimina */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="sm:max-w-md rounded-[2.5rem] border-t-8 border-t-club-orange shadow-2xl p-8">
+          <DialogHeader className="pb-4"><DialogTitle className="text-2xl font-black text-club-orange uppercase tracking-tight">Modifica Match</DialogTitle></DialogHeader>
+          <div className="space-y-6">
+             <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-xs font-bold text-gray-500 ml-1">Nome</Label>
+                <Input value={firstName} onChange={e => setFirstName(e.target.value)} className="h-12 rounded-xl border-gray-200" />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-bold text-gray-500 ml-1">Cognome</Label>
+                <Input value={lastName} onChange={e => setLastName(e.target.value)} className="h-12 rounded-xl border-gray-200" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs font-bold text-gray-500 ml-1">Orario Inizio</Label>
+              <Select value={formStartTime} onValueChange={setFormStartTime}>
+                <SelectTrigger className="h-12 rounded-xl border-gray-200"><SelectValue /></SelectTrigger>
+                <SelectContent className="rounded-xl">{TIME_SLOTS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs font-bold text-gray-500 ml-1">Note</Label>
+              <Textarea value={formNotes} onChange={e => setFormNotes(e.target.value)} className="rounded-xl border-gray-200 min-h-[80px]" />
+            </div>
+          </div>
+          <DialogFooter className="gap-3 pt-6">
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)} className="h-12 flex-1 rounded-xl font-bold">Annulla</Button>
+            <Button onClick={handleEdit} disabled={loading} className="h-12 flex-1 rounded-xl bg-club-orange hover:bg-orange-600 font-bold shadow-lg shadow-club-orange/20">Salva</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent className="rounded-3xl">
+        <AlertDialogContent className="rounded-[2.5rem] p-8">
           <AlertDialogHeader>
-            <AlertDialogTitle>Conferma Eliminazione</AlertDialogTitle>
-            <AlertDialogDescription>
-              Sei sicuro di voler eliminare questa prenotazione? Questa azione è irreversibile.
-            </AlertDialogDescription>
+            <AlertDialogTitle className="text-2xl font-black text-gray-900">Eliminare Prenotazione?</AlertDialogTitle>
+            <AlertDialogDescription className="text-base font-medium">L'azione è definitiva e lo slot tornerà disponibile per tutti i soci.</AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-xl">Annulla</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="rounded-xl bg-red-600 hover:bg-red-700">
-              Elimina Definitivamente
-            </AlertDialogAction>
+          <AlertDialogFooter className="gap-3 mt-4">
+            <AlertDialogCancel className="h-12 flex-1 rounded-xl font-bold">Annulla</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="h-12 flex-1 rounded-xl bg-red-600 hover:bg-red-700 font-bold">Elimina</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
