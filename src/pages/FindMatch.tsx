@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Calendar, Clock, Target, Users, MapPin, Search, PlusCircle, ChevronRight, Info, Zap } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, Target, Users, MapPin, Search, PlusCircle, ChevronRight, Info, Zap, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { format, parseISO, isAfter, startOfDay } from 'date-fns';
