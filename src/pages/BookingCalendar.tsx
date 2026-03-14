@@ -166,7 +166,7 @@ const BookingCalendar = () => {
   const handleBooking = async () => {
     if (!date || !isValid(date)) return;
     
-    // Controllo Policy Settimanale
+    // Controllo Policy Settimanale (EFFETTIVO)
     const limitsStatus = getBookingLimitsStatus(userReservations, date);
     if (!limitsStatus.canBookMoreThisWeek) {
       showError("Hai raggiunto il limite massimo di 2 prenotazioni per questa settimana (Lun-Dom).");
@@ -285,11 +285,17 @@ const BookingCalendar = () => {
                         onClick={() => { setSelectedCourtId(court.id.toString()); setSelectedSlots([]); }}
                         className={cn(
                           "group relative flex flex-col items-center p-4 rounded-2xl border-2 transition-all duration-200",
-                          isSelected ? "border-primary bg-primary/[0.08]" : "border-gray-50 bg-white hover:border-primary/20"
+                          isSelected ? "border-primary bg-primary/[0.08]" : "border-gray-50 bg-white"
                         )}
                       >
                         <h4 className={cn("font-extrabold text-sm mb-2 text-center leading-tight", isSelected ? "text-primary" : "text-gray-700")}>{court.name}</h4>
-                        <Badge className={cn("text-[9px] font-black uppercase tracking-tighter px-2 py-0", availability > 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700")}>
+                        <Badge 
+                          variant="outline"
+                          className={cn(
+                            "text-[9px] font-black uppercase tracking-tighter px-2 py-0 border-none hover:bg-inherit", 
+                            availability > 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                          )}
+                        >
                           {availability > 0 ? `${availability} slot` : 'Pieno'}
                         </Badge>
                       </button>
