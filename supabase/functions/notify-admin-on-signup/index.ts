@@ -60,23 +60,23 @@ serve(async (req) => {
       <p>Ricorda di sostituire "https://dyad-generated-app.vercel.app" con l'URL reale della tua applicazione se diverso.</p>
     `;
 
-    const { data: resendData, error: resendError } = await resend.emails.send({
-      from: SENDER_EMAIL,
-      to: ADMIN_EMAIL,
-      subject: emailSubject,
-      html: emailBody,
-    });
+    try {
+      const resendData = await resend.emails.send({
+        from: SENDER_EMAIL,
+        to: ADMIN_EMAIL,
+        subject: emailSubject,
+        html: emailBody,
+      });
 
-    if (resendError) {
+      console.log("[notify-admin-on-signup] Admin notification email sent successfully.", resendData);
+    } catch (resendError) {
       console.error("[notify-admin-on-signup] Resend Error:", resendError);
-      // We still return 200 because the database trigger succeeded, but log the email error
-      return new Response(JSON.stringify({ message: 'Profile created, but email notification failed.', error: resendError.message }), { 
+      const errorMessage = resendError?.message || 'Unknown error while sending admin notification.';
+      return new Response(JSON.stringify({ message: 'Profile created, but email notification failed.', error: errorMessage }), { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       });
     }
-
-    console.log("[notify-admin-on-signup] Admin notification email sent successfully.", resendData);
 
     return new Response(JSON.stringify({ message: 'Admin notification sent successfully.' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

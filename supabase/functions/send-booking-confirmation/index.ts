@@ -83,22 +83,23 @@ serve(async (req) => {
     }
 
     // --- Email Sending Logic using Resend ---
-    const { data: resendData, error: resendError } = await resend.emails.send({
-      from: SENDER_EMAIL,
-      to: userEmail,
-      subject: emailSubject,
-      html: emailBody,
-    });
+    try {
+      const resendData = await resend.emails.send({
+        from: SENDER_EMAIL,
+        to: userEmail,
+        subject: emailSubject,
+        html: emailBody,
+      });
 
-    if (resendError) {
+      console.log("[send-booking-confirmation] Confirmation email sent successfully.", resendData);
+    } catch (resendError) {
       console.error("[send-booking-confirmation] Resend Error:", resendError);
-      return new Response(JSON.stringify({ message: 'Booking confirmed, but email notification failed.', error: resendError.message }), { 
+      const errorMessage = resendError?.message || 'Unknown error while sending booking confirmation.';
+      return new Response(JSON.stringify({ message: 'Booking confirmed, but email notification failed.', error: errorMessage }), { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       });
     }
-
-    console.log("[send-booking-confirmation] Confirmation email sent successfully.", resendData);
 
     return new Response(JSON.stringify({ message: 'Email confirmation sent successfully.' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -108,7 +108,6 @@ const BookingCalendar = () => {
 
   const allTimeSlots = useMemo(() => {
     const slots = [];
-    // Orario esteso dalle 08:00 alle 22:00 (ultimo slot parte alle 21:00)
     for (let i = 8; i < 22; i++) slots.push(format(setMinutes(setHours(new Date(), i), 0), 'HH:mm'));
     return slots;
   }, []);
@@ -166,6 +165,14 @@ const BookingCalendar = () => {
 
   const handleBooking = async () => {
     if (!date || !isValid(date)) return;
+    
+    // Controllo Policy Settimanale
+    const limitsStatus = getBookingLimitsStatus(userReservations, date);
+    if (!limitsStatus.canBookMoreThisWeek) {
+      showError("Hai raggiunto il limite massimo di 2 prenotazioni per questa settimana (Lun-Dom).");
+      return;
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     
     const hasOverlap = selectedSlots.some(slotTime => {
@@ -278,7 +285,7 @@ const BookingCalendar = () => {
                         onClick={() => { setSelectedCourtId(court.id.toString()); setSelectedSlots([]); }}
                         className={cn(
                           "group relative flex flex-col items-center p-4 rounded-2xl border-2 transition-all duration-200",
-                          isSelected ? "border-primary bg-primary/[0.08]" : "border-gray-50 bg-white hover:border-primary/20 hover:bg-gray-50"
+                          isSelected ? "border-primary bg-primary/[0.08]" : "border-gray-50 bg-white hover:border-primary/20"
                         )}
                       >
                         <h4 className={cn("font-extrabold text-sm mb-2 text-center leading-tight", isSelected ? "text-primary" : "text-gray-700")}>{court.name}</h4>
