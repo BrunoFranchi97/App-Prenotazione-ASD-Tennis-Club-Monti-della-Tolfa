@@ -89,7 +89,7 @@ const MemberDashboard = () => {
       title: "I miei Campi", 
       icon: History, 
       description: "Visualizza i tuoi impegni passati e futuri.",
-      buttonText: "Vedi Storico"
+      buttonText: "Vedi Prenotazioni"
     },
     { 
       path: "/medical-certificates", 
