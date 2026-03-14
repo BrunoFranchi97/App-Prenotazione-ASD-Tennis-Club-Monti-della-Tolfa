@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
-import { ArrowLeft, LogOut, Clock, Users, Trash2, Info, CalendarDays, MapPin, Edit } from 'lucide-react';
+import { ArrowLeft, LogOut, Clock, Users, Trash2, Info, CalendarDays, MapPin, Edit, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { cleanReservationNotes } from '@/utils/noteCleaner';
@@ -39,7 +39,8 @@ const BookingHistory = () => {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
   
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  // Default undefined per mostrare tutto da oggi in poi
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
 
   const handleLogout = async () => {
     try {
@@ -78,7 +79,7 @@ const BookingHistory = () => {
         query = query.eq('user_id', user.id);
       }
 
-      const { data: reservationsData } = await query.order('starts_at', { ascending: false });
+      const { data: reservationsData } = await query.order('starts_at', { ascending: true });
       setReservations(reservationsData || []);
 
       const { data: courtsData } = await supabase.from('courts').select('*');
@@ -136,10 +137,22 @@ const BookingHistory = () => {
   }, [reservations, courts, currentUserId]);
 
   const filteredGroups = useMemo(() => {
-    if (!selectedDate) return [];
-    return allGroups
-      .filter(g => isSameDay(g.date, selectedDate))
-      .sort((a, b) => a.startTime.localeCompare(b.startTime)); // Ordinamento cronologico
+    let filtered = allGroups;
+    
+    if (selectedDate) {
+      // Filtra per data specifica
+      filtered = filtered.filter(g => isSameDay(g.date, selectedDate));
+    } else {
+      // Default: da oggi in poi
+      const today = startOfDay(new Date());
+      filtered = filtered.filter(g => !isBefore(g.date, today));
+    }
+    
+    return filtered.sort((a, b) => {
+      const dateDiff = a.date.getTime() - b.date.getTime();
+      if (dateDiff !== 0) return dateDiff;
+      return a.startTime.localeCompare(b.startTime);
+    });
   }, [allGroups, selectedDate]);
 
   const bookedDates = useMemo(() => {
@@ -186,8 +199,20 @@ const BookingHistory = () => {
         <div className="lg:col-span-4">
           <Card className="shadow-lg border-none overflow-hidden">
             <CardHeader className="bg-primary text-primary-foreground">
-              <CardTitle className="text-lg flex items-center">
-                <CalendarDays className="mr-2 h-5 w-5" /> Calendario Prenotazioni
+              <CardTitle className="text-lg flex items-center justify-between">
+                <div className="flex items-center">
+                  <CalendarDays className="mr-2 h-5 w-5" /> Calendario
+                </div>
+                {selectedDate && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => setSelectedDate(undefined)}
+                    className="h-7 px-2 text-xs text-white hover:bg-white/20"
+                  >
+                    <X className="h-3 w-3 mr-1" /> Reset
+                  </Button>
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent className="p-4 bg-white">
@@ -206,14 +231,14 @@ const BookingHistory = () => {
                   }
                 }}
               />
-              <div className="mt-4 flex items-center justify-center gap-4 text-xs text-muted-foreground">
-                <div className="flex items-center gap-1">
+              <div className="mt-4 flex flex-col gap-2 text-xs text-muted-foreground">
+                <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-club-orange"></div>
                   <span>Giorni con prenotazioni</span>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-primary"></div>
-                  <span>Selezionato</span>
+                  <span>Data selezionata</span>
                 </div>
               </div>
             </CardContent>
@@ -221,23 +246,37 @@ const BookingHistory = () => {
         </div>
 
         <div className="lg:col-span-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-700">
-              {selectedDate ? format(selectedDate, 'EEEE dd MMMM', { locale: it }) : 'Seleziona una data'}
-            </h2>
-            <Badge variant="outline" className="bg-white">
-              {filteredGroups.length} {filteredGroups.length === 1 ? 'prenotazione' : 'prenotazioni'}
+          <div className="flex items-center justify-between mb-6">
+            <div className="space-y-1">
+              <h2 className="text-2xl font-bold text-gray-800">
+                {selectedDate 
+                  ? format(selectedDate, 'EEEE dd MMMM', { locale: it }) 
+                  : 'Prossime Prenotazioni'}
+              </h2>
+              <p className="text-sm text-gray-500">
+                {selectedDate 
+                  ? `Match in programma per questa data` 
+                  : 'Tutti i tuoi impegni futuri nel club'}
+              </p>
+            </div>
+            <Badge variant="outline" className="bg-white px-3 py-1 text-primary border-primary/20 font-bold">
+              {filteredGroups.length} {filteredGroups.length === 1 ? 'match' : 'match'}
             </Badge>
           </div>
 
           {filteredGroups.length === 0 ? (
-            <Card className="border-dashed py-20 text-center text-muted-foreground bg-white/50">
+            <Card className="border-dashed py-20 text-center text-muted-foreground bg-white/50 rounded-[2rem]">
               <CardContent>
                 <div className="flex flex-col items-center">
-                  <Info className="h-12 w-12 mb-4 opacity-20" />
-                  <p className="text-lg">Nessun campo prenotato per questa data.</p>
-                  <Link to="/book" className="mt-4">
-                    <Button variant="link" className="text-primary font-semibold">Prenota ora il tuo prossimo match</Button>
+                  <div className="bg-gray-100 p-4 rounded-full mb-4">
+                    <Info className="h-8 w-8 opacity-40" />
+                  </div>
+                  <p className="text-lg font-medium">Nessuna prenotazione trovata.</p>
+                  <p className="text-sm mt-1">Non hai match in programma per questo periodo.</p>
+                  <Link to="/book" className="mt-6">
+                    <Button className="bg-primary hover:bg-primary/90 rounded-xl font-bold">
+                      Prenota un Campo ora
+                    </Button>
                   </Link>
                 </div>
               </CardContent>
@@ -247,7 +286,7 @@ const BookingHistory = () => {
               {filteredGroups.map((group) => {
                 const isFuture = !isBefore(group.date, startOfDay(new Date()));
                 return (
-                  <Card key={group.id} className={`border-none shadow-md overflow-hidden ${group.isRecipientOnly ? 'bg-blue-50/50' : 'bg-white'} hover:shadow-lg transition-shadow`}>
+                  <Card key={group.id} className={`border-none shadow-md overflow-hidden rounded-2xl ${group.isRecipientOnly ? 'bg-blue-50/50' : 'bg-white'} hover:shadow-lg transition-all duration-300`}>
                     <div className={`h-1.5 w-full ${group.status === 'confirmed' ? 'bg-primary' : 'bg-destructive'}`}></div>
                     <CardContent className="p-5">
                       <div className="flex justify-between items-start mb-4">
@@ -263,6 +302,9 @@ const BookingHistory = () => {
                           <h3 className="font-bold text-xl flex items-center text-primary">
                             <MapPin className="mr-1.5 h-4 w-4 text-club-orange" /> {group.courtName}
                           </h3>
+                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-0.5">
+                            {format(group.date, 'EEEE dd MMMM', { locale: it })}
+                          </p>
                         </div>
                       </div>
 
@@ -291,7 +333,7 @@ const BookingHistory = () => {
                             <Button 
                               variant="outline" 
                               size="sm" 
-                              className="flex-1 border-primary text-primary hover:bg-secondary hover:text-primary"
+                              className="flex-1 border-primary text-primary hover:bg-secondary hover:text-primary rounded-xl font-bold"
                               onClick={() => navigate('/edit-booking', { state: { group } })}
                             >
                               <Edit className="h-4 w-4 mr-1.5" /> Modifica
@@ -299,7 +341,7 @@ const BookingHistory = () => {
                             <Button 
                               variant="destructive" 
                               size="sm" 
-                              className="px-3"
+                              className="px-3 rounded-xl"
                               onClick={() => handleDelete(group)}
                               disabled={deletingGroupId === group.id}
                             >
@@ -307,7 +349,7 @@ const BookingHistory = () => {
                             </Button>
                           </div>
                         ) : (
-                          <div className="text-center text-[11px] text-muted-foreground flex items-center justify-center py-1 bg-gray-50 rounded">
+                          <div className="text-center text-[11px] text-muted-foreground flex items-center justify-center py-2 bg-gray-50 rounded-xl">
                             <Info className="h-3 w-3 mr-1.5" /> 
                             {group.isRecipientOnly ? "Gestita da chi ha prenotato" : "Prenotazione conclusa"}
                           </div>
