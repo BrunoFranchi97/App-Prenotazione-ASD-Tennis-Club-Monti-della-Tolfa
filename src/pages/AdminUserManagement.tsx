@@ -21,6 +21,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ArrowLeft, Search, Loader2, UserCog, Trash2, UserMinus } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import type { Profile } from '@/types/supabase';
@@ -218,27 +219,53 @@ const AdminUserManagement = () => {
                     </TableCell>
                     <TableCell className="text-center">
                       <div className="flex justify-center">
-                        <Switch 
-                          checked={p.is_admin} 
-                          onCheckedChange={() => handleToggleAdmin(p.id, p.is_admin)} 
-                          disabled={p.id === currentAdminId || processingId === p.id}
-                          className="data-[state=checked]:bg-club-orange"
-                        />
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className={p.id === currentAdminId ? "cursor-not-allowed" : ""}>
+                                <Switch
+                                  checked={p.is_admin}
+                                  onCheckedChange={() => handleToggleAdmin(p.id, p.is_admin)}
+                                  disabled={p.id === currentAdminId || processingId === p.id}
+                                  className="data-[state=checked]:bg-club-orange"
+                                />
+                              </span>
+                            </TooltipTrigger>
+                            {p.id === currentAdminId && (
+                              <TooltipContent side="top" className="text-xs">
+                                Non puoi rimuovere il tuo ruolo di amministratore
+                              </TooltipContent>
+                            )}
+                          </Tooltip>
+                        </TooltipProvider>
                       </div>
                     </TableCell>
                     <TableCell className="text-right px-10">
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        onClick={() => {
-                          setProfileToDelete(p);
-                          setDeleteDialogOpen(true);
-                        }}
-                        disabled={p.id === currentAdminId || processingId === p.id}
-                        className="rounded-xl text-gray-400 hover:text-destructive hover:bg-destructive/5 opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <Trash2 className="h-5 w-5" />
-                      </Button>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className={p.id === currentAdminId ? "cursor-not-allowed inline-block" : "inline-block"}>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  setProfileToDelete(p);
+                                  setDeleteDialogOpen(true);
+                                }}
+                                disabled={p.id === currentAdminId || processingId === p.id}
+                                className="rounded-xl text-gray-400 hover:text-destructive hover:bg-destructive/5 opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <Trash2 className="h-5 w-5" />
+                              </Button>
+                            </span>
+                          </TooltipTrigger>
+                          {p.id === currentAdminId && (
+                            <TooltipContent side="top" className="text-xs">
+                              Non puoi eliminare il tuo account da qui
+                            </TooltipContent>
+                          )}
+                        </Tooltip>
+                      </TooltipProvider>
                     </TableCell>
                   </TableRow>
                 ))}

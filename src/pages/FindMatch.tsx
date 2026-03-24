@@ -11,7 +11,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Calendar, Clock, Target, Users, MapPin, Search, PlusCircle, ChevronRight, Info, Zap, Loader2 } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, Target, Users, MapPin, Search, PlusCircle, ChevronRight, Info, Zap, Loader2, X } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { format, parseISO, isAfter, startOfDay } from 'date-fns';
@@ -35,6 +45,8 @@ const FindMatch = () => {
 
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [challengeToCancel, setChallengeToCancel] = useState<MatchRequest | null>(null);
   const [myRequests, setMyRequests] = useState<MatchRequest[]>([]);
   const [othersRequests, setOthersRequests] = useState<any[]>([]);
   const [courts, setCourts] = useState<Court[]>([]);
@@ -49,6 +61,20 @@ const FindMatch = () => {
   const [notes, setNotes] = useState('');
 
   const timeSlots = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00", "21:00"];
+
+  const handleCancelChallenge = async (request: MatchRequest) => {
+    setCancellingId(request.id);
+    try {
+      const { error } = await supabase.from('match_requests').delete().eq('id', request.id);
+      if (error) throw error;
+      showSuccess("Sfida annullata con successo.");
+      fetchData();
+    } catch (err: any) {
+      showError(err.message || "Errore durante l'annullamento della sfida.");
+    } finally {
+      setCancellingId(null);
+    }
+  };
 
   const fetchData = async () => {
     if (!isApproved) return;
@@ -389,6 +415,22 @@ const FindMatch = () => {
                           <MapPin size={14}/> {r.court?.name}
                         </div>
                       </div>
+                      {r.status === 'open' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-6 w-full rounded-2xl border-destructive/30 text-destructive hover:bg-destructive/5 hover:border-destructive font-bold text-xs"
+                          disabled={cancellingId === r.id}
+                          onClick={() => setChallengeToCancel(r)}
+                        >
+                          {cancellingId === r.id ? (
+                            <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                          ) : (
+                            <X className="h-3 w-3 mr-2" />
+                          )}
+                          Annulla Sfida
+                        </Button>
+                      )}
                     </CardContent>
                   </Card>
                 ))
@@ -398,6 +440,42 @@ const FindMatch = () => {
         </Tabs>
       </div>
       <Footer />
+
+      <AlertDialog open={!!challengeToCancel} onOpenChange={(open) => { if (!open) setChallengeToCancel(null); }}>
+        <AlertDialogContent className="rounded-[2rem] border-none shadow-2xl">
+          <AlertDialogHeader>
+            <div className="mx-auto w-16 h-16 rounded-2xl bg-destructive/10 flex items-center justify-center mb-4">
+              <X className="h-8 w-8 text-destructive" />
+            </div>
+            <AlertDialogTitle className="text-center text-xl font-black">Annulla sfida</AlertDialogTitle>
+            <AlertDialogDescription className="text-center text-gray-500">
+              Sei sicuro di voler ritirare questa proposta di sfida?
+              {challengeToCancel && (
+                <span className="block mt-2 font-bold text-gray-700">
+                  {format(parseISO(challengeToCancel.requested_date), 'EEEE d MMMM', { locale: it })} · {challengeToCancel.preferred_time_start}–{challengeToCancel.preferred_time_end}
+                </span>
+              )}
+              <span className="block mt-1 text-xs text-destructive font-semibold">La proposta sarà rimossa dalla bacheca.</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-3">
+            <AlertDialogCancel className="h-12 flex-1 rounded-2xl font-bold" onClick={() => setChallengeToCancel(null)}>
+              Mantieni
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="h-12 flex-1 rounded-2xl bg-destructive hover:bg-destructive/90 font-bold"
+              onClick={() => {
+                if (challengeToCancel) {
+                  handleCancelChallenge(challengeToCancel);
+                  setChallengeToCancel(null);
+                }
+              }}
+            >
+              Annulla Sfida
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

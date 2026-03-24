@@ -27,7 +27,13 @@ const Login = () => {
       });
 
       if (error) {
-        showError(error.message);
+        // Mostra un messaggio chiaro in italiano indipendentemente dall'errore Supabase
+        const isCredentialsError = error.message?.toLowerCase().includes('invalid') ||
+          error.message?.toLowerCase().includes('credentials') ||
+          error.message?.toLowerCase().includes('password') ||
+          error.message?.toLowerCase().includes('user not found') ||
+          (error as any).status === 400;
+        showError(isCredentialsError ? "Email o password non corretti." : error.message);
       } else {
         showSuccess("Accesso effettuato con successo!");
         navigate('/dashboard');

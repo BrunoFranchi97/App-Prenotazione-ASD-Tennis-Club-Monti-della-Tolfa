@@ -477,7 +477,7 @@ export default function AdminReservations() {
             </div>
             <div className="space-y-1"><Label className="text-[10px] font-bold text-gray-400">Note</Label><Textarea value={formNotes} onChange={e => setFormNotes(e.target.value)} className="rounded-xl min-h-[60px] text-xs" /></div>
           </div>
-          <DialogFooter className="gap-2 pt-4"><Button variant="outline" onClick={() => setCreateDialogOpen(false)} className="h-11 flex-1 rounded-xl">Annulla</Button><Button onClick={handleCreate} disabled={loading || !firstName} className="h-11 flex-1 rounded-xl bg-primary">Crea</Button></DialogFooter>
+          <DialogFooter className="gap-2 pt-4"><Button variant="outline" onClick={() => setCreateDialogOpen(false)} className="h-11 flex-1 rounded-xl">Annulla</Button><Button onClick={handleCreate} disabled={loading || !firstName || !lastName} className="h-11 flex-1 rounded-xl bg-primary">Crea</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 

@@ -92,7 +92,8 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
     } else {
       if (location.pathname === '/') {
         navigate('/login');
-      } else if (!isPublicAuthRoute && !isAdminRoute) {
+      } else if (!isPublicAuthRoute) {
+        // Tutte le route protette (incluse le route /admin) richiedono autenticazione
         navigate('/login');
       }
     }

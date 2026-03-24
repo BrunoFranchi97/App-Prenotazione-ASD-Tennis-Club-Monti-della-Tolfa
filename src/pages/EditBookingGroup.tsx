@@ -191,7 +191,7 @@ const EditBookingGroup = () => {
 
   const handleSave = async () => {
     if (selectedSlots.length === 0) {
-      showError("Seleziona almeno un orario o elimina la prenotazione dallo storico.");
+      showError("Seleziona almeno un orario o elimina la prenotazione dai tuoi campi prenotati.");
       return;
     }
 

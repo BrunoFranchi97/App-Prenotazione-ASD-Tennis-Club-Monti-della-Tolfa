@@ -50,7 +50,7 @@ function Calendar({
         day_range_end: "day-range-end",
         day_selected:
           "bg-primary text-white hover:bg-primary hover:text-white focus:bg-primary focus:text-white shadow-md",
-        day_today: "bg-accent text-accent-foreground font-bold ring-2 ring-primary/30",
+        day_today: "font-bold text-primary ring-2 ring-primary/40 ring-inset",
         day_outside:
           "day-outside text-muted-foreground/40 aria-selected:bg-accent/50 aria-selected:text-muted-foreground",
         day_disabled: "text-muted-foreground/30 cursor-not-allowed",

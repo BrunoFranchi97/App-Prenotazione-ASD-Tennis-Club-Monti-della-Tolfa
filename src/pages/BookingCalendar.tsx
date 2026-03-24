@@ -236,6 +236,10 @@ const BookingCalendar = () => {
         <UserNav />
       </header>
 
+      <div className="max-w-7xl mx-auto mb-6">
+        <BookingLimitsBox status={getBookingLimitsStatus(userReservations, date && isValid(date) ? date : new Date())} />
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 max-w-7xl mx-auto">
         <div className="lg:col-span-4 space-y-8">
           <Card className="border-none shadow-[0_2px_12px_rgba(0,0,0,0.04)] rounded-[2rem] bg-white overflow-hidden">
@@ -257,7 +261,6 @@ const BookingCalendar = () => {
             </CardContent>
           </Card>
           
-          <BookingLimitsBox status={getBookingLimitsStatus(userReservations, date && isValid(date) ? date : new Date())} />
         </div>
 
         <div className="lg:col-span-8">

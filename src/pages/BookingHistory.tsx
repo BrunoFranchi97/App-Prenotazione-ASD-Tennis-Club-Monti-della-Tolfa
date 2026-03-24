@@ -10,6 +10,16 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ArrowLeft, Clock, Users, Trash2, Info, CalendarDays, MapPin, Edit, X, Filter, Layers, Target, ChevronDown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
@@ -48,7 +58,8 @@ const BookingHistory = () => {
   const [courts, setCourts] = useState<Court[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
-  
+  const [groupToDelete, setGroupToDelete] = useState<ReservationGroup | null>(null);
+
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedSurface, setSelectedSurface] = useState<string>("all");
   const [selectedType, setSelectedType] = useState<string>("all");
@@ -148,6 +159,7 @@ const BookingHistory = () => {
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]"><div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div></div>;
 
   return (
+    <>
     <div className="min-h-screen bg-[#F8FAFC] p-4 sm:p-8 lg:p-10">
       <header className="flex justify-between items-center mb-6 max-w-6xl mx-auto">
         <div className="flex items-center gap-4">
@@ -314,10 +326,10 @@ const BookingHistory = () => {
                           >
                             <Edit className="h-3.5 w-3.5 mr-2" /> Modifica
                           </Button>
-                          <Button 
-                            variant="destructive" 
+                          <Button
+                            variant="destructive"
                             className="w-10 h-10 rounded-xl p-0 flex items-center justify-center"
-                            onClick={() => handleDelete(group)}
+                            onClick={() => setGroupToDelete(group)}
                             disabled={deletingGroupId === group.id}
                           >
                             {deletingGroupId === group.id ? <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin"></div> : <Trash2 className="h-3.5 w-3.5" />}
@@ -339,6 +351,43 @@ const BookingHistory = () => {
         )}
       </div>
     </div>
+
+    <AlertDialog open={!!groupToDelete} onOpenChange={(open) => { if (!open) setGroupToDelete(null); }}>
+      <AlertDialogContent className="rounded-[2rem] border-none shadow-2xl">
+        <AlertDialogHeader>
+          <div className="mx-auto w-16 h-16 rounded-2xl bg-destructive/10 flex items-center justify-center mb-4">
+            <Trash2 className="h-8 w-8 text-destructive" />
+          </div>
+          <AlertDialogTitle className="text-center text-xl font-black">Elimina prenotazione</AlertDialogTitle>
+          <AlertDialogDescription className="text-center text-gray-500">
+            Sei sicuro di voler eliminare questa prenotazione?
+            {groupToDelete && (
+              <span className="block mt-2 font-bold text-gray-700">
+                {groupToDelete.courtName} — {format(groupToDelete.date, 'EEEE d MMMM', { locale: it })} · {groupToDelete.startTime}–{groupToDelete.endTime}
+              </span>
+            )}
+            <span className="block mt-1 text-xs text-destructive font-semibold">Questa azione non può essere annullata.</span>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter className="gap-3">
+          <AlertDialogCancel className="h-12 flex-1 rounded-2xl font-bold" onClick={() => setGroupToDelete(null)}>
+            Annulla
+          </AlertDialogCancel>
+          <AlertDialogAction
+            className="h-12 flex-1 rounded-2xl bg-destructive hover:bg-destructive/90 font-bold"
+            onClick={() => {
+              if (groupToDelete) {
+                handleDelete(groupToDelete);
+                setGroupToDelete(null);
+              }
+            }}
+          >
+            Elimina
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 };
 

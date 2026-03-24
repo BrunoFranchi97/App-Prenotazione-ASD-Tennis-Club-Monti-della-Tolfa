@@ -1,4 +1,4 @@
-import { startOfWeek, endOfWeek, isWithinInterval, parseISO, isAfter, startOfDay } from 'date-fns';
+import { startOfWeek, endOfWeek, isWithinInterval, parseISO, startOfDay, addDays } from 'date-fns';
 import { it } from 'date-fns/locale';
 import type { Reservation } from '@/types/supabase';
 
@@ -14,12 +14,11 @@ export const getBookingLimitsStatus = (
   userReservations: Reservation[],
   targetDate: Date
 ): BookingLimitsStatus => {
-  const now = new Date();
-  
-  // 1. Filtra solo le prenotazioni "attive" (future e non annullate)
+  // 1. Filtra le prenotazioni non annullate (incluse quelle già passate nella settimana target)
+  // NOTA: non si filtra per "future" perché le prenotazioni già effettuate questa settimana
+  // devono comunque concorrere al conteggio del limite settimanale
   const activeReservations = userReservations.filter(res => {
-    const end = parseISO(res.ends_at);
-    return res.status !== 'cancelled' && isAfter(end, now);
+    return res.status !== 'cancelled';
   });
 
   const groupedReservations = groupReservationsIntoBlocks(activeReservations);
@@ -35,13 +34,10 @@ export const getBookingLimitsStatus = (
 
   const canBookWeekly = weeklyMatches.length < 2;
 
-  // Calcola la prossima data di sblocco (solo se il settimanale è pieno)
+  // Calcola la prossima data di sblocco (lunedì della settimana successiva)
   let nextAvailableDate: Date | undefined;
   if (!canBookWeekly) {
-    const sortedMatches = [...weeklyMatches].sort((a, b) => a.endTime.getTime() - b.endTime.getTime());
-    if (sortedMatches.length > 0) {
-      nextAvailableDate = sortedMatches[0].endTime;
-    }
+    nextAvailableDate = addDays(weekEnd, 1); // lunedì della settimana successiva
   }
 
   return {
