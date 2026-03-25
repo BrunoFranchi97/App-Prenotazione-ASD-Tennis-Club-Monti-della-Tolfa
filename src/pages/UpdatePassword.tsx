@@ -65,24 +65,28 @@ const UpdatePassword = () => {
           <form onSubmit={handleUpdatePassword} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="password">Nuova Password</Label>
-              <Input 
-                id="password" 
-                type="password" 
-                placeholder="Minimo 6 caratteri" 
-                value={password} 
-                onChange={(e) => setPassword(e.target.value)} 
-                required 
+              <Input
+                id="password"
+                name="password"
+                aria-label="Nuova Password"
+                type="password"
+                placeholder="Minimo 6 caratteri"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="confirm-password">Conferma Password</Label>
-              <Input 
-                id="confirm-password" 
-                type="password" 
-                placeholder="Ripeti la password" 
-                value={confirmPassword} 
-                onChange={(e) => setConfirmPassword(e.target.value)} 
-                required 
+              <Label htmlFor="confirmPassword">Conferma Password</Label>
+              <Input
+                id="confirmPassword"
+                name="confirmPassword"
+                aria-label="Conferma Password"
+                type="password"
+                placeholder="Ripeti la password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
               />
             </div>
             <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" disabled={loading}>

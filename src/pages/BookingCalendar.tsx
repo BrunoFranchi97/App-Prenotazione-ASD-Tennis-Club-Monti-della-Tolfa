@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, ChevronRight, CalendarDays, MapPin, Clock, Info, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { showError } from '@/utils/toast';
+import { showError, showSuccess } from '@/utils/toast';
 import { format, parseISO, addHours, setHours, setMinutes, isBefore, isEqual, setSeconds, setMilliseconds, addDays, startOfDay, endOfDay, isSameDay, addMinutes, isValid } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { useApprovalCheck } from '@/hooks/use-approval-check';
@@ -158,6 +158,15 @@ const BookingCalendar = () => {
         if (lastIdx - firstIdx + 1 > 3) return;
         const range: string[] = [];
         for (let i = firstIdx; i <= lastIdx; i++) range.push(allTimeSlots[i]);
+        // Notifica se sono stati auto-selezionati slot intermedi per formare un blocco consecutivo
+        const autoFilled = range.length - newSelected.length - 1;
+        if (autoFilled > 0) {
+          showSuccess(
+            autoFilled === 1
+              ? "Slot intermedio auto-selezionato per completare il blocco."
+              : `${autoFilled} slot intermedi auto-selezionati per completare il blocco.`
+          );
+        }
         setSelectedSlots(range);
       }
     }
@@ -307,17 +316,17 @@ const BookingCalendar = () => {
                 </div>
 
                 {selectedCourtId && (
-                  <div className="flex items-center gap-3 pt-4 animate-in fade-in slide-in-from-top-2">
-                    <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tipologia:</Label>
-                    <div className="flex gap-2">
+                  <div className="pt-4 animate-in fade-in slide-in-from-top-2 space-y-2">
+                    <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tipologia partita</Label>
+                    <div className="flex flex-wrap gap-2">
                       {(['singolare', 'doppio', 'lezione'] as BookingType[]).map(type => (
                         <button
                           key={type}
                           onClick={() => setBookingType(type)}
                           className={cn(
-                            "px-5 py-1.5 rounded-full text-xs font-bold transition-all border-2",
-                            bookingType === type 
-                              ? "bg-primary border-primary text-white shadow-md shadow-primary/10" 
+                            "px-5 py-2 rounded-full text-xs font-bold transition-all border-2 flex-shrink-0",
+                            bookingType === type
+                              ? "bg-primary border-primary text-white shadow-md shadow-primary/10"
                               : "bg-white border-gray-100 text-gray-400 hover:border-primary/30 hover:text-primary"
                           )}
                         >

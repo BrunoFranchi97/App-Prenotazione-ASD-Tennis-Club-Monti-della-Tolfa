@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
 
@@ -83,80 +83,103 @@ const EmailVerificationHandler = () => {
     handleEmailVerification();
   }, [searchParams, navigate]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-white p-4">
-        <Card className="w-full max-w-md shadow-lg rounded-lg">
-          <CardHeader className="text-center">
-            <CardTitle className="text-primary">Verifica Email in corso...</CardTitle>
-            <CardDescription>Stiamo completando la verifica del tuo account</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col items-center justify-center space-y-4">
-            <Loader2 className="h-12 w-12 text-primary animate-spin" />
-            <p className="text-sm text-gray-600 text-center">
-              Attendere prego...
-            </p>
-          </CardContent>
+  const PageShell = ({ children }: { children: React.ReactNode }) => (
+    <div className="min-h-screen flex flex-col bg-[#F8FAFC]">
+      <div className="container mx-auto px-6 py-6 flex justify-between items-center">
+        <div className="flex items-center justify-center p-2 bg-white rounded-xl shadow-sm border border-gray-50">
+          <img src="/assets/coni.jpeg" alt="Logo CONI" className="h-8 w-auto grayscale opacity-80 hover:grayscale-0 hover:opacity-100 transition-all duration-500" />
+        </div>
+        <div className="flex items-center justify-center p-2 bg-white rounded-xl shadow-sm border border-gray-50">
+          <img src="/assets/fitp.jpeg" alt="Logo FITP" className="h-8 w-auto grayscale opacity-80 hover:grayscale-0 hover:opacity-100 transition-all duration-500" />
+        </div>
+      </div>
+      <div className="flex-grow flex items-center justify-center px-6 py-4">
+        <Card className="w-full max-w-md border-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-[2rem] overflow-hidden bg-white/80 backdrop-blur-xl">
+          {children}
         </Card>
       </div>
+    </div>
+  );
+
+  if (loading) {
+    return (
+      <PageShell>
+        <CardContent className="pt-12 pb-10 px-8 flex flex-col items-center gap-6 text-center">
+          <div className="w-20 h-20 rounded-3xl bg-primary/10 flex items-center justify-center shadow-inner">
+            <Loader2 className="h-10 w-10 text-primary animate-spin" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-extrabold text-gray-900">Verifica in corso…</h2>
+            <p className="text-gray-500 text-sm">Stiamo completando la verifica del tuo account</p>
+          </div>
+        </CardContent>
+      </PageShell>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-white p-4">
-        <Card className="w-full max-w-md shadow-lg rounded-lg">
-          <CardHeader className="text-center">
-            <XCircle className="mx-auto h-16 w-16 text-red-500 mb-4" />
-            <CardTitle className="text-red-600">Verifica Fallita</CardTitle>
-            <CardDescription>Non è stato possibile verificare il tuo account</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-gray-700 text-center">{error}</p>
-            <p className="text-sm text-gray-600 text-center">
-              Il link di verifica potrebbe essere scaduto o non valido.
+      <PageShell>
+        <CardContent className="pt-12 pb-10 px-8 flex flex-col items-center gap-6 text-center">
+          <div className="w-20 h-20 rounded-3xl bg-red-50 flex items-center justify-center shadow-inner">
+            <XCircle className="h-10 w-10 text-red-400" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-extrabold text-gray-900">Verifica fallita</h2>
+            <p className="text-gray-500 text-sm leading-relaxed">
+              Il link potrebbe essere scaduto o già utilizzato.
             </p>
-            <div className="pt-4">
-              <Button 
-                onClick={() => navigate('/login')} 
-                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-              >
-                Vai al Login
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+          <div className="w-full bg-red-50 rounded-2xl px-5 py-4">
+            <p className="text-sm text-red-600 font-medium">{error}</p>
+          </div>
+          <div className="w-full space-y-3 pt-1">
+            <Button
+              onClick={() => navigate('/register')}
+              className="w-full h-13 bg-gradient-to-br from-primary to-[#23532f] hover:from-[#357a46] hover:to-[#23532f] text-white rounded-2xl text-base font-bold shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all hover:scale-[1.02] active:scale-[0.98]"
+            >
+              Torna alla Registrazione
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => navigate('/login')}
+              className="w-full rounded-2xl text-gray-400 hover:text-primary font-medium"
+            >
+              Vai al Login
+            </Button>
+          </div>
+        </CardContent>
+      </PageShell>
     );
   }
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-white p-4">
-        <Card className="w-full max-w-md shadow-lg rounded-lg">
-          <CardHeader className="text-center">
-            <CheckCircle className="mx-auto h-16 w-16 text-green-500 mb-4" />
-            <CardTitle className="text-green-600">Email Verificata!</CardTitle>
-            <CardDescription>Il tuo account è stato verificato con successo</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-gray-700 text-center">
-              Il tuo indirizzo email è stato verificato. Stai per essere reindirizzato...
+      <PageShell>
+        <CardContent className="pt-12 pb-10 px-8 flex flex-col items-center gap-6 text-center">
+          <div className="w-20 h-20 rounded-3xl bg-primary/10 flex items-center justify-center shadow-inner">
+            <CheckCircle className="h-10 w-10 text-primary" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-extrabold text-gray-900">Email verificata!</h2>
+            <p className="text-gray-500 text-sm leading-relaxed">
+              Il tuo account è stato confermato con successo.
             </p>
-            <p className="text-sm text-gray-600 text-center">
-              Ricorda che il tuo account dovrà essere approvato da un amministratore prima di poter prenotare.
+          </div>
+          <div className="w-full bg-gray-50 rounded-2xl p-5 text-left space-y-1">
+            <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Prossimo step</p>
+            <p className="text-sm text-gray-600 leading-relaxed">
+              Un amministratore del circolo dovrà approvare il tuo account prima che tu possa prenotare i campi. Riceverai una notifica via email.
             </p>
-            <div className="pt-4">
-              <Button 
-                onClick={() => navigate('/dashboard')} 
-                className="w-full bg-green-600 hover:bg-green-700 text-white"
-              >
-                Vai alla Dashboard
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+          <Button
+            onClick={() => navigate('/dashboard')}
+            className="w-full h-13 bg-gradient-to-br from-primary to-[#23532f] hover:from-[#357a46] hover:to-[#23532f] text-white rounded-2xl text-base font-bold shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all hover:scale-[1.02] active:scale-[0.98]"
+          >
+            Entra nell'App
+          </Button>
+        </CardContent>
+      </PageShell>
     );
   }
 

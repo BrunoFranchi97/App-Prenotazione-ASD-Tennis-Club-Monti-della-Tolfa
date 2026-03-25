@@ -46,7 +46,7 @@ const ForgotPassword = () => {
           <form onSubmit={handleResetPassword} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="Inserisci la tua email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <Input id="email" name="email" aria-label="Email" type="email" placeholder="Inserisci la tua email" value={email} onChange={(e) => setEmail(e.target.value)} required />
             </div>
             <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" disabled={loading}>
               {loading ? "Invio in corso..." : "Invia Link di Reset"}
