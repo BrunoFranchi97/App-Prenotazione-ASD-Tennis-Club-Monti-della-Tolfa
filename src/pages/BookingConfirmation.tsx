@@ -43,76 +43,76 @@ const BookingConfirmation = () => {
   const bookingEndTime = format(parseISO(lastReservation.ends_at), 'HH:mm');
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-white p-4">
-      <Card className="w-full max-w-md shadow-2xl rounded-2xl border-t-8 border-t-primary overflow-hidden">
-        <CardHeader className="text-center pb-2">
-          <div className="mx-auto bg-green-100 w-20 h-20 rounded-full flex items-center justify-center mb-4">
-            <CheckCircle2 className="h-12 w-12 text-primary" />
+    <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] px-6 py-10">
+      <Card className="w-full max-w-md border-none shadow-[0_8px_30px_rgb(0,0,0,0.06)] rounded-[2rem] overflow-hidden bg-white/80 backdrop-blur-xl">
+        <CardHeader className="text-center pt-10 pb-4">
+          <div className="mx-auto w-20 h-20 rounded-3xl bg-primary/10 flex items-center justify-center shadow-inner mb-5">
+            <CheckCircle2 className="h-10 w-10 text-primary" />
           </div>
           <CardTitle className="text-primary text-3xl font-extrabold tracking-tight">Confermata!</CardTitle>
-          <CardDescription className="text-gray-600 mt-2 text-base font-medium">
+          <CardDescription className="text-gray-500 mt-2 text-sm font-medium">
             La tua prenotazione è ora attiva.
           </CardDescription>
         </CardHeader>
-        
-        <CardContent className="space-y-6 pt-4">
-          {/* Box Riepilogo ASD Tennis Club */}
-          <div className="bg-primary/5 border border-primary/10 p-6 rounded-2xl space-y-5 text-left relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-8 opacity-5">
+
+        <CardContent className="space-y-6 px-8 pb-10 pt-4">
+          {/* Box Riepilogo */}
+          <div className="bg-primary/[0.03] border border-primary/10 p-6 rounded-2xl space-y-5 text-left relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-8 opacity-[0.03]">
               <CheckCircle2 className="h-24 w-24 text-primary" />
             </div>
 
             {bookedFor && (
               <div className="flex items-center text-gray-800 relative z-10">
-                <div className="bg-club-orange/20 p-2.5 rounded-xl mr-4 shadow-sm">
+                <div className="bg-club-orange/15 p-2.5 rounded-xl mr-4">
                   <User className="h-5 w-5 text-club-orange shrink-0" />
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-[10px] uppercase font-bold text-gray-400 tracking-widest">Per il socio</span>
+                  <span className="text-[10px] uppercase font-black text-gray-400 tracking-widest">Per il socio</span>
                   <span className="text-base font-bold text-gray-900">{bookedFor}</span>
                 </div>
               </div>
             )}
-            
+
             <div className="flex items-center text-gray-800 relative z-10">
-              <div className="bg-club-orange/20 p-2.5 rounded-xl mr-4 shadow-sm">
+              <div className="bg-club-orange/15 p-2.5 rounded-xl mr-4">
                 <MapPin className="h-5 w-5 text-club-orange shrink-0" />
               </div>
               <div className="flex flex-col">
-                <span className="text-[10px] uppercase font-bold text-gray-400 tracking-widest">Campo</span>
+                <span className="text-[10px] uppercase font-black text-gray-400 tracking-widest">Campo</span>
                 <span className="text-base font-bold text-gray-900">{courtName || 'Campo da Tennis'}</span>
               </div>
             </div>
 
             <div className="flex items-center text-gray-800 relative z-10">
-              <div className="bg-club-orange/20 p-2.5 rounded-xl mr-4 shadow-sm">
+              <div className="bg-club-orange/15 p-2.5 rounded-xl mr-4">
                 <CalendarDays className="h-5 w-5 text-club-orange shrink-0" />
               </div>
               <div className="flex flex-col">
-                <span className="text-[10px] uppercase font-bold text-gray-400 tracking-widest">Data</span>
+                <span className="text-[10px] uppercase font-black text-gray-400 tracking-widest">Data</span>
                 <span className="text-base font-bold text-gray-900 capitalize">{bookingDate}</span>
               </div>
             </div>
 
             <div className="flex items-center text-gray-800 relative z-10">
-              <div className="bg-club-orange/20 p-2.5 rounded-xl mr-4 shadow-sm">
+              <div className="bg-club-orange/15 p-2.5 rounded-xl mr-4">
                 <Clock className="h-5 w-5 text-club-orange shrink-0" />
               </div>
               <div className="flex flex-col">
-                <span className="text-[10px] uppercase font-bold text-gray-400 tracking-widest">Orario</span>
-                <span className="text-base font-bold text-gray-900">{bookingStartTime} - {bookingEndTime}</span>
+                <span className="text-[10px] uppercase font-black text-gray-400 tracking-widest">Orario</span>
+                <span className="text-base font-bold text-gray-900">{bookingStartTime} — {bookingEndTime}</span>
               </div>
             </div>
           </div>
-          
-          <div className="pt-4 flex flex-col gap-3">
+
+          <div className="flex flex-col gap-3 pt-2">
             <Link to="/history">
-              <Button className="w-full bg-primary hover:bg-primary/90 py-7 text-lg font-bold shadow-lg shadow-primary/20 transition-all active:scale-95">
+              <Button className="w-full h-14 bg-gradient-to-br from-primary to-[#23532f] hover:from-[#357a46] hover:to-[#23532f] text-white rounded-2xl text-base font-bold shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all hover:scale-[1.02] active:scale-[0.98]">
                 Vedi i Miei Campi <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
             <Link to="/dashboard">
-              <Button variant="ghost" className="w-full text-gray-500 hover:text-primary font-semibold">
+              <Button variant="ghost" className="w-full rounded-2xl text-gray-400 hover:text-primary font-semibold">
                 Torna alla Dashboard
               </Button>
             </Link>

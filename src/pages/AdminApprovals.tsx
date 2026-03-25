@@ -35,6 +35,7 @@ const AdminApprovals = () => {
         .from('profiles')
         .select('*')
         .eq('approved', false)
+        .or('status.is.null,status.eq.pending')
         .order('created_at', { ascending: true });
 
       if (error) throw error;
@@ -62,9 +63,10 @@ const AdminApprovals = () => {
   const handleUpdateStatus = async (profileId: string, status: 'approved' | 'rejected') => {
     setProcessingId(profileId);
     try {
-      const updateData: any = { 
+      const updateData: any = {
         approved: status === 'approved',
-        approved_at: status === 'approved' ? new Date().toISOString() : null 
+        status: status === 'approved' ? 'approved' : 'rejected',
+        approved_at: status === 'approved' ? new Date().toISOString() : null
       };
 
       const { error } = await supabase

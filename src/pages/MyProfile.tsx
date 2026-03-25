@@ -168,120 +168,127 @@ const MyProfile = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-white">
+      <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 sm:p-6 lg:p-8">
-      <header className="flex justify-between items-center mb-8 max-w-4xl mx-auto">
-        <div className="flex items-center">
-          <Link to="/dashboard" className="mr-4">
-            <Button variant="outline" size="icon" className="text-primary border-primary">
-              <ArrowLeft className="h-4 w-4" />
+    <div className="min-h-screen bg-[#F8FAFC] p-6 sm:p-10 lg:p-12">
+      <header className="flex justify-between items-end mb-10 max-w-4xl mx-auto">
+        <div className="flex items-center gap-6">
+          <Link to="/dashboard">
+            <Button variant="outline" size="icon" className="rounded-2xl border-none shadow-sm bg-white text-primary hover:scale-110 active:scale-95 transition-transform">
+              <ArrowLeft className="h-5 w-5" />
             </Button>
           </Link>
-          <h1 className="text-3xl font-bold text-primary">Il mio Profilo</h1>
+          <div>
+            <p className="text-sm font-bold text-club-orange uppercase tracking-[0.2em] mb-1">Account</p>
+            <h1 className="text-4xl font-extrabold text-gray-900 tracking-tighter">Il mio Profilo</h1>
+          </div>
         </div>
       </header>
 
-      <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
-        <div className="space-y-6">
-          <Card className="shadow-lg text-center p-6">
-            <div className="relative inline-block mx-auto mb-4 group">
-              <Avatar className="h-32 w-32 border-4 border-white shadow-xl cursor-pointer" onClick={handleAvatarClick}>
+      <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Sidebar */}
+        <div className="space-y-5">
+          <Card className="border-none shadow-[0_2px_12px_rgba(0,0,0,0.04)] rounded-[2rem] bg-white text-center p-6">
+            <div className="relative inline-block mx-auto mb-4">
+              <Avatar className="h-28 w-28 border-4 border-white shadow-xl cursor-pointer" onClick={handleAvatarClick}>
                 <AvatarImage src={profile?.avatar_url} />
-                <AvatarFallback className="text-4xl bg-primary text-white">
+                <AvatarFallback className="text-4xl bg-primary/10 text-primary font-black">
                   {fullName?.charAt(0).toUpperCase() || userEmail.charAt(0).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
-              <div 
-                className="absolute bottom-0 right-0 p-2 bg-club-orange rounded-full text-white shadow-lg cursor-pointer hover:scale-110 transition-transform"
+              <button
                 onClick={handleAvatarClick}
+                className="absolute bottom-0 right-0 p-2 bg-club-orange rounded-full text-white shadow-lg hover:scale-110 transition-transform"
               >
                 {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-              </div>
-              <input 
-                ref={fileInputRef}
-                type="file"
-                className="hidden"
-                accept="image/*"
-                onChange={handleAvatarUpload}
-              />
+              </button>
+              <input ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={handleAvatarUpload} />
             </div>
-            <h2 className="text-xl font-bold text-gray-800">{fullName || 'Socio'}</h2>
-            <p className="text-sm text-gray-500 mb-4">{userEmail}</p>
-            <div className="flex justify-center gap-2">
-              <Badge variant="secondary" className="bg-green-100 text-green-800">
+            <h2 className="text-lg font-extrabold text-gray-900 tracking-tight">{fullName || 'Socio'}</h2>
+            <p className="text-xs text-gray-400 font-medium mb-4">{userEmail}</p>
+            <div className="flex justify-center gap-2 flex-wrap">
+              <Badge className={`border-none font-bold ${profile?.approved ? 'bg-primary/10 text-primary' : 'bg-amber-100 text-amber-700'}`}>
                 {profile?.approved ? 'Approvato' : 'In attesa'}
               </Badge>
               {profile?.is_admin && (
-                <Badge variant="secondary" className="bg-orange-100 text-orange-800">Admin</Badge>
+                <Badge className="bg-club-orange/10 text-club-orange border-none font-bold">Admin</Badge>
               )}
             </div>
           </Card>
 
-          <Card className="shadow-lg">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-500">Info Club</CardTitle>
+          <Card className="border-none shadow-[0_2px_12px_rgba(0,0,0,0.04)] rounded-[2rem] bg-white">
+            <CardHeader className="pb-3 px-6 pt-6">
+              <CardTitle className="text-xs font-black text-gray-400 uppercase tracking-widest">Info Club</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center text-sm">
-                <CreditCard className="mr-2 h-4 w-4 text-club-orange" />
-                <span className="font-medium mr-2">Tessera:</span>
-                <span className="text-gray-700">{membershipNumber || 'N/D'}</span>
+            <CardContent className="space-y-4 px-6 pb-6">
+              <div className="flex items-center gap-3 text-sm">
+                <div className="w-8 h-8 rounded-xl bg-club-orange/10 flex items-center justify-center flex-shrink-0">
+                  <CreditCard className="h-4 w-4 text-club-orange" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tessera</p>
+                  <p className="font-bold text-gray-800">{membershipNumber || 'N/D'}</p>
+                </div>
               </div>
-              <div className="flex items-center text-sm">
-                <Target className="mr-2 h-4 w-4 text-club-orange" />
-                <span className="font-medium mr-2">Livello:</span>
-                <span className="text-gray-700 capitalize">{skillLevel}</span>
+              <div className="flex items-center gap-3 text-sm">
+                <div className="w-8 h-8 rounded-xl bg-club-orange/10 flex items-center justify-center flex-shrink-0">
+                  <Target className="h-4 w-4 text-club-orange" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Livello</p>
+                  <p className="font-bold text-gray-800 capitalize">{skillLevel}</p>
+                </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        <div className="md:col-span-2 space-y-6">
-          <Card className="shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-primary flex items-center">
-                <User className="mr-2 h-5 w-5" /> Informazioni Personali
+        {/* Main content */}
+        <div className="md:col-span-2 space-y-5">
+          <Card className="border-none shadow-[0_2px_12px_rgba(0,0,0,0.04)] rounded-[2rem] bg-white">
+            <CardHeader className="px-8 pt-8 pb-4">
+              <CardTitle className="text-lg font-extrabold text-gray-900 flex items-center gap-2">
+                <User className="h-5 w-5 text-primary" /> Informazioni Personali
               </CardTitle>
-              <CardDescription>Aggiorna i tuoi dati di contatto e le tue abilità</CardDescription>
+              <CardDescription className="text-gray-400 text-sm">Aggiorna i tuoi dati e le tue abilità</CardDescription>
             </CardHeader>
-            <CardContent>
-              <form onSubmit={handleUpdateProfile} className="space-y-4">
+            <CardContent className="px-8 pb-8">
+              <form onSubmit={handleUpdateProfile} className="space-y-5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="fullName">Nome Completo</Label>
-                    <Input 
-                      id="fullName" 
-                      value={fullName} 
-                      onChange={(e) => setFullName(e.target.value)} 
+                    <Label htmlFor="fullName" className="text-sm font-semibold ml-1 text-gray-700">Nome Completo</Label>
+                    <Input
+                      id="fullName"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
                       placeholder="Il tuo nome"
+                      className="rounded-xl border-gray-200 focus:ring-primary/20 focus:border-primary transition-all"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="phone">Telefono</Label>
+                    <Label htmlFor="phone" className="text-sm font-semibold ml-1 text-gray-700">Telefono</Label>
                     <div className="relative">
                       <Smartphone className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                      <Input 
-                        id="phone" 
-                        className="pl-9"
-                        value={phone} 
-                        onChange={(e) => setPhone(e.target.value)} 
+                      <Input
+                        id="phone"
+                        className="pl-9 rounded-xl border-gray-200 focus:ring-primary/20 focus:border-primary transition-all"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
                         placeholder="+39 333..."
                       />
                     </div>
                   </div>
                 </div>
-
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Livello di Gioco</Label>
+                    <Label className="text-sm font-semibold ml-1 text-gray-700">Livello di Gioco</Label>
                     <Select value={skillLevel} onValueChange={(v) => setSkillLevel(v as SkillLevel)}>
-                      <SelectTrigger>
+                      <SelectTrigger className="rounded-xl border-gray-200">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -293,58 +300,70 @@ const MyProfile = () => {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="membership">Numero Tessera (opzionale)</Label>
-                    <Input 
-                      id="membership" 
-                      value={membershipNumber} 
-                      onChange={(e) => setMembershipNumber(e.target.value)} 
+                    <Label htmlFor="membership" className="text-sm font-semibold ml-1 text-gray-700">Numero Tessera (opzionale)</Label>
+                    <Input
+                      id="membership"
+                      value={membershipNumber}
+                      onChange={(e) => setMembershipNumber(e.target.value)}
                       placeholder="Codice tessera"
+                      className="rounded-xl border-gray-200 focus:ring-primary/20 focus:border-primary transition-all"
                     />
                   </div>
                 </div>
-
-                <Button type="submit" disabled={saving} className="w-full bg-primary hover:bg-primary/90">
+                <Button
+                  type="submit"
+                  disabled={saving}
+                  className="w-full h-12 bg-gradient-to-br from-primary to-[#23532f] hover:from-[#357a46] hover:to-[#23532f] text-white rounded-2xl font-bold shadow-lg shadow-primary/20 transition-all hover:scale-[1.01] active:scale-[0.98]"
+                >
                   {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                  <span className="ml-2">Salva Modifiche Profilo</span>
+                  Salva Modifiche Profilo
                 </Button>
               </form>
             </CardContent>
           </Card>
 
-          <Card className="shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-primary flex items-center">
-                <Lock className="mr-2 h-5 w-5" /> Sicurezza
+          <Card className="border-none shadow-[0_2px_12px_rgba(0,0,0,0.04)] rounded-[2rem] bg-white">
+            <CardHeader className="px-8 pt-8 pb-4">
+              <CardTitle className="text-lg font-extrabold text-gray-900 flex items-center gap-2">
+                <Lock className="h-5 w-5 text-primary" /> Sicurezza
               </CardTitle>
-              <CardDescription>Aggiorna la tua password di accesso</CardDescription>
+              <CardDescription className="text-gray-400 text-sm">Aggiorna la tua password di accesso</CardDescription>
             </CardHeader>
-            <CardContent>
-              <form onSubmit={handleChangePassword} className="space-y-4">
+            <CardContent className="px-8 pb-8">
+              <form onSubmit={handleChangePassword} className="space-y-5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="newPassword">Nuova Password</Label>
-                    <Input 
-                      id="newPassword" 
-                      type="password" 
-                      value={newPassword} 
-                      onChange={(e) => setNewPassword(e.target.value)} 
+                    <Label htmlFor="newPassword" className="text-sm font-semibold ml-1 text-gray-700">Nuova Password</Label>
+                    <Input
+                      id="newPassword"
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
                       placeholder="Min. 6 caratteri"
+                      className="rounded-xl border-gray-200 focus:ring-primary/20 focus:border-primary transition-all"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="confirmPass">Conferma Nuova Password</Label>
-                    <Input 
-                      id="confirmPass" 
-                      type="password" 
-                      value={confirmPassword} 
-                      onChange={(e) => setConfirmPassword(e.target.value)} 
+                    <Label htmlFor="confirmPass" className="text-sm font-semibold ml-1 text-gray-700">Conferma Nuova Password</Label>
+                    <Input
+                      id="confirmPass"
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Ripeti la password"
+                      className="rounded-xl border-gray-200 focus:ring-primary/20 focus:border-primary transition-all"
                     />
                   </div>
                 </div>
-                <Button type="submit" variant="outline" disabled={saving || !newPassword} className="w-full border-primary text-primary">
+                <Button
+                  type="submit"
+                  variant="outline"
+                  disabled={saving || !newPassword}
+                  className="w-full h-12 rounded-2xl border-2 border-primary/20 text-primary font-bold hover:bg-primary/5 transition-all"
+                >
                   Aggiorna Password
                 </Button>
-                <p className="text-xs text-muted-foreground text-center">
+                <p className="text-xs text-gray-400 text-center">
                   Nota: verrai disconnesso per confermare la nuova password.
                 </p>
               </form>

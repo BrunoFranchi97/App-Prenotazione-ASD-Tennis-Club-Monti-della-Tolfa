@@ -177,11 +177,8 @@ const AdminBlockSlots = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-white p-4">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold mb-4 text-primary">Caricamento...</h1>
-          <p className="text-xl text-gray-600">Recupero dati.</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
+        <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
       </div>
     );
   }
@@ -191,134 +188,128 @@ const AdminBlockSlots = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 sm:p-6 lg:p-8">
-      <header className="flex justify-between items-center mb-8">
-        <div className="flex items-center">
-          <Link to="/admin" className="mr-4">
-            <Button variant="outline" size="icon" className="text-primary border-primary hover:bg-secondary hover:text-primary">
-              <ArrowLeft className="h-4 w-4" />
+    <div className="min-h-screen bg-[#F8FAFC] p-6 sm:p-10 lg:p-12">
+      <header className="flex justify-between items-end mb-10 max-w-7xl mx-auto">
+        <div className="flex items-center gap-6">
+          <Link to="/admin">
+            <Button variant="outline" size="icon" className="rounded-2xl border-none shadow-sm bg-white text-primary hover:scale-110 active:scale-95 transition-transform">
+              <ArrowLeft className="h-5 w-5" />
             </Button>
           </Link>
-          <h1 className="text-3xl font-bold text-primary">Blocca Slot Orari</h1>
+          <div>
+            <p className="text-sm font-bold text-club-orange uppercase tracking-[0.2em] mb-1">Amministrazione</p>
+            <h1 className="text-4xl font-extrabold text-gray-900 tracking-tighter">Blocca Slot Orari</h1>
+          </div>
         </div>
-        <Button variant="outline" className="text-primary border-primary hover:bg-secondary hover:text-primary" onClick={handleLogout}>
+        <Button variant="ghost" onClick={handleLogout} className="rounded-2xl text-gray-400 hover:text-primary font-bold">
           <LogOut className="mr-2 h-4 w-4" /> Esci
         </Button>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="shadow-lg rounded-lg">
-          <CardHeader>
-            <CardTitle className="text-primary flex items-center">
-              <CalendarPlus className="mr-2 h-5 w-5" /> Seleziona Data e Campo
+      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="border-none shadow-[0_2px_12px_rgba(0,0,0,0.04)] rounded-[2rem] bg-white">
+          <CardHeader className="px-8 pt-8 pb-4">
+            <CardTitle className="text-lg font-extrabold text-gray-900 flex items-center gap-2">
+              <CalendarPlus className="h-5 w-5 text-primary" /> Seleziona Data e Campo
             </CardTitle>
-            <CardDescription>Scegli la data e il campo da bloccare</CardDescription>
+            <CardDescription className="text-gray-400 text-sm">Scegli la data e il campo da bloccare</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label className="text-sm font-medium">Campo</Label>
+          <CardContent className="px-8 pb-8 space-y-5">
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold ml-1 text-gray-700">Campo</Label>
               <Select value={selectedCourt} onValueChange={setSelectedCourt}>
-                <SelectTrigger className="mt-1">
+                <SelectTrigger className="rounded-xl border-gray-200">
                   <SelectValue placeholder="Seleziona un campo" />
                 </SelectTrigger>
                 <SelectContent>
                   {courts.length === 0 ? (
-                    <SelectItem value="no-courts" disabled>
-                      Nessun campo disponibile
-                    </SelectItem>
+                    <SelectItem value="no-courts" disabled>Nessun campo disponibile</SelectItem>
                   ) : (
                     courts.map((court) => (
-                      <SelectItem key={court.id} value={String(court.id)}>
-                        {court.name}
-                      </SelectItem>
+                      <SelectItem key={court.id} value={String(court.id)}>{court.name}</SelectItem>
                     ))
                   )}
                 </SelectContent>
               </Select>
             </div>
 
-            <div>
-              <Label className="text-sm font-medium">Data</Label>
-              <div className="mt-1 rounded-md border bg-white">
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold ml-1 text-gray-700">Data</Label>
+              <div className="rounded-2xl border border-gray-100 bg-white overflow-hidden">
                 <Calendar
                   mode="single"
                   selected={selectedDate}
                   onSelect={setSelectedDate}
                   locale={it}
                   disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                  className="rounded-md"
+                  className="rounded-2xl"
                 />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="shadow-lg rounded-lg">
-          <CardHeader>
-            <CardTitle className="text-primary flex items-center">
-              <Clock className="mr-2 h-5 w-5" /> Imposta Orario e Motivo
+        <Card className="border-none shadow-[0_2px_12px_rgba(0,0,0,0.04)] rounded-[2rem] bg-white">
+          <CardHeader className="px-8 pt-8 pb-4">
+            <CardTitle className="text-lg font-extrabold text-gray-900 flex items-center gap-2">
+              <Clock className="h-5 w-5 text-primary" /> Imposta Orario e Motivo
             </CardTitle>
-            <CardDescription>Definisci la fascia oraria da bloccare</CardDescription>
+            <CardDescription className="text-gray-400 text-sm">Definisci la fascia oraria da bloccare</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="px-8 pb-8 space-y-5">
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="text-sm font-medium">Ora inizio</Label>
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold ml-1 text-gray-700">Ora inizio</Label>
                 <Select value={startTime} onValueChange={setStartTime}>
-                  <SelectTrigger className="mt-1">
+                  <SelectTrigger className="rounded-xl border-gray-200">
                     <SelectValue placeholder="Inizio" />
                   </SelectTrigger>
                   <SelectContent>
                     {timeSlots.map((time) => (
-                      <SelectItem key={time} value={time}>
-                        {time}
-                      </SelectItem>
+                      <SelectItem key={time} value={time}>{time}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-
-              <div>
-                <Label className="text-sm font-medium">Ora fine</Label>
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold ml-1 text-gray-700">Ora fine</Label>
                 <Select value={endTime} onValueChange={setEndTime}>
-                  <SelectTrigger className="mt-1">
+                  <SelectTrigger className="rounded-xl border-gray-200">
                     <SelectValue placeholder="Fine" />
                   </SelectTrigger>
                   <SelectContent>
                     {timeSlots.map((time) => (
-                      <SelectItem key={time} value={time}>
-                        {time}
-                      </SelectItem>
+                      <SelectItem key={time} value={time}>{time}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
-            <div>
-              <Label className="text-sm font-medium">Motivo (opzionale)</Label>
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold ml-1 text-gray-700">Motivo (opzionale)</Label>
               <Textarea
-                className="mt-1"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 placeholder="Es. Manutenzione, torneo, evento speciale..."
                 rows={3}
+                className="rounded-xl border-gray-200 focus:ring-primary/20 focus:border-primary resize-none"
               />
             </div>
 
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-              <div className="flex items-start">
-                <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 mr-2 flex-shrink-0" />
-                <p className="text-sm text-amber-800">
+            <div className="bg-amber-50/80 border border-amber-200/60 rounded-2xl p-4">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-amber-700 font-medium leading-relaxed">
                   Lo slot bloccato non sarà prenotabile dai soci. Verrà visualizzato come non disponibile nel calendario.
                 </p>
               </div>
             </div>
 
-            <Button 
-              onClick={handleBlockSlot} 
+            <Button
+              onClick={handleBlockSlot}
               disabled={saving || !selectedDate || !selectedCourt || !startTime || !endTime}
-              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+              className="w-full h-12 bg-gradient-to-br from-primary to-[#23532f] hover:from-[#357a46] hover:to-[#23532f] text-white rounded-2xl font-bold shadow-lg shadow-primary/20 transition-all hover:scale-[1.01] active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
               {saving ? "Bloccaggio in corso..." : "Blocca Slot"}
             </Button>

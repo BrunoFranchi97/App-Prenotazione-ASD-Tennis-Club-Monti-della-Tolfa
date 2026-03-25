@@ -74,7 +74,7 @@ const AdminUsageStats = () => {
   if (loading) return <div className="p-8 text-center">Caricamento statistiche...</div>;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-[#F8FAFC] p-6 sm:p-10 lg:p-12">
       <header className="flex justify-between items-center mb-8">
         <div className="flex items-center gap-3">
           <Link to="/admin"><Button variant="outline" size="icon"><ArrowLeft className="h-4 w-4" /></Button></Link>
