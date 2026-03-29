@@ -46,7 +46,7 @@ const AdminDashboard = () => {
     const { count, error } = await supabase
       .from('profiles')
       .select('id', { count: 'exact', head: true })
-      .eq('approved', false);
+      .eq('status', 'pending');
 
     if (error) {
       console.error("Error fetching unapproved count:", error.message);
