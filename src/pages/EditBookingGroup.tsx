@@ -83,15 +83,20 @@ const EditBookingGroup = () => {
         const endDay = endOfDay(group.date).toISOString();
 
         // 1. Carica prenotazioni di ALTRI su questo campo
-        const { data: resData } = await supabase
+        let resQuery = supabase
           .from('reservations')
           .select('*')
           .eq('court_id', group.courtId)
           .gte('starts_at', startDay)
           .lte('ends_at', endDay)
-          .neq('status', 'cancelled')
-          .not('id', 'in', `(${group.reservations.map(r => r.id).join(',')})`);
+          .neq('status', 'cancelled');
 
+        // Escludi le prenotazioni del gruppo corrente solo se esistono
+        if (group.reservations.length > 0) {
+          resQuery = resQuery.not('id', 'in', `(${group.reservations.map(r => r.id).join(',')})`);
+        }
+
+        const { data: resData } = await resQuery;
         setOtherReservations(resData || []);
 
         // 2. Carica MIE prenotazioni su ALTRI campi per evitare sovrapposizioni

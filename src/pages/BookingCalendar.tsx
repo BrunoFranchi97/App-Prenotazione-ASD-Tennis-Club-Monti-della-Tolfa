@@ -93,7 +93,8 @@ const BookingCalendar = () => {
   useEffect(() => {
     if (isApproved) {
       fetchUserData();
-      supabase.from('courts').select('*').eq('is_active', true).order('id').then(({data}) => {
+      supabase.from('courts').select('*').eq('is_active', true).order('id').then(({ data, error }) => {
+        if (error) { showError("Errore nel caricamento dei campi."); return; }
         if (data) setCourts(data);
       });
     }

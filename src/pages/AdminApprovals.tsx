@@ -34,8 +34,7 @@ const AdminApprovals = () => {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .eq('approved', false)
-        .or('status.is.null,status.eq.pending')
+        .eq('status', 'pending')
         .order('created_at', { ascending: true });
 
       if (error) throw error;
@@ -65,7 +64,7 @@ const AdminApprovals = () => {
     try {
       const updateData: any = {
         approved: status === 'approved',
-        status: status === 'approved' ? 'approved' : 'rejected',
+        status: status,
         approved_at: status === 'approved' ? new Date().toISOString() : null
       };
 
@@ -75,8 +74,10 @@ const AdminApprovals = () => {
         .eq('id', profileId);
 
       if (error) throw error;
+
       showSuccess(status === 'approved' ? "Socio approvato!" : "Socio rifiutato.");
-      fetchPendingProfiles();
+      // In entrambi i casi (approvato o rifiutato) il profilo sparisce dalla lista
+      setProfiles(prev => prev.filter(p => p.id !== profileId));
     } catch (err: any) {
       showError("Errore: " + err.message);
     } finally {
