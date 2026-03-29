@@ -9,6 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ArrowLeft, Users, CheckCircle2, MapPin, Clock, Calendar, ChevronRight, Zap } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess } from '@/utils/toast';
+import { getBookingLimitsStatus } from '@/utils/bookingLimits';
 import { format, parseISO, addHours, setHours, setMinutes, setSeconds, setMilliseconds } from 'date-fns';
 import { it } from 'date-fns/locale';
 import UserNav from '@/components/UserNav';
@@ -67,16 +68,51 @@ const MatchBooking = () => {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Sessione scaduta. Effettua nuovamente il login.");
+
       const baseDate = parseISO(matchRequest.requested_date);
       const startH = parseInt(matchRequest.preferred_time_start.split(':')[0]);
       const endH = parseInt(matchRequest.preferred_time_end.split(':')[0]);
-      
+
+      // 1. Controllo limite settimanale per l'utente accettante
+      const { data: myRes } = await supabase
+        .from('reservations')
+        .select('*')
+        .eq('user_id', user.id)
+        .neq('status', 'cancelled');
+
+      const limitsStatus = getBookingLimitsStatus(myRes || [], baseDate);
+      if (!limitsStatus.canBookMoreThisWeek) {
+        showError("Hai raggiunto il limite massimo di 2 prenotazioni per questa settimana (Lun-Dom).");
+        setLoading(false);
+        return;
+      }
+
+      // 2. Ri-verifica disponibilità del campo in tempo reale (anti race condition)
+      const start = setSeconds(setMilliseconds(setMinutes(setHours(baseDate, startH), 0), 0), 0).toISOString();
+      const end   = setSeconds(setMilliseconds(setMinutes(setHours(baseDate, endH),   0), 0), 0).toISOString();
+
+      const { data: conflicts } = await supabase
+        .from('reservations')
+        .select('id')
+        .eq('court_id', matchRequest.court_id)
+        .lt('starts_at', end)
+        .gt('ends_at', start)
+        .neq('status', 'cancelled');
+
+      if (conflicts && conflicts.length > 0) {
+        showError("Il campo è stato appena prenotato da qualcun altro. Scegli un'altra sfida.");
+        navigate('/find-match');
+        return;
+      }
+
+      // 3. Inserisci le prenotazioni
       const reservations = [];
       for (let h = startH; h < endH; h++) {
-        let s = setSeconds(setMilliseconds(setMinutes(setHours(baseDate, h), 0), 0), 0);
+        const s = setSeconds(setMilliseconds(setMinutes(setHours(baseDate, h), 0), 0), 0);
         reservations.push({
           court_id: matchRequest.court_id,
-          user_id: user?.id,
+          user_id: user.id,
           starts_at: s.toISOString(),
           ends_at: addHours(s, 1).toISOString(),
           status: 'confirmed',
@@ -90,9 +126,17 @@ const MatchBooking = () => {
       const { error: insErr } = await supabase.from('reservations').insert(reservations);
       if (insErr) throw insErr;
 
-      await supabase.from('match_requests').update({ status: 'matched', matched_with_user_id: user?.id }).eq('id', matchRequest.id);
+      // 4. Chiudi la sfida — se fallisce non blocca il flusso ma logghiamo
+      const { error: updateErr } = await supabase
+        .from('match_requests')
+        .update({ status: 'matched', matched_with_user_id: user.id })
+        .eq('id', matchRequest.id);
 
-      showSuccess("Partita confermata! Sfidante notificato.");
+      if (updateErr) {
+        console.error('[MatchBooking] Errore aggiornamento status sfida:', updateErr.message);
+      }
+
+      showSuccess("Partita confermata! Lo sfidante vedrà la prenotazione nel suo storico.");
       navigate('/history');
     } catch (err: any) { showError(err.message); }
     finally { setLoading(false); }
