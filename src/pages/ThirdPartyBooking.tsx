@@ -15,6 +15,7 @@ import { format, parseISO, addHours, setHours, setMinutes, isBefore, isEqual, se
 import { it } from 'date-fns/locale';
 import { useApprovalCheck } from '@/hooks/use-approval-check';
 import { Court, Reservation, BookingType } from '@/types/supabase';
+import { getBookingLimitsStatus } from '@/utils/bookingLimits';
 import BookingSuccessDialog from '@/components/BookingSuccessDialog';
 import UserNav from '@/components/UserNav';
 import { cn } from '@/lib/utils';
@@ -33,6 +34,7 @@ const ThirdPartyBooking = () => {
   const [courts, setCourts] = useState<Court[]>([]);
   const [selectedCourtId, setSelectedCourtId] = useState<string | undefined>(undefined);
   const [allReservations, setAllReservations] = useState<Reservation[]>([]);
+  const [userReservations, setUserReservations] = useState<Reservation[]>([]);
   const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
   const [bookingType, setBookingType] = useState<BookingType>('singolare');
   const [bookedForFirstName, setBookedForFirstName] = useState('');
@@ -60,13 +62,17 @@ const ThirdPartyBooking = () => {
 
   useEffect(() => {
     if (!isApproved) return;
-    const fetchCourts = async () => {
-      const { data } = await supabase.from('courts').select('*').eq('is_active', true).order('id');
-      if (data) {
-        setCourts(data);
+    const fetchCourtsAndUserRes = async () => {
+      const { data: courtsData } = await supabase.from('courts').select('*').eq('is_active', true).order('id');
+      if (courtsData) setCourts(courtsData);
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: myRes } = await supabase.from('reservations').select('*').eq('user_id', user.id).neq('status', 'cancelled');
+        setUserReservations(myRes || []);
       }
     };
-    fetchCourts();
+    fetchCourtsAndUserRes();
   }, [isApproved]);
 
   useEffect(() => {
@@ -122,6 +128,15 @@ const ThirdPartyBooking = () => {
   };
 
   const handleBooking = async () => {
+    if (!date) return;
+
+    // Controllo Policy Settimanale (identico a BookingCalendar)
+    const limitsStatus = getBookingLimitsStatus(userReservations, date);
+    if (!limitsStatus.canBookMoreThisWeek) {
+      showError("Hai raggiunto il limite massimo di 2 prenotazioni per questa settimana (Lun-Dom).");
+      return;
+    }
+
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -142,6 +157,8 @@ const ThirdPartyBooking = () => {
 
       const { data: inserted, error } = await supabase.from('reservations').insert(reservationsToInsert).select();
       if (error) throw error;
+      // Aggiorna userReservations localmente per il controllo limite nella stessa sessione
+      setUserReservations(prev => [...prev, ...(inserted || [])]);
       setLastBookingData({ reservations: inserted || reservationsToInsert as any, courtName, bookedFor: `${bookedForFirstName} ${bookedForLastName}` });
       setShowSuccessModal(true);
       setSelectedSlots([]);
