@@ -90,7 +90,20 @@ const Register = () => {
         }
         return;
       }
-      
+
+      // Notifica admin della nuova registrazione
+      try {
+        await supabase.functions.invoke('notify-admin-on-signup', {
+          body: {
+            full_name: name,
+            email: email
+          }
+        });
+      } catch (notifyError) {
+        // Non bloccare la registrazione se la notifica fallisce
+        console.error("Notifica admin fallita:", notifyError);
+      }
+
       setIsRegistered(true);
       
     } catch (error: any) { 

@@ -1,25 +1,13 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
-import { Resend } from 'https://esm.sh/resend@3.5.0'; // Using Resend for email sending
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Initialize Supabase client with Service Role Key for admin access
-const supabaseAdmin = createClient(
-  Deno.env.get('SUPABASE_URL')!,
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-);
-
-// Initialize Resend client using the secret API key (Must be set in Supabase Secrets: RESEND_API_KEY)
-const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
-
-// Define the sender and recipient emails
-// SENDER_EMAIL must be a verified domain/email in Resend.
-const SENDER_EMAIL = 'onboarding@resend.dev'; 
-const ADMIN_EMAIL = 'brunofranchi9@gmail.com'; // Updated Admin Email
+const SENDER_EMAIL = 'brunofranchi9@gmail.com';
+const SENDER_NAME = 'ASD Tennis Club Monti della Tolfa';
+const ADMIN_EMAIL = 'brunofranchi9@gmail.com';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -27,63 +15,59 @@ serve(async (req) => {
   }
 
   try {
-    // 1. Get the new user data from the request body (sent by the database trigger)
     const payload = await req.json();
-    const newProfile = payload.record;
-    
-    if (!newProfile || !newProfile.id) {
-        console.error("[notify-admin-on-signup] Invalid payload received.");
-        return new Response(JSON.stringify({ error: 'Invalid payload' }), { status: 400, headers: corsHeaders });
-    }
 
-    // 2. Fetch user email from auth.users (requires service role)
-    const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(newProfile.id);
-    if (userError) throw userError;
-    
-    const userEmail = userData.user?.email || 'Email Sconosciuta';
-    const newUserName = newProfile.full_name || userEmail;
-    
-    console.log(`[notify-admin-on-signup] New user profile created: ${newUserName} (${userEmail})`);
+    const userEmail = payload.email || 'Email Sconosciuta';
+    const newUserName = payload.full_name || userEmail;
 
-    // 3. Send email notification to admin
+    console.log(`[notify-admin-on-signup] Nuovo socio: ${newUserName} (${userEmail})`);
+
     const emailSubject = `[AZIONE RICHIESTA] Nuovo Socio Registrato: ${newUserName}`;
     const emailBody = `
       <h1>Nuova Registrazione Socio</h1>
       <p>Il socio <strong>${newUserName}</strong> si è appena registrato e attende la tua approvazione per poter prenotare i campi.</p>
       <ul>
-        <li>Nome: ${newUserName}</li>
-        <li>Email: ${userEmail}</li>
-        <li>Livello Skill: ${newProfile.skill_level || 'Non specificato'}</li>
+        <li><strong>Nome:</strong> ${newUserName}</li>
+        <li><strong>Email:</strong> ${userEmail}</li>
+        <li><strong>Livello Skill:</strong> ${newProfile.skill_level || 'Non specificato'}</li>
       </ul>
       <p>Per approvare o rifiutare, accedi al pannello di amministrazione:</p>
-      <a href="https://app-prenotazione-asd-tennis-club-mo.vercel.app/admin/approvals" style="padding: 10px 20px; background-color: #2E6B3D; color: white; text-decoration: none; border-radius: 5px;">Vai a Gestisci Approvazioni</a>
+      <a href="https://app-prenotazione-asd-tennis-club-mo.vercel.app/admin/approvals" style="padding: 10px 20px; background-color: #2E6B3D; color: white; text-decoration: none; border-radius: 5px;">
+        Vai a Gestisci Approvazioni
+      </a>
     `;
 
-    try {
-      const resendData = await resend.emails.send({
-        from: SENDER_EMAIL,
-        to: ADMIN_EMAIL,
+    const brevoResponse = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'api-key': Deno.env.get('BREVO_API_KEY')!,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        sender: { name: SENDER_NAME, email: SENDER_EMAIL },
+        to: [{ email: ADMIN_EMAIL, name: 'Bruno Franchi' }],
         subject: emailSubject,
-        html: emailBody,
-      });
+        htmlContent: emailBody,
+      }),
+    });
 
-      console.log("[notify-admin-on-signup] Admin notification email sent successfully.", resendData);
-    } catch (resendError) {
-      console.error("[notify-admin-on-signup] Resend Error:", resendError);
-      const errorMessage = resendError?.message || 'Unknown error while sending admin notification.';
-      return new Response(JSON.stringify({ message: 'Profile created, but email notification failed.', error: errorMessage }), { 
+    if (!brevoResponse.ok) {
+      const brevoError = await brevoResponse.text();
+      console.error("[notify-admin-on-signup] Brevo Error:", brevoError);
+      return new Response(JSON.stringify({ message: 'Profilo creato, ma notifica email fallita.', error: brevoError }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       });
     }
 
-    return new Response(JSON.stringify({ message: 'Admin notification sent successfully.' }), {
+    console.log("[notify-admin-on-signup] Email di notifica inviata con successo.");
+    return new Response(JSON.stringify({ message: 'Notifica admin inviata con successo.' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
 
   } catch (error) {
-    console.error("[notify-admin-on-signup] Critical Error processing request:", error.message);
+    console.error("[notify-admin-on-signup] Errore critico:", error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
