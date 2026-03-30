@@ -56,8 +56,7 @@ serve(async (req) => {
         <li>Livello Skill: ${newProfile.skill_level || 'Non specificato'}</li>
       </ul>
       <p>Per approvare o rifiutare, accedi al pannello di amministrazione:</p>
-      <a href="https://dyad-generated-app.vercel.app/admin/approvals" style="padding: 10px 20px; background-color: #2E6B3D; color: white; text-decoration: none; border-radius: 5px;">Vai a Gestisci Approvazioni</a>
-      <p>Ricorda di sostituire "https://dyad-generated-app.vercel.app" con l'URL reale della tua applicazione se diverso.</p>
+      <a href="https://app-prenotazione-asd-tennis-club-mo.vercel.app/admin/approvals" style="padding: 10px 20px; background-color: #2E6B3D; color: white; text-decoration: none; border-radius: 5px;">Vai a Gestisci Approvazioni</a>
     `;
 
     try {

@@ -130,8 +130,8 @@ const FindMatch = () => {
     setSubmitting(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const startISO = `${requestedDate}T${preferredTimeStart}:00.000Z`;
-      const endISO = `${requestedDate}T${preferredTimeEnd}:00.000Z`;
+      const startISO = new Date(`${requestedDate}T${preferredTimeStart}:00`).toISOString();
+      const endISO = new Date(`${requestedDate}T${preferredTimeEnd}:00`).toISOString();
 
       const { data: conflicts } = await supabase
         .from('reservations')
