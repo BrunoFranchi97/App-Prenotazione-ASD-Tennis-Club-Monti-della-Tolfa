@@ -62,38 +62,35 @@ serve(async (req) => {
     const dayLabel = format(tomorrow, "EEEE d MMMM", { locale: it });
     const dayLabelCap = dayLabel.charAt(0).toUpperCase() + dayLabel.slice(1);
 
-    if (!reservations || reservations.length === 0) {
-      const message = `🎾 *ASD Tennis Club Monti della Tolfa*\n\n📅 *Prenotazioni ${dayLabelCap}*\n\nNessuna prenotazione per domani.`;
-      return new Response(JSON.stringify({ message, count: 0 }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      });
-    }
-
-    // Raggruppa per campo
-    const byCourt: Record<number, any[]> = {};
-    reservations.forEach((r: any) => {
-      if (!byCourt[r.court_id]) byCourt[r.court_id] = [];
-      byCourt[r.court_id].push(r);
-    });
-
+    // Costruisci il messaggio (sia con che senza prenotazioni)
     let body = `🎾 *ASD Tennis Club Monti della Tolfa*\n\n📅 *Prenotazioni ${dayLabelCap}*\n`;
 
-    for (const [courtId, recs] of Object.entries(byCourt)) {
-      const courtName = courtMap[Number(courtId)] || `Campo ${courtId}`;
-      body += `\n🏟️ *${courtName}*\n`;
-
-      recs.forEach((r: any) => {
-        const start = format(new Date(r.starts_at), "HH:mm");
-        const end = format(new Date(r.ends_at), "HH:mm");
-        const name = r.booked_for_first_name && r.booked_for_last_name
-          ? `${r.booked_for_first_name} ${r.booked_for_last_name}`
-          : profileMap[r.user_id] || "Socio";
-        body += `  • ${start}–${end} — ${name}\n`;
+    if (!reservations || reservations.length === 0) {
+      body += `\nNessuna prenotazione per domani.`;
+    } else {
+      // Raggruppa per campo
+      const byCourt: Record<number, any[]> = {};
+      reservations.forEach((r: any) => {
+        if (!byCourt[r.court_id]) byCourt[r.court_id] = [];
+        byCourt[r.court_id].push(r);
       });
-    }
 
-    body += `\n_Totale: ${reservations.length} ${reservations.length === 1 ? "ora prenotata" : "ore prenotate"}_`;
+      for (const [courtId, recs] of Object.entries(byCourt)) {
+        const courtName = courtMap[Number(courtId)] || `Campo ${courtId}`;
+        body += `\n🏟️ *${courtName}*\n`;
+
+        recs.forEach((r: any) => {
+          const start = format(new Date(r.starts_at), "HH:mm");
+          const end = format(new Date(r.ends_at), "HH:mm");
+          const name = r.booked_for_first_name && r.booked_for_last_name
+            ? `${r.booked_for_first_name} ${r.booked_for_last_name}`
+            : profileMap[r.user_id] || "Socio";
+          body += `  • ${start}–${end} — ${name}\n`;
+        });
+      }
+
+      body += `\n_Totale: ${reservations.length} ${reservations.length === 1 ? "ora prenotata" : "ore prenotate"}_`;
+    }
 
     // Invia via Green API se configurato
     const greenApiInstance = Deno.env.get("GREEN_API_INSTANCE_ID");
