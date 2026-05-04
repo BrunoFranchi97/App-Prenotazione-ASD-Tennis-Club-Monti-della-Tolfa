@@ -132,7 +132,7 @@ const BookingHistory = () => {
     if (selectedDate) filtered = filtered.filter(g => isSameDay(g.date, selectedDate));
     else {
       const today = startOfDay(new Date());
-      filtered = filtered.filter(g => !isBefore(g.date, today));
+      filtered = filtered.filter(g => !isBefore(g.date, today) && g.status !== 'cancelled');
     }
     if (selectedSurface !== "all") filtered = filtered.filter(g => g.courtSurface === selectedSurface);
     if (selectedType !== "all") filtered = filtered.filter(g => g.bookingType === selectedType);
@@ -149,8 +149,13 @@ const BookingHistory = () => {
   const handleDelete = async (group: ReservationGroup) => {
     setDeletingGroupId(group.id);
     try {
-      for (const res of group.reservations) await supabase.from('reservations').delete().eq('id', res.id);
-      showSuccess("Prenotazione eliminata!");
+      const ids = group.reservations.map(r => r.id);
+      const { error } = await supabase
+        .from('reservations')
+        .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+        .in('id', ids);
+      if (error) throw error;
+      showSuccess("Prenotazione annullata.");
       fetchData();
     } catch (err: any) { showError(err.message); }
     finally { setDeletingGroupId(null); }
