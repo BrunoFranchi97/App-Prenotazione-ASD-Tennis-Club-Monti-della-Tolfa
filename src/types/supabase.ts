@@ -20,7 +20,8 @@ export interface Reservation {
   created_at: string;
   booked_for_first_name?: string | null;
   booked_for_last_name?: string | null;
-  updated_at?: string; 
+  updated_at?: string;
+  is_paid?: boolean | null;
 }
 
 export type SkillLevel = 'principiante' | 'intermedio' | 'avanzato' | 'agonista';

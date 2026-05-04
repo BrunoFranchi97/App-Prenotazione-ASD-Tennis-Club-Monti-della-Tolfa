@@ -4,8 +4,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { format, parseISO, addDays, subDays, startOfDay, endOfDay, isSameDay, setHours, setMinutes, addHours, differenceInMinutes } from "date-fns";
 import { it } from "date-fns/locale";
-import { 
-  ArrowLeft, ChevronLeft, ChevronRight, Eye, Edit, Trash2, Plus, Clock, MapPin
+import {
+  ArrowLeft, ChevronLeft, ChevronRight, Eye, Edit, Trash2, Plus, Clock, MapPin, CircleDollarSign
 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -277,8 +277,30 @@ export default function AdminReservations() {
     } catch (err: any) { showError(err.message); } finally { setLoading(false); }
   };
 
+  const handleTogglePaid = async (res: ReservationRow, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newPaidState = !res.is_paid;
+    try {
+      const { error } = await supabase
+        .from('reservations')
+        .update({ is_paid: newPaidState })
+        .eq('id', res.id);
+      if (error) throw error;
+      setReservations(prev =>
+        prev.map(r => r.id === res.id ? { ...r, is_paid: newPaidState } : r)
+      );
+      showSuccess(newPaidState ? "Ora segnata come pagata." : "Pagamento rimosso.");
+    } catch (err: any) {
+      showError("Errore nell'aggiornamento del pagamento.");
+    }
+  };
+
   if (!isAdmin && !loading) return null;
   const visibleCourtsList = courts.filter(c => visibleCourts.includes(c.id));
+
+  const bookedHours = reservations.length;
+  const paidHours = reservations.filter(r => r.is_paid).length;
+  const unpaidHours = bookedHours - paidHours;
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col">
@@ -355,6 +377,45 @@ export default function AdminReservations() {
         </div>
       </div>
 
+      {/* Barra riepilogo pagamenti */}
+      {bookedHours > 0 && (
+        <div className="bg-white border-b border-gray-100 px-4 py-2.5">
+          <div className="max-w-7xl mx-auto flex items-center gap-4 flex-wrap">
+            <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest">Riepilogo</span>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-full bg-gray-300" />
+              <span className="text-[11px] font-black text-gray-700">{bookedHours}</span>
+              <span className="text-[10px] text-gray-400">ore prenotate</span>
+            </div>
+            <div className="w-px h-4 bg-gray-100" />
+            <div className="flex items-center gap-1.5">
+              <CircleDollarSign className="h-3.5 w-3.5 text-green-500" />
+              <span className="text-[11px] font-black text-green-600">{paidHours}</span>
+              <span className="text-[10px] text-gray-400">pagate</span>
+            </div>
+            <div className="w-px h-4 bg-gray-100" />
+            <div className="flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-full bg-amber-400" />
+              <span className="text-[11px] font-black text-amber-600">{unpaidHours}</span>
+              <span className="text-[10px] text-gray-400">da pagare</span>
+            </div>
+            {bookedHours > 0 && (
+              <div className="ml-auto flex items-center gap-2">
+                <div className="h-1.5 w-24 rounded-full bg-gray-100 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-green-500 transition-all duration-500"
+                    style={{ width: `${Math.round((paidHours / bookedHours) * 100)}%` }}
+                  />
+                </div>
+                <span className="text-[10px] font-black text-gray-400">
+                  {Math.round((paidHours / bookedHours) * 100)}%
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="flex-1 overflow-auto">
         <div className="container mx-auto px-4 py-6">
           <div className="flex gap-2">
@@ -398,13 +459,29 @@ export default function AdminReservations() {
                         {res ? (
                           <>
                             <div className="p-3 h-full flex flex-col">
-                              <p className="font-black text-gray-900 text-[11px] truncate uppercase">
-                                {res.booked_for_first_name} {res.booked_for_last_name}
+                              <p className="font-black text-gray-900 text-[11px] truncate uppercase pr-8">
+                                {res.booked_for_first_name && res.booked_for_last_name
+                                  ? `${res.booked_for_first_name} ${res.booked_for_last_name}`
+                                  : res.bookedByName}
                               </p>
                               <p className="text-[9px] font-bold opacity-60 mt-0.5 flex items-center gap-1">
                                 <Clock size={8} /> {time} - {format(parseISO(res.ends_at), 'HH:mm')}
                               </p>
                             </div>
+
+                            {/* Badge pagamento — sempre visibile, top-right */}
+                            <button
+                              onClick={(e) => handleTogglePaid(res, e)}
+                              title={res.is_paid ? "Pagata — clicca per annullare" : "Non pagata — clicca per segnare come pagata"}
+                              className={cn(
+                                "absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center transition-all duration-200",
+                                res.is_paid
+                                  ? "bg-green-500 text-white shadow-md"
+                                  : "bg-white/80 text-gray-300 border border-gray-200 hover:text-green-500 hover:border-green-300"
+                              )}
+                            >
+                              <CircleDollarSign className="h-3.5 w-3.5" />
+                            </button>
 
                             <div className={cn(
                               "absolute bottom-2 right-2 flex gap-1 transition-all duration-300",
@@ -451,6 +528,12 @@ export default function AdminReservations() {
                 <div><Label className="text-[9px] font-black text-gray-400 uppercase">Creato da</Label><p className="font-bold text-gray-700 text-[10px]">{selectedReservation.bookedByName}</p></div>
               </div>
               {selectedReservation.notes && <p className="text-xs text-gray-500 italic px-2">"{selectedReservation.notes}"</p>}
+              <div className="flex items-center gap-2 px-2">
+                <CircleDollarSign className={cn("h-4 w-4", selectedReservation.is_paid ? "text-green-500" : "text-gray-300")} />
+                <span className={cn("text-xs font-bold", selectedReservation.is_paid ? "text-green-600" : "text-gray-400")}>
+                  {selectedReservation.is_paid ? "Ora pagata" : "Non ancora pagata"}
+                </span>
+              </div>
             </div>
           )}
           <DialogFooter><Button variant="outline" onClick={() => setViewDialogOpen(false)} className="rounded-xl h-12 w-full">Chiudi</Button></DialogFooter>
