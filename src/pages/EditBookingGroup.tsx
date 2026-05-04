@@ -207,12 +207,15 @@ const EditBookingGroup = () => {
       const slotsToRemove = originalSlots.filter(s => !selectedSlots.includes(s));
       const slotsToKeep = selectedSlots.filter(s => originalSlots.includes(s));
 
-      // 1. Rimuovi slot deselezionati
+      // 1. Annulla slot deselezionati (soft-delete per mantenere storico)
       if (slotsToRemove.length > 0) {
         const idsToRemove = group.reservations
           .filter(r => slotsToRemove.includes(format(parseISO(r.starts_at), 'HH:mm')))
           .map(r => r.id);
-        await supabase.from('reservations').delete().in('id', idsToRemove);
+        await supabase
+          .from('reservations')
+          .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+          .in('id', idsToRemove);
       }
 
       // 2. Aggiorna slot mantenuti

@@ -269,9 +269,12 @@ export default function AdminReservations() {
     if (!selectedReservation) return;
     setLoading(true);
     try {
-      const { error } = await supabase.from('reservations').delete().eq('id', selectedReservation.id);
+      const { error } = await supabase
+        .from('reservations')
+        .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+        .eq('id', selectedReservation.id);
       if (error) throw error;
-      showSuccess("Eliminata!");
+      showSuccess("Prenotazione annullata.");
       setDeleteDialogOpen(false);
       refreshAll();
     } catch (err: any) { showError(err.message); } finally { setLoading(false); }
