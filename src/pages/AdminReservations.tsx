@@ -441,7 +441,11 @@ export default function AdminReservations() {
                     const res = getReservationForSlot(court.id, time);
                     const slotKey = `${court.id}-${time}`;
                     const isHovered = hoveredSlot === slotKey;
-                    const slotColor = res ? getGroupColor(res.groupId || '') : "";
+                    const slotColor = res
+                      ? res.is_paid
+                        ? "bg-green-50 border-green-200 text-green-800"
+                        : "bg-[#FFFBEB] border-amber-200 text-amber-800"
+                      : "";
 
                     return (
                       <div
