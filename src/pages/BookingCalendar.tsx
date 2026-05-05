@@ -41,6 +41,7 @@ const BookingCalendar = () => {
   const [loading, setLoading] = useState(false);
   const [fetchingData, setFetchingData] = useState(true);
   const [bookerFullName, setBookerFullName] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [lastBookingData, setLastBookingData] = useState<{ reservations: Reservation[], courtName: string } | null>(null);
@@ -52,8 +53,11 @@ const BookingCalendar = () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     
-    const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).single();
-    if (profile) setBookerFullName(profile.full_name);
+    const { data: profile } = await supabase.from('profiles').select('full_name, is_admin').eq('id', user.id).single();
+    if (profile) {
+      setBookerFullName(profile.full_name);
+      setIsAdmin(profile.is_admin ?? false);
+    }
 
     const { data: myRes } = await supabase.from('reservations').select('*').eq('user_id', user.id).neq('status', 'cancelled');
     setUserReservations(myRes || []);
@@ -156,7 +160,7 @@ const BookingCalendar = () => {
         const sorted = [...newSelected, slotTime].sort();
         const firstIdx = allTimeSlots.indexOf(sorted[0]);
         const lastIdx = allTimeSlots.indexOf(sorted[sorted.length - 1]);
-        if (lastIdx - firstIdx + 1 > 3) return;
+        if (!isAdmin && lastIdx - firstIdx + 1 > 3) return;
         const range: string[] = [];
         for (let i = firstIdx; i <= lastIdx; i++) range.push(allTimeSlots[i]);
         // Notifica se sono stati auto-selezionati slot intermedi per formare un blocco consecutivo
@@ -176,11 +180,13 @@ const BookingCalendar = () => {
   const handleBooking = async () => {
     if (!date || !isValid(date)) return;
     
-    // Controllo Policy Settimanale (EFFETTIVO)
-    const limitsStatus = getBookingLimitsStatus(userReservations, date);
-    if (!limitsStatus.canBookMoreThisWeek) {
-      showError("Hai raggiunto il limite massimo di 2 prenotazioni per questa settimana (Lun-Dom).");
-      return;
+    // Controllo Policy Settimanale (EFFETTIVO) — bypass per gli admin
+    if (!isAdmin) {
+      const limitsStatus = getBookingLimitsStatus(userReservations, date);
+      if (!limitsStatus.canBookMoreThisWeek) {
+        showError("Hai raggiunto il limite massimo di 2 prenotazioni per questa settimana (Lun-Dom).");
+        return;
+      }
     }
 
     const { data: { user } } = await supabase.auth.getUser();
@@ -247,7 +253,7 @@ const BookingCalendar = () => {
       </header>
 
       <div className="max-w-7xl mx-auto mb-6">
-        <BookingLimitsBox status={getBookingLimitsStatus(userReservations, date && isValid(date) ? date : new Date())} />
+        <BookingLimitsBox status={getBookingLimitsStatus(userReservations, date && isValid(date) ? date : new Date())} isAdmin={isAdmin} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 max-w-7xl mx-auto">
