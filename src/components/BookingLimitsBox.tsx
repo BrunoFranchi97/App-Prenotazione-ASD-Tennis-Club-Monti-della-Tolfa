@@ -3,19 +3,42 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { ShieldCheck, AlertCircle, Info } from 'lucide-react';
+import { ShieldCheck, AlertCircle, Info, Infinity } from 'lucide-react';
 import { BookingLimitsStatus } from '@/utils/bookingLimits';
 import { cn } from '@/lib/utils';
 
 interface BookingLimitsBoxProps {
   status: BookingLimitsStatus;
   isChecking?: boolean;
+  isAdmin?: boolean;
 }
 
-const BookingLimitsBox: React.FC<BookingLimitsBoxProps> = ({ status, isChecking }) => {
+const BookingLimitsBox: React.FC<BookingLimitsBoxProps> = ({ status, isChecking, isAdmin }) => {
   const { weeklyCount, weeklyMax } = status;
-  
+
   const weeklyPercent = (weeklyCount / weeklyMax) * 100;
+
+  if (isAdmin) {
+    return (
+      <Card className="border-none shadow-[0_2px_12px_rgba(0,0,0,0.04)] bg-club-orange/[0.04] rounded-[2rem] overflow-hidden">
+        <CardHeader className="py-5 px-6 flex flex-row items-center justify-between space-y-0 bg-club-orange/[0.03]">
+          <CardTitle className="text-sm font-extrabold text-club-orange flex items-center uppercase tracking-widest">
+            <ShieldCheck className="mr-2 h-4 w-4" /> Accesso Amministratore
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="py-5 px-6">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-club-orange/10 flex items-center justify-center shrink-0">
+              <Infinity className="h-5 w-5 text-club-orange" />
+            </div>
+            <p className="text-sm font-bold text-gray-600 leading-snug">
+              Nessun limite settimanale né di durata — puoi prenotare senza restrizioni.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="border-none shadow-[0_2px_12px_rgba(0,0,0,0.04)] bg-primary/[0.03] rounded-[2rem] overflow-hidden">
@@ -34,7 +57,7 @@ const BookingLimitsBox: React.FC<BookingLimitsBoxProps> = ({ status, isChecking 
             </span>
           </div>
           <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
-             <div 
+             <div
                className={cn("h-full transition-all duration-1000 ease-out rounded-full", weeklyCount >= weeklyMax ? "bg-destructive" : "bg-primary")}
                style={{ width: `${weeklyPercent}%` }}
              ></div>
