@@ -5,7 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { CalendarDays, History, LogOut, Users, Settings, Search, FileText, AlertTriangle, ShieldCheck, ChevronRight } from 'lucide-react';
+import { CalendarDays, History, LogOut, Users, Settings, Search, FileText, AlertTriangle, ShieldCheck, ChevronRight, LayoutGrid } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import Footer from '@/components/Footer';
@@ -59,35 +59,42 @@ const MemberDashboard = () => {
   }
 
   const bookingRoutes = [
-    { 
-      path: "/book", 
-      title: "Prenota un Campo", 
-      icon: CalendarDays, 
+    {
+      path: "/book",
+      title: "Prenota un Campo",
+      icon: CalendarDays,
       description: "Riserva il tuo slot orario per giocare.",
       buttonText: "Vai al Calendario",
       isPrimary: true
     },
-    { 
-      path: "/book-for-third-party", 
-      title: "Prenota per Socio", 
-      icon: Users, 
+    {
+      path: "/weekly-view",
+      title: "Vista Settimanale",
+      icon: LayoutGrid,
+      description: "Guarda la situazione dei campi settimana per settimana, come il foglio in bacheca.",
+      buttonText: "Vedi la Griglia"
+    },
+    {
+      path: "/book-for-third-party",
+      title: "Prenota per Socio",
+      icon: Users,
       description: "Gestisci la prenotazione per un altro socio.",
       buttonText: "Prenota per terzi"
     },
-    { 
-      path: "/find-match", 
-      title: "Cerco Partita", 
-      icon: Search, 
+    {
+      path: "/find-match",
+      title: "Cerco Partita",
+      icon: Search,
       description: "Trova nuovi avversari e organizza sfide.",
       buttonText: "Apri la Bacheca"
     },
   ];
 
   const nonBookingRoutes = [
-    { 
-      path: "/history", 
-      title: "I miei Campi", 
-      icon: History, 
+    {
+      path: "/history",
+      title: "I miei Campi",
+      icon: History,
       description: "Visualizza i tuoi impegni passati e futuri.",
       buttonText: "Vedi Prenotazioni"
     },

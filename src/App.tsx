@@ -29,6 +29,7 @@ import MedicalCertificates from "./pages/MedicalCertificates";
 import EmailVerificationHandler from "./components/EmailVerificationHandler";
 import EditBookingGroup from "./pages/EditBookingGroup";
 import MyProfile from "./pages/MyProfile";
+import WeeklyView from "./pages/WeeklyView";
 
 const queryClient = new QueryClient();
 
@@ -63,6 +64,7 @@ const App = () => (
               <Route path="/find-match" element={<FindMatch />} />
               <Route path="/match-booking" element={<MatchBooking />} />
               <Route path="/medical-certificates" element={<MedicalCertificates />} />
+              <Route path="/weekly-view" element={<WeeklyView />} />
               <Route path="/auth/verify" element={<EmailVerificationHandler />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
