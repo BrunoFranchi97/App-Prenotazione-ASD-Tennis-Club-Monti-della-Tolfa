@@ -79,9 +79,16 @@ const BookingHistory = () => {
         const firstName = parts[0];
         const lastName = parts.slice(1).join(' ');
         if (firstName && lastName) {
-          query = query.or(`user_id.eq.${user.id},and(booked_for_first_name.ilike.${firstName},booked_for_last_name.ilike.${lastName})`);
-        } else { query = query.eq('user_id', user.id); }
-      } else { query = query.eq('user_id', user.id); }
+          // Cerca per ID utente (preciso) o per nome come fallback per prenotazioni legacy
+          query = query.or(
+            `user_id.eq.${user.id},booked_for_user_id.eq.${user.id},and(booked_for_first_name.ilike.${firstName},booked_for_last_name.ilike.${lastName},booked_for_user_id.is.null)`
+          );
+        } else {
+          query = query.or(`user_id.eq.${user.id},booked_for_user_id.eq.${user.id}`);
+        }
+      } else {
+        query = query.or(`user_id.eq.${user.id},booked_for_user_id.eq.${user.id}`);
+      }
 
       const { data: reservationsData } = await query.order('starts_at', { ascending: true });
       setReservations(reservationsData || []);

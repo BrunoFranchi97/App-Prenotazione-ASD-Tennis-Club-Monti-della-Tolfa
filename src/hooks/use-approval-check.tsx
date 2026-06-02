@@ -22,6 +22,7 @@ export function useApprovalCheck() {
 
       if (!user) {
         // L'AuthLayout dovrebbe già gestire il reindirizzamento al login, ma per sicurezza
+        setLoading(false);
         navigate('/login');
         return;
       }
@@ -36,6 +37,7 @@ export function useApprovalCheck() {
         console.error("Error fetching approval status:", error?.message);
         // Se c'è un errore o il profilo non esiste, assumiamo non approvato o errore grave
         setIsApproved(false);
+        setLoading(false);
         showError("Impossibile verificare lo stato di approvazione. Riprova.");
         navigate('/dashboard');
         return;

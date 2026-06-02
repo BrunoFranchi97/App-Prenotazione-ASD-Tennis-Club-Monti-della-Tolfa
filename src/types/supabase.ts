@@ -20,6 +20,7 @@ export interface Reservation {
   created_at: string;
   booked_for_first_name?: string | null;
   booked_for_last_name?: string | null;
+  booked_for_user_id?: string | null;
   updated_at?: string;
   is_paid?: boolean | null;
 }

@@ -25,7 +25,7 @@ const MemberDashboard = () => {
       if (user) {
         const { data: profile, error } = await supabase
           .from('profiles')
-          .select('full_name, is_admin, approved')
+          .select('full_name, is_admin, status')
           .eq('id', user.id)
           .single();
 
@@ -34,7 +34,7 @@ const MemberDashboard = () => {
         } else if (profile) {
           setFullName(profile.full_name);
           setIsAdmin(profile.is_admin);
-          setIsApproved(profile.approved);
+          setIsApproved(profile.status === 'approved');
         } else {
           setFullName(user.email);
         }

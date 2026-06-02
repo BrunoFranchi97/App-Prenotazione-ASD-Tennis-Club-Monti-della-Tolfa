@@ -41,6 +41,7 @@ const ThirdPartyBooking = () => {
   const [bookedForLastName, setBookedForLastName] = useState('');
   const [loading, setLoading] = useState(false);
   const [fetchingData, setFetchingData] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [lastBookingData, setLastBookingData] = useState<{ reservations: Reservation[], courtName: string, bookedFor: string } | null>(null);
@@ -68,6 +69,8 @@ const ThirdPartyBooking = () => {
 
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
+        const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single();
+        setIsAdmin(profile?.is_admin ?? false);
         const { data: myRes } = await supabase.from('reservations').select('*').eq('user_id', user.id).neq('status', 'cancelled');
         setUserReservations(myRes || []);
       }
@@ -130,11 +133,13 @@ const ThirdPartyBooking = () => {
   const handleBooking = async () => {
     if (!date) return;
 
-    // Controllo Policy Settimanale (identico a BookingCalendar)
-    const limitsStatus = getBookingLimitsStatus(userReservations, date);
-    if (!limitsStatus.canBookMoreThisWeek) {
-      showError("Hai raggiunto il limite massimo di 2 prenotazioni per questa settimana (Lun-Dom).");
-      return;
+    // Controllo Policy Settimanale — bypass per gli admin (come in BookingCalendar)
+    if (!isAdmin) {
+      const limitsStatus = getBookingLimitsStatus(userReservations, date);
+      if (!limitsStatus.canBookMoreThisWeek) {
+        showError("Hai raggiunto il limite massimo di 2 prenotazioni per questa settimana (Lun-Dom).");
+        return;
+      }
     }
 
     setLoading(true);
@@ -144,14 +149,22 @@ const ThirdPartyBooking = () => {
       const courtIdNum = parseInt(selectedCourtId!);
       const courtName = courts.find(c => c.id === courtIdNum)?.name || `Campo ${courtIdNum}`;
 
+      // Cerca l'ID del beneficiario per nome (unambiguo solo se esiste un solo match)
+      const { data: matchedProfiles } = await supabase
+        .from('profiles')
+        .select('id')
+        .ilike('full_name', `${bookedForFirstName.trim()} ${bookedForLastName.trim()}`);
+      const bookedForUserId = matchedProfiles?.length === 1 ? matchedProfiles[0].id : null;
+
       const reservationsToInsert = sortedSlots.map(slotTime => {
         let slotStart = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date!), parseInt(slotTime.split(':')[0])), 0), 0), 0);
         return {
           court_id: courtIdNum, user_id: user?.id,
           starts_at: slotStart.toISOString(), ends_at: addHours(slotStart, 1).toISOString(),
-          status: 'confirmed', booking_type: bookingType, 
+          status: 'confirmed', booking_type: bookingType,
           notes: `Per ${bookedForFirstName} ${bookedForLastName} (${bookingTypeLabels[bookingType]})`,
           booked_for_first_name: bookedForFirstName, booked_for_last_name: bookedForLastName,
+          booked_for_user_id: bookedForUserId,
         };
       });
 

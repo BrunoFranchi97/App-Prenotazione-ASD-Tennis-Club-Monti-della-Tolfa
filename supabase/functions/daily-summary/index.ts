@@ -43,19 +43,6 @@ serve(async (req) => {
 
     if (courtsError) throw courtsError;
 
-    // Carica profili degli utenti che hanno prenotato
-    const userIds = [...new Set((reservations || []).map((r: any) => r.user_id))];
-    let profileMap: Record<string, string> = {};
-    if (userIds.length > 0) {
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, full_name")
-        .in("id", userIds);
-      profiles?.forEach((p: any) => {
-        profileMap[p.id] = p.full_name || "Socio";
-      });
-    }
-
     const courtMap: Record<number, string> = {};
     courts?.forEach((c: any) => { courtMap[c.id] = c.name; });
 
@@ -82,10 +69,7 @@ serve(async (req) => {
         recs.forEach((r: any) => {
           const start = format(new Date(r.starts_at), "HH:mm");
           const end = format(new Date(r.ends_at), "HH:mm");
-          const name = r.booked_for_first_name && r.booked_for_last_name
-            ? `${r.booked_for_first_name} ${r.booked_for_last_name}`
-            : profileMap[r.user_id] || "Socio";
-          body += `  • ${start}–${end} — ${name}\n`;
+          body += `  • ${start}–${end}\n`;
         });
       }
 

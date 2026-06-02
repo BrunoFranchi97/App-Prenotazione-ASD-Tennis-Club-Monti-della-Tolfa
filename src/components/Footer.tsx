@@ -1,8 +1,6 @@
 "use client";
 
 import React from 'react';
-import { MadeWithDyad } from './made-with-dyad';
-
 const Footer = () => {
   const clubDetails = {
     name: "ASD Tennis Club Monti della Tolfa",
@@ -24,8 +22,6 @@ const Footer = () => {
           <p>Email: <a href={`mailto:${clubDetails.email}`} className="hover:underline text-club-orange">{clubDetails.email}</a></p>
         </div>
 
-        {/* Dyad Credit */}
-        <MadeWithDyad />
       </div>
     </footer>
   );

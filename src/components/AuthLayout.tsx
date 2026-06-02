@@ -76,7 +76,7 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
 
       // Se l'utente non è approvato o è rifiutato, può stare solo in dashboard o profilo
       if (status !== 'approved' && !isAdmin) {
-        const allowedNonApprovedRoutes = ['/dashboard', '/profile', '/medical-certificates'];
+        const allowedNonApprovedRoutes = ['/dashboard', '/profile', '/medical-certificates', '/update-password'];
         if (!allowedNonApprovedRoutes.includes(location.pathname)) {
           navigate('/dashboard');
         }

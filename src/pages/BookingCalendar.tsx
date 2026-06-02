@@ -163,6 +163,16 @@ const BookingCalendar = () => {
         if (!isAdmin && lastIdx - firstIdx + 1 > 3) return;
         const range: string[] = [];
         for (let i = firstIdx; i <= lastIdx; i++) range.push(allTimeSlots[i]);
+
+        // Verifica che nessuno slot intermedio sia già occupato
+        const hasOccupiedIntermediate = range.some(slot =>
+          !newSelected.includes(slot) && slot !== slotTime && !isSlotAvailable(slot, courtIdNum)
+        );
+        if (hasOccupiedIntermediate) {
+          showError("Non puoi selezionare un blocco con slot già occupati nel mezzo. Scegli orari consecutivi liberi.");
+          return;
+        }
+
         // Notifica se sono stati auto-selezionati slot intermedi per formare un blocco consecutivo
         const autoFilled = range.length - newSelected.length - 1;
         if (autoFilled > 0) {
@@ -223,7 +233,14 @@ const BookingCalendar = () => {
       setSelectedSlots([]);
       fetchUserData();
       fetchReservations();
-    } catch (e: any) { showError(e.message); }
+    } catch (e: any) {
+      if (e.code === '23505') {
+        showError("Uno o più slot sono stati appena prenotati da qualcun altro. Ricarica la pagina e riprova.");
+        fetchReservations();
+      } else {
+        showError(e.message);
+      }
+    }
     finally { setLoading(false); }
   };
 
