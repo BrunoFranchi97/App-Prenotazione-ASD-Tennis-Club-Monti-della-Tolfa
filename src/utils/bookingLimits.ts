@@ -14,9 +14,7 @@ export const getBookingLimitsStatus = (
   userReservations: Reservation[],
   targetDate: Date
 ): BookingLimitsStatus => {
-  // 1. Filtra le prenotazioni non annullate (incluse quelle già passate nella settimana target)
-  // NOTA: non si filtra per "future" perché le prenotazioni già effettuate questa settimana
-  // devono comunque concorrere al conteggio del limite settimanale
+  // 1. Filtra le prenotazioni non annullate
   const activeReservations = userReservations.filter(res => {
     return res.status !== 'cancelled';
   });
@@ -26,18 +24,28 @@ export const getBookingLimitsStatus = (
   // 2. Calcola limiti settimanali (Lunedì - Domenica) della data TARGET selezionata
   const weekStart = startOfWeek(targetDate, { locale: it, weekStartsOn: 1 });
   const weekEnd = endOfWeek(targetDate, { locale: it, weekStartsOn: 1 });
-  
+
+  // SLOT ROTATIVO: nel ciclo settimanale concorrono al limite solo le prenotazioni
+  // ancora "attive" (non ancora concluse). Una volta che una prenotazione è terminata
+  // (ora di fine già passata) libera nuovamente uno slot disponibile nello stesso ciclo.
+  const now = new Date();
   const weeklyMatches = groupedReservations.filter(block => {
     const blockDate = startOfDay(block.date);
-    return isWithinInterval(blockDate, { start: weekStart, end: weekEnd });
+    const inWeek = isWithinInterval(blockDate, { start: weekStart, end: weekEnd });
+    if (!inWeek) return false;
+    return block.endTime.getTime() > now.getTime();
   });
 
   const canBookWeekly = weeklyMatches.length < 2;
 
-  // Calcola la prossima data di sblocco (lunedì della settimana successiva)
+  // Con lo slot rotativo lo sblocco avviene quando la prima prenotazione attiva
+  // del ciclo si conclude (fallback: lunedì della settimana successiva).
   let nextAvailableDate: Date | undefined;
   if (!canBookWeekly) {
-    nextAvailableDate = addDays(weekEnd, 1); // lunedì della settimana successiva
+    const earliestEnd = weeklyMatches
+      .map(block => block.endTime)
+      .sort((a, b) => a.getTime() - b.getTime())[0];
+    nextAvailableDate = earliestEnd ?? addDays(weekEnd, 1);
   }
 
   return {

@@ -137,7 +137,7 @@ const ThirdPartyBooking = () => {
     if (!isAdmin) {
       const limitsStatus = getBookingLimitsStatus(userReservations, date);
       if (!limitsStatus.canBookMoreThisWeek) {
-        showError("Hai raggiunto il limite massimo di 2 prenotazioni per questa settimana (Lun-Dom).");
+        showError("Hai già 2 prenotazioni attive in questo ciclo (Lun-Dom). Potrai prenotare di nuovo quando una di esse sarà conclusa.");
         return;
       }
     }
