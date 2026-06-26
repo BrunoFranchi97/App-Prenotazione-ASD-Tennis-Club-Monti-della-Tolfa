@@ -13,7 +13,7 @@ import { showError, showSuccess } from '@/utils/toast';
 import { format, parseISO, addHours, setHours, setMinutes, isBefore, isEqual, setSeconds, setMilliseconds, addDays, startOfDay, endOfDay, isSameDay, addMinutes, isValid } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { useApprovalCheck } from '@/hooks/use-approval-check';
-import { Court, Reservation, BookingType } from '@/types/supabase';
+import { Court, Reservation, BookingType, MemberType } from '@/types/supabase';
 import { getBookingLimitsStatus } from '@/utils/bookingLimits';
 import BookingLimitsBox from '@/components/BookingLimitsBox';
 import BookingSuccessDialog from '@/components/BookingSuccessDialog';
@@ -42,21 +42,26 @@ const BookingCalendar = () => {
   const [fetchingData, setFetchingData] = useState(true);
   const [bookerFullName, setBookerFullName] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [memberType, setMemberType] = useState<MemberType>('socio_effettivo');
 
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [lastBookingData, setLastBookingData] = useState<{ reservations: Reservation[], courtName: string } | null>(null);
 
   const today = useMemo(() => startOfDay(new Date()), []);
-  const maxDate = useMemo(() => addDays(today, 14), [today]);
+  const maxDate = useMemo(() => {
+    if (isAdmin) return addDays(today, 365);
+    return addDays(today, memberType === 'frequentatore_occasionale' ? 7 : 14);
+  }, [today, isAdmin, memberType]);
 
   const fetchUserData = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     
-    const { data: profile } = await supabase.from('profiles').select('full_name, is_admin').eq('id', user.id).single();
+    const { data: profile } = await supabase.from('profiles').select('full_name, is_admin, member_type').eq('id', user.id).single();
     if (profile) {
       setBookerFullName(profile.full_name);
       setIsAdmin(profile.is_admin ?? false);
+      setMemberType((profile.member_type as MemberType) || 'socio_effettivo');
     }
 
     const { data: myRes } = await supabase.from('reservations').select('*').eq('user_id', user.id).neq('status', 'cancelled');
@@ -130,10 +135,21 @@ const BookingCalendar = () => {
     let slotStart = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date), hours), minutes), 0), 0);
     const slotEnd = addHours(slotStart, 1);
     const now = new Date();
-    
+
     if (isBefore(slotEnd, now)) return false;
     if (isSameDay(date, now) && now > addMinutes(slotStart, 20)) return false;
-    
+
+    // Frequentatori occasionali: domenica mattina (< 12:00) non prenotabile su campi in terra sintetica
+    if (!isAdmin && memberType === 'frequentatore_occasionale') {
+      const isDomenica = date.getDay() === 0;
+      if (isDomenica && hours < 12) {
+        const court = courts.find(c => c.id === courtId);
+        if (court?.surface?.toLowerCase().includes('sintetico') || court?.surface?.toLowerCase().includes('terra')) {
+          return false;
+        }
+      }
+    }
+
     return !getSlotReservation(slotTime, courtId);
   };
 
@@ -192,9 +208,10 @@ const BookingCalendar = () => {
     
     // Controllo Policy Settimanale (EFFETTIVO) — bypass per gli admin
     if (!isAdmin) {
-      const limitsStatus = getBookingLimitsStatus(userReservations, date);
+      const limitsStatus = getBookingLimitsStatus(userReservations, date, memberType);
       if (!limitsStatus.canBookMoreThisWeek) {
-        showError("Hai già 2 prenotazioni attive in questo ciclo (Lun-Dom). Potrai prenotare di nuovo quando una di esse sarà conclusa.");
+        const max = limitsStatus.weeklyMax;
+        showError(`Hai già ${max} prenotazion${max === 1 ? 'e attiva' : 'i attive'} in questo ciclo (Lun-Dom). Potrai prenotare di nuovo quando si sarà conclusa.`);
         return;
       }
     }
@@ -270,7 +287,7 @@ const BookingCalendar = () => {
       </header>
 
       <div className="max-w-7xl mx-auto mb-6">
-        <BookingLimitsBox status={getBookingLimitsStatus(userReservations, date && isValid(date) ? date : new Date())} isAdmin={isAdmin} />
+        <BookingLimitsBox status={getBookingLimitsStatus(userReservations, date && isValid(date) ? date : new Date(), memberType)} isAdmin={isAdmin} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 max-w-7xl mx-auto">

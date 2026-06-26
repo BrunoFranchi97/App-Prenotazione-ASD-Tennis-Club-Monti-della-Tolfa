@@ -1,6 +1,6 @@
 import { startOfWeek, endOfWeek, isWithinInterval, parseISO, startOfDay, addDays } from 'date-fns';
 import { it } from 'date-fns/locale';
-import type { Reservation } from '@/types/supabase';
+import type { Reservation, MemberType } from '@/types/supabase';
 
 export interface BookingLimitsStatus {
   weeklyCount: number;
@@ -12,8 +12,10 @@ export interface BookingLimitsStatus {
 
 export const getBookingLimitsStatus = (
   userReservations: Reservation[],
-  targetDate: Date
+  targetDate: Date,
+  memberType: MemberType = 'socio_effettivo'
 ): BookingLimitsStatus => {
+  const weeklyMax = memberType === 'frequentatore_occasionale' ? 1 : 2;
   // 1. Filtra le prenotazioni non annullate
   const activeReservations = userReservations.filter(res => {
     return res.status !== 'cancelled';
@@ -36,7 +38,7 @@ export const getBookingLimitsStatus = (
     return block.endTime.getTime() > now.getTime();
   });
 
-  const canBookWeekly = weeklyMatches.length < 2;
+  const canBookWeekly = weeklyMatches.length < weeklyMax;
 
   // Con lo slot rotativo lo sblocco avviene quando la prima prenotazione attiva
   // del ciclo si conclude (fallback: lunedì della settimana successiva).
@@ -50,7 +52,7 @@ export const getBookingLimitsStatus = (
 
   return {
     weeklyCount: weeklyMatches.length,
-    weeklyMax: 2,
+    weeklyMax,
     durationMax: 3,
     canBookMoreThisWeek: canBookWeekly,
     nextAvailableDate
