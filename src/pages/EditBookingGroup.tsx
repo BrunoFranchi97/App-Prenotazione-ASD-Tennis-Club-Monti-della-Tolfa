@@ -45,6 +45,7 @@ const EditBookingGroup = () => {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [courts, setCourts] = useState<Court[]>([]);
   const [otherReservations, setOtherReservations] = useState<Reservation[]>([]); // Prenotazioni di altri su questo campo
   const [myOtherReservations, setMyOtherReservations] = useState<Reservation[]>([]); // Mie prenotazioni su altri campi
@@ -76,6 +77,10 @@ const EditBookingGroup = () => {
       setLoading(true);
       try {
         const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single();
+          setIsAdmin(profile?.is_admin ?? false);
+        }
         const { data: courtsData } = await supabase.from('courts').select('*').eq('is_active', true);
         setCourts(courtsData || []);
 
@@ -174,7 +179,7 @@ const EditBookingGroup = () => {
         const lastIdx = allTimeSlots.indexOf(sorted[sorted.length - 1]);
         const count = lastIdx - firstIdx + 1;
 
-        if (count > 3) {
+        if (!isAdmin && count > 3) {
           showError("Limite Policy: Non puoi superare le 3 ore consecutive.");
           return;
         }

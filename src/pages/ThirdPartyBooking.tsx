@@ -122,7 +122,7 @@ const ThirdPartyBooking = () => {
         const sorted = [...newSelected, slotTime].sort();
         const firstIdx = allTimeSlots.indexOf(sorted[0]);
         const lastIdx = allTimeSlots.indexOf(sorted[sorted.length - 1]);
-        if (lastIdx - firstIdx + 1 > 3) return;
+        if (!isAdmin && lastIdx - firstIdx + 1 > 3) return;
         const range: string[] = [];
         for (let i = firstIdx; i <= lastIdx; i++) range.push(allTimeSlots[i]);
         setSelectedSlots(range);
