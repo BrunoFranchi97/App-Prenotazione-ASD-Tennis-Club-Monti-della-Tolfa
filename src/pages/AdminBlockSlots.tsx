@@ -153,7 +153,8 @@ const AdminBlockSlots = () => {
         user_id: user.id,
         starts_at: startDateTime.toISOString(),
         ends_at: endDateTime.toISOString(),
-        status: 'cancelled',
+        status: 'confirmed',
+        booking_type: 'lezione',
         notes: `BLOCCATO: ${reason || 'Nessun motivo specificato'}`,
         booked_for_first_name: 'SLOT',
         booked_for_last_name: 'BLOCCATO'
