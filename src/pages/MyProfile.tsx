@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, User, Camera, Save, Lock, Smartphone, CreditCard, Loader2, Target } from 'lucide-react';
+import { ArrowLeft, User, Camera, Save, Lock, Smartphone, CreditCard, Loader2, Target, Users } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import type { SkillLevel } from '@/types/supabase';
@@ -218,6 +218,11 @@ const MyProfile = () => {
               {profile?.is_admin && (
                 <Badge className="bg-club-orange/10 text-club-orange border-none font-bold">Admin</Badge>
               )}
+              {profile?.member_type && (
+                <Badge className={`border-none font-bold ${profile.member_type === 'socio_effettivo' ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+                  {profile.member_type === 'socio_effettivo' ? 'Socio Effettivo' : 'Frequentatore'}
+                </Badge>
+              )}
             </div>
           </Card>
 
@@ -242,6 +247,17 @@ const MyProfile = () => {
                 <div>
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Livello</p>
                   <p className="font-bold text-gray-800 capitalize">{skillLevel}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 text-sm">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
+                  <Users className="h-4 w-4 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tipo Iscrizione</p>
+                  <p className="font-bold text-gray-800">
+                    {profile?.member_type === 'socio_effettivo' ? 'Socio Effettivo' : profile?.member_type === 'frequentatore_occasionale' ? 'Frequentatore Occasionale' : 'N/D'}
+                  </p>
                 </div>
               </div>
             </CardContent>

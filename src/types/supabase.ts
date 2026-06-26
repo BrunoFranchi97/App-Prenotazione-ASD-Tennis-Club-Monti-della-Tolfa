@@ -45,6 +45,8 @@ export interface MatchRequest {
   updated_at: string;
 }
 
+export type MemberType = 'socio_effettivo' | 'frequentatore_occasionale';
+
 export type CertificateType = 'agonistico' | 'non_agonistico';
 
 export interface MedicalCertificate {
@@ -69,6 +71,7 @@ export interface Profile {
   status: ProfileStatus;
   approved_at?: string | null;
   skill_level: SkillLevel;
+  member_type: MemberType;
   created_at: string;
   terms_accepted?: boolean;
   personal_data_accepted?: boolean;

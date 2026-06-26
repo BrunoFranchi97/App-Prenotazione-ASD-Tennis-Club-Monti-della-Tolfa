@@ -139,6 +139,7 @@ const AdminApprovals = () => {
                     <TableHead className="font-black text-gray-800 py-6 px-8">Socio</TableHead>
                     <TableHead className="font-black text-gray-800">Registrato il</TableHead>
                     <TableHead className="font-black text-gray-800">Livello</TableHead>
+                    <TableHead className="font-black text-gray-800">Tipo Iscrizione</TableHead>
                     <TableHead className="text-right font-black text-gray-800 px-8">Azioni</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -162,6 +163,11 @@ const AdminApprovals = () => {
                       <TableCell>
                         <Badge variant="outline" className="capitalize border-primary/20 text-primary font-bold">
                           {p.skill_level}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={`border-none font-bold ${p.member_type === 'frequentatore_occasionale' ? 'bg-gray-100 text-gray-600' : 'bg-blue-50 text-blue-700'}`}>
+                          {p.member_type === 'frequentatore_occasionale' ? 'Frequentatore' : 'Socio Effettivo'}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right px-8">

@@ -20,7 +20,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Search, Loader2, UserCog, Trash2, UserMinus } from 'lucide-react';
+import { ArrowLeft, Search, Loader2, UserCog, Trash2, UserMinus, Users } from 'lucide-react';
+import type { MemberType } from '@/types/supabase';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
@@ -35,6 +36,7 @@ const AdminUserManagement = () => {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [memberTypeFilter, setMemberTypeFilter] = useState<string>("all");
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [currentAdminId, setCurrentAdminId] = useState<string | null>(null);
   
@@ -113,12 +115,24 @@ const AdminUserManagement = () => {
     }
   };
 
+  const handleChangeMemberType = async (profileId: string, newType: MemberType) => {
+    setProcessingId(profileId);
+    try {
+      const { error } = await supabase.from('profiles').update({ member_type: newType }).eq('id', profileId);
+      if (error) throw error;
+      showSuccess(newType === 'socio_effettivo' ? "Tipo aggiornato: Socio Effettivo." : "Tipo aggiornato: Frequentatore Occasionale.");
+      setProfiles(prev => prev.map(p => p.id === profileId ? { ...p, member_type: newType } : p));
+    } catch (err: any) { showError(err.message); }
+    finally { setProcessingId(null); }
+  };
+
   const filteredProfiles = profiles.filter(p => {
     const matchesSearch = (p.full_name || "").toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === "all" || 
-      (statusFilter === "approved" && p.approved) || 
+    const matchesStatus = statusFilter === "all" ||
+      (statusFilter === "approved" && p.approved) ||
       (statusFilter === "pending" && !p.approved);
-    return matchesSearch && matchesStatus;
+    const matchesMemberType = memberTypeFilter === "all" || p.member_type === memberTypeFilter;
+    return matchesSearch && matchesStatus && matchesMemberType;
   });
 
   if (loading) return (
@@ -148,7 +162,7 @@ const AdminUserManagement = () => {
         <UserNav />
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10 max-w-7xl mx-auto">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10 max-w-7xl mx-auto">
         <Card className="border-none shadow-[0_2px_12px_rgba(0,0,0,0.06)] rounded-[2rem] bg-white p-6">
           <div className="flex flex-col gap-3">
             <Label className="text-xs font-black uppercase text-gray-400 tracking-widest ml-1">Ricerca Rapida</Label>
@@ -178,6 +192,21 @@ const AdminUserManagement = () => {
             </Select>
           </div>
         </Card>
+        <Card className="border-none shadow-[0_2px_12px_rgba(0,0,0,0.06)] rounded-[2rem] bg-white p-6">
+          <div className="flex flex-col gap-3">
+            <Label className="text-xs font-black uppercase text-gray-400 tracking-widest ml-1">Filtro Tipo Iscrizione</Label>
+            <Select value={memberTypeFilter} onValueChange={setMemberTypeFilter}>
+              <SelectTrigger className="h-14 rounded-2xl bg-gray-50 border-none text-base font-medium focus:ring-primary/20">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl">
+                <SelectItem value="all">Tutti</SelectItem>
+                <SelectItem value="socio_effettivo">Soci Effettivi</SelectItem>
+                <SelectItem value="frequentatore_occasionale">Frequentatori Occasionali</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </Card>
       </div>
 
       <Card className="shadow-[0_2px_12px_rgba(0,0,0,0.06)] rounded-[2.5rem] border-none overflow-hidden max-w-7xl mx-auto bg-white">
@@ -188,6 +217,7 @@ const AdminUserManagement = () => {
                 <TableRow className="bg-gray-50/30 hover:bg-gray-50/30">
                   <TableHead className="font-black text-gray-800 py-8 px-10 text-base">Socio</TableHead>
                   <TableHead className="font-black text-gray-800 text-base">Livello</TableHead>
+                  <TableHead className="font-black text-gray-800 text-base">Tipo Iscrizione</TableHead>
                   <TableHead className="text-center font-black text-gray-800 text-base">Abilitato</TableHead>
                   <TableHead className="text-center font-black text-gray-800 text-base">Admin</TableHead>
                   <TableHead className="text-right font-black text-gray-800 text-base px-10">Azioni</TableHead>
@@ -206,6 +236,25 @@ const AdminUserManagement = () => {
                       <Badge variant="outline" className="capitalize font-bold border-primary/20 text-primary py-1 px-3 bg-primary/5">
                         {p.skill_level}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Select
+                        value={p.member_type || 'socio_effettivo'}
+                        onValueChange={(v) => handleChangeMemberType(p.id, v as MemberType)}
+                        disabled={processingId === p.id}
+                      >
+                        <SelectTrigger className="h-9 rounded-xl border border-gray-200 bg-white text-sm font-semibold w-[200px] focus:ring-primary/20">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl">
+                          <SelectItem value="socio_effettivo">
+                            <span className="flex items-center gap-2 font-semibold text-blue-700">Socio Effettivo</span>
+                          </SelectItem>
+                          <SelectItem value="frequentatore_occasionale">
+                            <span className="flex items-center gap-2 font-semibold text-gray-600">Frequentatore Occasionale</span>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
                     </TableCell>
                     <TableCell className="text-center">
                       <div className="flex justify-center">

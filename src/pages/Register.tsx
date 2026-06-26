@@ -10,6 +10,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess } from '@/utils/toast';
 import { MailCheck, Loader2, Mail, RefreshCw } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import type { MemberType } from '@/types/supabase';
 import Footer from '@/components/Footer';
 
 const Register = () => {
@@ -19,6 +21,7 @@ const Register = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const [memberType, setMemberType] = useState<MemberType>('socio_effettivo');
   const [isRegistered, setIsRegistered] = useState(false);
   const [consents, setConsents] = useState({ terms: false, personal: false, health: false });
   const navigate = useNavigate();
@@ -69,11 +72,12 @@ const Register = () => {
         email, 
         password,
         options: { 
-          data: { 
-            full_name: name, 
-            terms_accepted: true, 
-            personal_data_accepted: true, 
-            health_data_accepted: true 
+          data: {
+            full_name: name,
+            terms_accepted: true,
+            personal_data_accepted: true,
+            health_data_accepted: true,
+            member_type: memberType
           },
           emailRedirectTo: `${window.location.origin}/auth/verify`
         }
@@ -293,6 +297,32 @@ const Register = () => {
                 {confirmPassword && password !== confirmPassword && (
                   <p className="text-xs text-red-500 ml-1">Le password non corrispondono</p>
                 )}
+              </div>
+
+              {/* Tipo iscrizione */}
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold ml-1 text-gray-700">Tipo di iscrizione *</Label>
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  {([
+                    { value: 'socio_effettivo', label: 'Socio Effettivo', desc: 'Quota associativa annuale' },
+                    { value: 'frequentatore_occasionale', label: 'Frequentatore Occasionale', desc: 'Utilizzo saltuario' },
+                  ] as { value: MemberType; label: string; desc: string }[]).map(({ value, label, desc }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setMemberType(value)}
+                      className={cn(
+                        "flex flex-col items-start gap-1 p-4 rounded-2xl border-2 text-left transition-all",
+                        memberType === value
+                          ? "border-primary bg-primary/5 shadow-sm"
+                          : "border-gray-200 bg-white hover:border-gray-300"
+                      )}
+                    >
+                      <span className={cn("text-sm font-bold", memberType === value ? "text-primary" : "text-gray-700")}>{label}</span>
+                      <span className="text-xs text-gray-400 leading-tight">{desc}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="space-y-3 pt-2 pb-1 px-1">
