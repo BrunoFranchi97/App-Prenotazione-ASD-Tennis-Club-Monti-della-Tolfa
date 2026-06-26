@@ -7,7 +7,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, ChevronRight, CalendarDays, MapPin, Clock, Info, User } from 'lucide-react';
+import { ArrowLeft, ChevronRight, CalendarDays, MapPin, Clock, Info, User, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess } from '@/utils/toast';
 import { format, parseISO, addHours, setHours, setMinutes, isBefore, isEqual, setSeconds, setMilliseconds, addDays, startOfDay, endOfDay, isSameDay, addMinutes, isValid } from 'date-fns';
@@ -43,6 +43,7 @@ const BookingCalendar = () => {
   const [bookerFullName, setBookerFullName] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [memberType, setMemberType] = useState<MemberType>('socio_effettivo');
+  const [torneoInCorso, setTorneoInCorso] = useState(false);
 
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [lastBookingData, setLastBookingData] = useState<{ reservations: Reservation[], courtName: string } | null>(null);
@@ -106,6 +107,9 @@ const BookingCalendar = () => {
         if (error) { showError("Errore nel caricamento dei campi."); return; }
         if (data) setCourts(data);
       });
+      supabase.from('app_settings').select('value').eq('key', 'torneo_in_corso').single().then(({ data }) => {
+        setTorneoInCorso(data?.value === 'true');
+      });
     }
   }, [isApproved]);
 
@@ -160,6 +164,19 @@ const BookingCalendar = () => {
       return `${res.booked_for_first_name} ${res.booked_for_last_name}`;
     }
     return profileMap[res.user_id] || 'Socio';
+  };
+
+  // Restituisce true se lo slot è a rischio revoca per il torneo
+  const isTorneoSlot = (slotTime: string, slotDate: Date): boolean => {
+    if (!torneoInCorso) return false;
+    const hour = parseInt(slotTime.split(':')[0]);
+    const dayOfWeek = slotDate.getDay(); // 0=domenica, 6=sabato
+    // Fascia serale: 18:00-20:00 e 21:00-22:00
+    if (hour >= 18 && hour <= 19) return true;
+    if (hour === 21) return true;
+    // Sabato e domenica mattina (< 12:00)
+    if ((dayOfWeek === 6 || dayOfWeek === 0) && hour < 12) return true;
+    return false;
   };
 
   const handleSlotClick = (slotTime: string) => {
@@ -404,19 +421,27 @@ const BookingCalendar = () => {
                       const available = isSlotAvailable(t, courtIdNum);
                       const endTime = format(slotEnd, 'HH:mm');
                       const occupantName = getSlotOccupantName(t, courtIdNum);
-                      
+                      const isTorneo = available && isTorneoSlot(t, date);
+
                       return (
-                        <button 
-                          key={t} 
+                        <button
+                          key={t}
                           disabled={!available && !isSelected}
-                          onClick={() => available && handleSlotClick(t)} 
+                          onClick={() => available && handleSlotClick(t)}
                           className={cn(
                             "relative h-20 rounded-2xl flex flex-col items-center justify-center p-3 transition-all duration-150 border-2",
-                            isSelected ? "bg-primary border-primary text-white scale-[1.02] shadow-lg shadow-primary/10" : 
-                            available ? "bg-gray-50 border-transparent text-gray-700 hover:border-primary/20" : 
-                            "bg-red-500 border-red-600 text-white shadow-sm"
+                            isSelected
+                              ? isTorneo ? "bg-amber-500 border-amber-500 text-white scale-[1.02] shadow-lg shadow-amber-500/20"
+                                         : "bg-primary border-primary text-white scale-[1.02] shadow-lg shadow-primary/10"
+                              : available
+                                ? isTorneo ? "bg-amber-50 border-amber-200 text-amber-800 hover:border-amber-400"
+                                           : "bg-gray-50 border-transparent text-gray-700 hover:border-primary/20"
+                                : "bg-red-500 border-red-600 text-white shadow-sm"
                           )}
                         >
+                          {isTorneo && (
+                            <AlertTriangle className={cn("absolute top-2 right-2 h-3.5 w-3.5", isSelected ? "text-white/80" : "text-amber-500")} />
+                          )}
                           <span className={cn("text-sm font-black tracking-tight", !available && "mb-1")}>{t} - {endTime}</span>
                           {!available ? (
                             <div className="flex items-center gap-1 overflow-hidden w-full justify-center">
@@ -426,8 +451,10 @@ const BookingCalendar = () => {
                               </span>
                             </div>
                           ) : (
-                            <span className={cn("text-[9px] font-black uppercase tracking-tighter mt-0.5", isSelected ? "text-white/60" : "text-primary/30")}>
-                              LIBERO
+                            <span className={cn("text-[9px] font-black uppercase tracking-tighter mt-0.5",
+                              isSelected ? "text-white/60" : isTorneo ? "text-amber-500/70" : "text-primary/30"
+                            )}>
+                              {isTorneo ? '⚠ TORNEO' : 'LIBERO'}
                             </span>
                           )}
                         </button>
@@ -435,9 +462,19 @@ const BookingCalendar = () => {
                     })}
                   </div>
 
-                  <div className="pt-8">
-                    <Button 
-                      onClick={handleBooking} 
+                  {/* Banner avviso torneo */}
+                  {selectedSlots.length > 0 && date && isValid(date) && selectedSlots.some(s => isTorneoSlot(s, date)) && (
+                    <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4">
+                      <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                      <p className="text-sm font-medium text-amber-800 leading-snug">
+                        <span className="font-black">Attenzione:</span> uno o più slot selezionati potrebbero essere revocati dall'amministrazione per garantire lo svolgimento del torneo in corso.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="pt-4">
+                    <Button
+                      onClick={handleBooking}
                       className={cn(
                         "w-full h-16 rounded-[1.5rem] font-black text-xl shadow-xl transition-all flex items-center justify-center gap-3",
                         selectedSlots.length > 0 ? "bg-gradient-to-br from-primary to-[#23532f] text-white hover:scale-[1.01] active:scale-[0.98] shadow-primary/20" : "bg-gray-100 text-gray-400 cursor-not-allowed shadow-none"

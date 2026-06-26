@@ -5,7 +5,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CalendarPlus, Lock, BarChart2, LogOut, BookOpen, ArrowLeft, Users, CheckCircle, UserCog, ChevronRight, ShieldCheck } from 'lucide-react';
+import { CalendarPlus, Lock, BarChart2, BookOpen, ArrowLeft, CheckCircle, UserCog, ChevronRight, Trophy } from 'lucide-react';
+import { Switch } from "@/components/ui/switch";
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import Footer from '@/components/Footer';
@@ -16,6 +17,8 @@ const AdminDashboard = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [unapprovedCount, setUnapprovedCount] = useState(0);
+  const [torneoInCorso, setTorneoInCorso] = useState(false);
+  const [torneoLoading, setTorneoLoading] = useState(false);
 
   const fetchAdminStatus = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -42,6 +45,26 @@ const AdminDashboard = () => {
     }
   };
 
+  const fetchTorneoStatus = async () => {
+    const { data } = await supabase.from('app_settings').select('value').eq('key', 'torneo_in_corso').single();
+    setTorneoInCorso(data?.value === 'true');
+  };
+
+  const handleToggleTorneo = async (value: boolean) => {
+    setTorneoLoading(true);
+    const { error } = await supabase
+      .from('app_settings')
+      .update({ value: value ? 'true' : 'false', updated_at: new Date().toISOString() })
+      .eq('key', 'torneo_in_corso');
+    if (error) {
+      showError("Errore nell'aggiornamento dello stato torneo.");
+    } else {
+      setTorneoInCorso(value);
+      showSuccess(value ? "Torneo attivato: i soci vedranno l'avviso sugli slot a rischio." : "Torneo disattivato: avvisi rimossi.");
+    }
+    setTorneoLoading(false);
+  };
+
   const fetchUnapprovedCount = async () => {
     const { count, error } = await supabase
       .from('profiles')
@@ -63,7 +86,7 @@ const AdminDashboard = () => {
       setLoading(true);
       const adminOk = await fetchAdminStatus();
       if (isMounted && adminOk) {
-        await fetchUnapprovedCount();
+        await Promise.all([fetchUnapprovedCount(), fetchTorneoStatus()]);
       }
       if (isMounted) {
         setLoading(false);
@@ -177,6 +200,42 @@ const AdminDashboard = () => {
           </div>
           <UserNav />
         </header>
+
+        {/* Card Stato Torneo */}
+        <Card className={`mb-8 border-none rounded-[1.5rem] overflow-hidden transition-all duration-500 ${torneoInCorso ? 'bg-amber-50 shadow-[0_4px_20px_rgba(245,158,11,0.15)]' : 'bg-white shadow-[0_2px_12px_rgba(0,0,0,0.06)]'}`}>
+          <div className={`h-1.5 w-full transition-all duration-500 ${torneoInCorso ? 'bg-amber-400' : 'bg-gray-200'}`}></div>
+          <CardContent className="px-8 py-6">
+            <div className="flex items-center justify-between gap-6">
+              <div className="flex items-center gap-5">
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 transition-all duration-500 ${torneoInCorso ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-400'}`}>
+                  <Trophy size={26} />
+                </div>
+                <div>
+                  <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Gestione Torneo</p>
+                  <h3 className="text-xl font-extrabold text-gray-900 tracking-tight">
+                    {torneoInCorso ? 'Torneo in Corso' : 'Nessun Torneo Attivo'}
+                  </h3>
+                  <p className="text-sm text-gray-500 mt-1 leading-snug">
+                    {torneoInCorso
+                      ? 'I soci vedranno un avviso sugli slot serali e del weekend: il loro posto potrebbe essere revocato.'
+                      : 'Attiva per mostrare ai soci l\'avviso di possibile revoca sugli slot serali (18-20, 21-22) e weekend mattina.'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-col items-center gap-2 flex-shrink-0">
+                <Switch
+                  checked={torneoInCorso}
+                  onCheckedChange={handleToggleTorneo}
+                  disabled={torneoLoading}
+                  className={torneoInCorso ? 'data-[state=checked]:bg-amber-500' : ''}
+                />
+                <span className={`text-[10px] font-black uppercase tracking-widest ${torneoInCorso ? 'text-amber-600' : 'text-gray-400'}`}>
+                  {torneoInCorso ? 'Attivo' : 'Inattivo'}
+                </span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {adminTools.map((item) => {
