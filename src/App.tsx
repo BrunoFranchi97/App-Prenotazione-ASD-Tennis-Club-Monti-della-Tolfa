@@ -23,6 +23,7 @@ import AdminBlockSlots from "./pages/AdminBlockSlots";
 import AdminUsageStats from "./pages/AdminUsageStats";
 import AdminApprovals from "./pages/AdminApprovals";
 import AdminUserManagement from "./pages/AdminUserManagement";
+import AdminTournament from "./pages/AdminTournament";
 import FindMatch from "./pages/FindMatch";
 import MatchBooking from "./pages/MatchBooking";
 import MedicalCertificates from "./pages/MedicalCertificates";
@@ -61,6 +62,7 @@ const App = () => (
               <Route path="/admin/usage-stats" element={<AdminUsageStats />} />
               <Route path="/admin/approvals" element={<AdminApprovals />} />
               <Route path="/admin/users" element={<AdminUserManagement />} />
+              <Route path="/admin/tournament" element={<AdminTournament />} />
               <Route path="/find-match" element={<FindMatch />} />
               <Route path="/match-booking" element={<MatchBooking />} />
               <Route path="/medical-certificates" element={<MedicalCertificates />} />

@@ -15,6 +15,7 @@ import { it } from 'date-fns/locale';
 import { useApprovalCheck } from '@/hooks/use-approval-check';
 import { Court, Reservation, BookingType, MemberType } from '@/types/supabase';
 import { getBookingLimitsStatus } from '@/utils/bookingLimits';
+import { isTorneoAttivo } from '@/utils/tournament';
 import BookingLimitsBox from '@/components/BookingLimitsBox';
 import BookingSuccessDialog from '@/components/BookingSuccessDialog';
 import UserNav from '@/components/UserNav';
@@ -107,8 +108,8 @@ const BookingCalendar = () => {
         if (error) { showError("Errore nel caricamento dei campi."); return; }
         if (data) setCourts(data);
       });
-      supabase.from('app_settings').select('value').eq('key', 'torneo_in_corso').single().then(({ data }) => {
-        setTorneoInCorso(data?.value === 'true');
+      supabase.from('tournaments').select('*').order('updated_at', { ascending: false }).limit(1).maybeSingle().then(({ data }) => {
+        setTorneoInCorso(isTorneoAttivo(data));
       });
     }
   }, [isApproved]);

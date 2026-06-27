@@ -79,6 +79,20 @@ export interface Profile {
   consent_date?: string;
 }
 
+export type TournamentOverrideMode = 'auto' | 'on' | 'off';
+
+export interface Tournament {
+  id: string;
+  name: string;
+  description?: string | null;
+  start_date?: string | null; // YYYY-MM-DD
+  end_date?: string | null; // YYYY-MM-DD
+  poster_url?: string | null;
+  override_mode: TournamentOverrideMode;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ReservationGroup {
   id: string;
   courtId: number;

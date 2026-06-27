@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CalendarPlus, Lock, BarChart2, BookOpen, ArrowLeft, CheckCircle, UserCog, ChevronRight, Trophy } from 'lucide-react';
-import { Switch } from "@/components/ui/switch";
 import { supabase } from '@/integrations/supabase/client';
-import { showSuccess, showError } from '@/utils/toast';
+import { showError } from '@/utils/toast';
+import { isTorneoAttivo } from '@/utils/tournament';
 import Footer from '@/components/Footer';
 import UserNav from '@/components/UserNav';
 
@@ -18,7 +18,6 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [unapprovedCount, setUnapprovedCount] = useState(0);
   const [torneoInCorso, setTorneoInCorso] = useState(false);
-  const [torneoLoading, setTorneoLoading] = useState(false);
 
   const fetchAdminStatus = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -46,23 +45,13 @@ const AdminDashboard = () => {
   };
 
   const fetchTorneoStatus = async () => {
-    const { data } = await supabase.from('app_settings').select('value').eq('key', 'torneo_in_corso').single();
-    setTorneoInCorso(data?.value === 'true');
-  };
-
-  const handleToggleTorneo = async (value: boolean) => {
-    setTorneoLoading(true);
-    const { error } = await supabase
-      .from('app_settings')
-      .update({ value: value ? 'true' : 'false', updated_at: new Date().toISOString() })
-      .eq('key', 'torneo_in_corso');
-    if (error) {
-      showError("Errore nell'aggiornamento dello stato torneo.");
-    } else {
-      setTorneoInCorso(value);
-      showSuccess(value ? "Torneo attivato: i soci vedranno l'avviso sugli slot a rischio." : "Torneo disattivato: avvisi rimossi.");
-    }
-    setTorneoLoading(false);
+    const { data } = await supabase
+      .from('tournaments')
+      .select('*')
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    setTorneoInCorso(isTorneoAttivo(data));
   };
 
   const fetchUnapprovedCount = async () => {
@@ -174,12 +163,20 @@ const AdminDashboard = () => {
       description: "Attiva o disattiva la visibilità dei campi.",
       buttonText: "Configura"
     },
-    { 
-      path: "/admin/usage-stats", 
-      title: "Statistiche", 
-      icon: BarChart2, 
+    {
+      path: "/admin/usage-stats",
+      title: "Statistiche",
+      icon: BarChart2,
       description: "Analizza l'utilizzo e le ore giocate nel club.",
       buttonText: "Vedi Report"
+    },
+    {
+      path: "/admin/tournament",
+      title: "Gestione Torneo",
+      icon: Trophy,
+      description: "Imposta date, locandina e avvisi del torneo sociale.",
+      buttonText: "Configura Torneo",
+      torneoBadge: torneoInCorso
     },
   ];
 
@@ -201,56 +198,25 @@ const AdminDashboard = () => {
           <UserNav />
         </header>
 
-        {/* Card Stato Torneo */}
-        <Card className={`mb-8 border-none rounded-[1.5rem] overflow-hidden transition-all duration-500 ${torneoInCorso ? 'bg-amber-50 shadow-[0_4px_20px_rgba(245,158,11,0.15)]' : 'bg-white shadow-[0_2px_12px_rgba(0,0,0,0.06)]'}`}>
-          <div className={`h-1.5 w-full transition-all duration-500 ${torneoInCorso ? 'bg-amber-400' : 'bg-gray-200'}`}></div>
-          <CardContent className="px-8 py-6">
-            <div className="flex items-center justify-between gap-6">
-              <div className="flex items-center gap-5">
-                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 transition-all duration-500 ${torneoInCorso ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-400'}`}>
-                  <Trophy size={26} />
-                </div>
-                <div>
-                  <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Gestione Torneo</p>
-                  <h3 className="text-xl font-extrabold text-gray-900 tracking-tight">
-                    {torneoInCorso ? 'Torneo in Corso' : 'Nessun Torneo Attivo'}
-                  </h3>
-                  <p className="text-sm text-gray-500 mt-1 leading-snug">
-                    {torneoInCorso
-                      ? 'I soci vedranno un avviso sugli slot serali e del weekend: il loro posto potrebbe essere revocato.'
-                      : 'Attiva per mostrare ai soci l\'avviso di possibile revoca sugli slot serali (18-20, 21-22) e weekend mattina.'}
-                  </p>
-                </div>
-              </div>
-              <div className="flex flex-col items-center gap-2 flex-shrink-0">
-                <Switch
-                  checked={torneoInCorso}
-                  onCheckedChange={handleToggleTorneo}
-                  disabled={torneoLoading}
-                  className={torneoInCorso ? 'data-[state=checked]:bg-amber-500' : ''}
-                />
-                <span className={`text-[10px] font-black uppercase tracking-widest ${torneoInCorso ? 'text-amber-600' : 'text-gray-400'}`}>
-                  {torneoInCorso ? 'Attivo' : 'Inattivo'}
-                </span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {adminTools.map((item) => {
             const Icon = item.icon;
             return (
               <Card key={item.path} className={`group relative border-none shadow-[0_2px_12px_rgba(0,0,0,0.06)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] rounded-[1.5rem] transition-all duration-500 overflow-hidden bg-white hover:-translate-y-2`}>
-                <div className={`h-1.5 w-full ${item.isUrgent ? 'bg-destructive' : 'bg-club-orange'}`}></div>
+                <div className={`h-1.5 w-full ${item.isUrgent ? 'bg-destructive' : item.torneoBadge ? 'bg-amber-400' : 'bg-club-orange'}`}></div>
                 <CardHeader className="pb-2">
                   <div className="flex justify-between items-start">
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-2 ${item.isUrgent ? 'bg-destructive/10 text-destructive' : 'bg-club-orange/10 text-club-orange'}`}>
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-2 ${item.isUrgent ? 'bg-destructive/10 text-destructive' : item.torneoBadge ? 'bg-amber-100 text-amber-600' : 'bg-club-orange/10 text-club-orange'}`}>
                       <Icon size={24} />
                     </div>
                     {item.badge && (
                       <div className="bg-destructive text-white text-[10px] font-black px-2.5 py-1 rounded-full animate-pulse shadow-md shadow-destructive/20">
                         {item.badge} AZIONI
+                      </div>
+                    )}
+                    {item.torneoBadge && (
+                      <div className="bg-amber-500 text-white text-[10px] font-black px-2.5 py-1 rounded-full animate-pulse shadow-md shadow-amber-500/20">
+                        ATTIVO
                       </div>
                     )}
                   </div>
