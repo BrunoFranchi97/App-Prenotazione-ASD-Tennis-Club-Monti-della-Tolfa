@@ -8,6 +8,7 @@ export interface BookingLimitsStatus {
   durationMax: number;
   canBookMoreThisWeek: boolean;
   nextAvailableDate?: Date;
+  limitMessage?: string;
 }
 
 export const getBookingLimitsStatus = (
@@ -15,7 +16,13 @@ export const getBookingLimitsStatus = (
   targetDate: Date,
   memberType: MemberType = 'socio_effettivo'
 ): BookingLimitsStatus => {
-  const weeklyMax = memberType === 'frequentatore_occasionale' ? 1 : 2;
+  const isOccasional = memberType === 'frequentatore_occasionale';
+  // Quante prenotazioni può avere ATTIVE contemporaneamente (concorrenza)
+  const concurrencyMax = isOccasional ? 1 : 2;
+  // Tetto TOTALE di prenotazioni nella settimana (solo per il frequentatore:
+  // lo slot rotativo vale una volta sola → al massimo 2 prenotazioni a settimana)
+  const weeklyTotalMax = isOccasional ? 2 : Infinity;
+
   // 1. Filtra le prenotazioni non annullate
   const activeReservations = userReservations.filter(res => {
     return res.status !== 'cancelled';
@@ -26,36 +33,54 @@ export const getBookingLimitsStatus = (
   // 2. Calcola limiti settimanali (Lunedì - Domenica) della data TARGET selezionata
   const weekStart = startOfWeek(targetDate, { locale: it, weekStartsOn: 1 });
   const weekEnd = endOfWeek(targetDate, { locale: it, weekStartsOn: 1 });
-
-  // SLOT ROTATIVO: nel ciclo settimanale concorrono al limite solo le prenotazioni
-  // ancora "attive" (non ancora concluse). Una volta che una prenotazione è terminata
-  // (ora di fine già passata) libera nuovamente uno slot disponibile nello stesso ciclo.
   const now = new Date();
-  const weeklyMatches = groupedReservations.filter(block => {
-    const blockDate = startOfDay(block.date);
-    const inWeek = isWithinInterval(blockDate, { start: weekStart, end: weekEnd });
-    if (!inWeek) return false;
-    return block.endTime.getTime() > now.getTime();
-  });
 
-  const canBookWeekly = weeklyMatches.length < weeklyMax;
+  // Tutte le prenotazioni della settimana (attive + già concluse)
+  const weekBlocks = groupedReservations.filter(block =>
+    isWithinInterval(startOfDay(block.date), { start: weekStart, end: weekEnd })
+  );
+  const totalCount = weekBlocks.length;
 
-  // Con lo slot rotativo lo sblocco avviene quando la prima prenotazione attiva
-  // del ciclo si conclude (fallback: lunedì della settimana successiva).
+  // SLOT ROTATIVO: concorrono alla "concorrenza" solo le prenotazioni ancora attive
+  // (non ancora concluse). Una volta terminata, libera nuovamente uno slot.
+  const activeBlocks = weekBlocks.filter(block => block.endTime.getTime() > now.getTime());
+  const activeCount = activeBlocks.length;
+
+  const concurrencyOk = activeCount < concurrencyMax;
+  const totalOk = totalCount < weeklyTotalMax;
+  const canBookWeekly = concurrencyOk && totalOk;
+
   let nextAvailableDate: Date | undefined;
+  let limitMessage: string | undefined;
   if (!canBookWeekly) {
-    const earliestEnd = weeklyMatches
-      .map(block => block.endTime)
-      .sort((a, b) => a.getTime() - b.getTime())[0];
-    nextAvailableDate = earliestEnd ?? addDays(weekEnd, 1);
+    if (!totalOk) {
+      // Tetto settimanale esaurito (caso frequentatore): si riparte la settimana dopo
+      nextAvailableDate = addDays(weekEnd, 1);
+      limitMessage = `Hai esaurito le ${weeklyTotalMax} prenotazioni disponibili in questa settimana (Lun-Dom). Potrai prenotare di nuovo dalla prossima settimana.`;
+    } else {
+      // Bloccato dalla concorrenza: una o più prenotazioni sono ancora in corso
+      const earliestEnd = activeBlocks
+        .map(block => block.endTime)
+        .sort((a, b) => a.getTime() - b.getTime())[0];
+      nextAvailableDate = earliestEnd ?? addDays(weekEnd, 1);
+      limitMessage = concurrencyMax === 1
+        ? `Hai già una prenotazione in corso. Potrai prenotarne un'altra quando questa si sarà conclusa.`
+        : `Hai già ${concurrencyMax} prenotazioni attive in questo ciclo (Lun-Dom). Potrai prenotare di nuovo quando una si sarà conclusa.`;
+    }
   }
 
+  // Dati per la UI: il socio mostra le prenotazioni ATTIVE (rotazione),
+  // il frequentatore mostra il consumo TOTALE sul tetto settimanale.
+  const weeklyCount = isOccasional ? totalCount : activeCount;
+  const weeklyMax = isOccasional ? weeklyTotalMax : concurrencyMax;
+
   return {
-    weeklyCount: weeklyMatches.length,
+    weeklyCount,
     weeklyMax,
-    durationMax: 3,
+    durationMax: 2,
     canBookMoreThisWeek: canBookWeekly,
-    nextAvailableDate
+    nextAvailableDate,
+    limitMessage
   };
 };
 

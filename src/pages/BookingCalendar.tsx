@@ -230,8 +230,7 @@ const BookingCalendar = () => {
     if (!isAdmin) {
       const limitsStatus = getBookingLimitsStatus(userReservations, date, memberType);
       if (!limitsStatus.canBookMoreThisWeek) {
-        const max = limitsStatus.weeklyMax;
-        showError(`Hai già ${max} prenotazion${max === 1 ? 'e attiva' : 'i attive'} in questo ciclo (Lun-Dom). Potrai prenotare di nuovo quando si sarà conclusa.`);
+        showError(limitsStatus.limitMessage || "Limite di prenotazione raggiunto per questa settimana.");
         return;
       }
     }

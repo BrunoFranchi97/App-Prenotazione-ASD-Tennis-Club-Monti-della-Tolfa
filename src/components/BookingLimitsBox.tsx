@@ -69,7 +69,7 @@ const BookingLimitsBox: React.FC<BookingLimitsBoxProps> = ({ status, isChecking,
             <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-tighter">
               <Info className="h-3 w-3 text-club-orange" /> Max durata per prenotazione
             </div>
-            <span className="text-sm font-bold text-gray-700">3 Ore</span>
+            <span className="text-sm font-bold text-gray-700">2 Ore</span>
           </div>
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-tighter">
