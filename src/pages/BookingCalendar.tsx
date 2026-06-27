@@ -170,11 +170,13 @@ const BookingCalendar = () => {
   // Restituisce true se lo slot è a rischio revoca per il torneo
   const isTorneoSlot = (slotTime: string, slotDate: Date): boolean => {
     if (!torneoInCorso) return false;
+    // I campi in cemento sono esclusi: su quelli non si svolgono tornei
+    const court = courts.find(c => c.id === parseInt(selectedCourtId));
+    if (court?.surface?.toLowerCase().includes('cemento')) return false;
     const hour = parseInt(slotTime.split(':')[0]);
     const dayOfWeek = slotDate.getDay(); // 0=domenica, 6=sabato
-    // Fascia serale: 18:00-20:00 e 21:00-22:00
-    if (hour >= 18 && hour <= 19) return true;
-    if (hour === 21) return true;
+    // Fascia serale: 18:00-22:00
+    if (hour >= 18 && hour <= 21) return true;
     // Sabato e domenica mattina (< 12:00)
     if ((dayOfWeek === 6 || dayOfWeek === 0) && hour < 12) return true;
     return false;
@@ -194,7 +196,7 @@ const BookingCalendar = () => {
         const sorted = [...newSelected, slotTime].sort();
         const firstIdx = allTimeSlots.indexOf(sorted[0]);
         const lastIdx = allTimeSlots.indexOf(sorted[sorted.length - 1]);
-        if (!isAdmin && lastIdx - firstIdx + 1 > 3) return;
+        if (!isAdmin && lastIdx - firstIdx + 1 > 2) return;
         const range: string[] = [];
         for (let i = firstIdx; i <= lastIdx; i++) range.push(allTimeSlots[i]);
 
@@ -404,7 +406,7 @@ const BookingCalendar = () => {
                     <Label className="text-xs font-black text-gray-400 uppercase tracking-[0.2em]">Orario</Label>
                     {selectedSlots.length > 0 && (
                       <span className="text-[10px] text-primary font-black uppercase tracking-widest bg-primary/5 px-2 py-1 rounded">
-                        Selezionati: {selectedSlots.length} / max 3 ore
+                        Selezionati: {selectedSlots.length}{isAdmin ? '' : ' / max 2 ore'}
                       </span>
                     )}
                   </div>

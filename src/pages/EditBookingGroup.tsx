@@ -179,8 +179,8 @@ const EditBookingGroup = () => {
         const lastIdx = allTimeSlots.indexOf(sorted[sorted.length - 1]);
         const count = lastIdx - firstIdx + 1;
 
-        if (!isAdmin && count > 3) {
-          showError("Limite Policy: Non puoi superare le 3 ore consecutive.");
+        if (!isAdmin && count > 2) {
+          showError("Limite Policy: Non puoi superare le 2 ore consecutive.");
           return;
         }
 
@@ -307,7 +307,7 @@ const EditBookingGroup = () => {
                <p className="text-sm text-amber-900 font-bold">Istruzioni Modifica</p>
                <p className="text-xs text-amber-800 leading-relaxed font-medium">
                  Puoi aggiungere slot liberi adiacenti o rimuovere quelli attuali. 
-                 Il limite massimo è di <strong>3 ore consecutive</strong>.
+                 Il limite massimo è di <strong>2 ore consecutive</strong>.
                </p>
              </div>
           </div>

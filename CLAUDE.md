@@ -244,7 +244,7 @@ src/
 
 ### Prenotazioni
 - **Orario prenotabile:** 08:00 - 22:00 (slot da 1 ora, 14 slot totali per campo)
-- **Max durata prenotazione:** 3 ore consecutive (max 3 slot selezionabili)
+- **Max durata prenotazione:** 2 ore consecutive (max 2 slot selezionabili) — gli admin sono esenti
 - **Limite settimanale:** 2 prenotazioni per utente per settimana (Lun-Dom)
 - **Anticipo prenotazione:** max 14 giorni dalla data odierna
 - **Slot scaduto:** non prenotabile se l'ora di fine e' passata, o se oggi e' iniziato da piu' di 20 minuti

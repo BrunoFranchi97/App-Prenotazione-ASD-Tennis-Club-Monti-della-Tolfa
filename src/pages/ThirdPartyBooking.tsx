@@ -139,7 +139,7 @@ const ThirdPartyBooking = () => {
         const sorted = [...newSelected, slotTime].sort();
         const firstIdx = allTimeSlots.indexOf(sorted[0]);
         const lastIdx = allTimeSlots.indexOf(sorted[sorted.length - 1]);
-        if (!isAdmin && lastIdx - firstIdx + 1 > 3) return;
+        if (!isAdmin && lastIdx - firstIdx + 1 > 2) return;
         const range: string[] = [];
         for (let i = firstIdx; i <= lastIdx; i++) range.push(allTimeSlots[i]);
         setSelectedSlots(range);
@@ -341,7 +341,7 @@ const ThirdPartyBooking = () => {
                   <Label className="text-xs font-black text-gray-400 uppercase tracking-[0.2em]">Selezione Orario</Label>
                   {selectedSlots.length > 0 && (
                     <span className="text-[10px] text-primary font-black uppercase tracking-widest bg-primary/5 px-2 py-1 rounded">
-                      Selezionati: {selectedSlots.length} / max 3 ore
+                      Selezionati: {selectedSlots.length}{isAdmin ? '' : ' / max 2 ore'}
                     </span>
                   )}
                 </div>
