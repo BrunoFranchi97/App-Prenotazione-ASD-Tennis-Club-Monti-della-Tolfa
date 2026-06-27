@@ -46,7 +46,7 @@ const BookingCalendar = () => {
   const [torneoInCorso, setTorneoInCorso] = useState(false);
 
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [lastBookingData, setLastBookingData] = useState<{ reservations: Reservation[], courtName: string } | null>(null);
+  const [lastBookingData, setLastBookingData] = useState<{ reservations: Reservation[], courtName: string, hasTorneoWarning: boolean } | null>(null);
 
   const today = useMemo(() => startOfDay(new Date()), []);
   const maxDate = useMemo(() => {
@@ -262,7 +262,8 @@ const BookingCalendar = () => {
       const { data: inserted, error } = await supabase.from('reservations').insert(inserts).select();
       if (error) throw error;
       
-      setLastBookingData({ reservations: inserted || [], courtName });
+      const hasTorneoWarning = torneoInCorso && selectedSlots.some(s => isTorneoSlot(s, date));
+      setLastBookingData({ reservations: inserted || [], courtName, hasTorneoWarning });
       setShowSuccessModal(true);
       setSelectedSlots([]);
       fetchUserData();
@@ -431,16 +432,14 @@ const BookingCalendar = () => {
                           className={cn(
                             "relative h-20 rounded-2xl flex flex-col items-center justify-center p-3 transition-all duration-150 border-2",
                             isSelected
-                              ? isTorneo ? "bg-amber-500 border-amber-500 text-white scale-[1.02] shadow-lg shadow-amber-500/20"
-                                         : "bg-primary border-primary text-white scale-[1.02] shadow-lg shadow-primary/10"
+                              ? "bg-primary border-primary text-white scale-[1.02] shadow-lg shadow-primary/10"
                               : available
-                                ? isTorneo ? "bg-amber-50 border-amber-200 text-amber-800 hover:border-amber-400"
-                                           : "bg-gray-50 border-transparent text-gray-700 hover:border-primary/20"
+                                ? "bg-gray-50 border-transparent text-gray-700 hover:border-primary/20"
                                 : "bg-red-500 border-red-600 text-white shadow-sm"
                           )}
                         >
                           {isTorneo && (
-                            <AlertTriangle className={cn("absolute top-2 right-2 h-3.5 w-3.5", isSelected ? "text-white/80" : "text-amber-500")} />
+                            <AlertTriangle className={cn("absolute top-2 right-2 h-3.5 w-3.5", isSelected ? "text-white/70" : "text-amber-400")} />
                           )}
                           <span className={cn("text-sm font-black tracking-tight", !available && "mb-1")}>{t} - {endTime}</span>
                           {!available ? (
@@ -451,10 +450,8 @@ const BookingCalendar = () => {
                               </span>
                             </div>
                           ) : (
-                            <span className={cn("text-[9px] font-black uppercase tracking-tighter mt-0.5",
-                              isSelected ? "text-white/60" : isTorneo ? "text-amber-500/70" : "text-primary/30"
-                            )}>
-                              {isTorneo ? '⚠ TORNEO' : 'LIBERO'}
+                            <span className={cn("text-[9px] font-black uppercase tracking-tighter mt-0.5", isSelected ? "text-white/60" : "text-primary/30")}>
+                              LIBERO
                             </span>
                           )}
                         </button>
@@ -497,11 +494,12 @@ const BookingCalendar = () => {
           </Card>
         </div>
       </div>
-      <BookingSuccessDialog 
-        open={showSuccessModal} 
-        onOpenChange={setShowSuccessModal} 
-        reservations={lastBookingData?.reservations || null} 
-        courtName={lastBookingData?.courtName || ''} 
+      <BookingSuccessDialog
+        open={showSuccessModal}
+        onOpenChange={setShowSuccessModal}
+        reservations={lastBookingData?.reservations || null}
+        courtName={lastBookingData?.courtName || ''}
+        hasTorneoWarning={lastBookingData?.hasTorneoWarning || false}
       />
     </div>
   );

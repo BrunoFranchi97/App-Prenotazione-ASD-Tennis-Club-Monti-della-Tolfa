@@ -11,7 +11,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, CalendarDays, Clock, MapPin, User, ArrowRight, History } from 'lucide-react';
+import { CheckCircle2, CalendarDays, Clock, MapPin, User, ArrowRight, History, AlertTriangle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { Reservation } from '@/types/supabase';
@@ -22,6 +22,7 @@ interface BookingSuccessDialogProps {
   reservations: Reservation[] | null;
   courtName: string;
   bookedFor?: string;
+  hasTorneoWarning?: boolean;
 }
 
 const BookingSuccessDialog: React.FC<BookingSuccessDialogProps> = ({
@@ -29,7 +30,8 @@ const BookingSuccessDialog: React.FC<BookingSuccessDialogProps> = ({
   onOpenChange,
   reservations,
   courtName,
-  bookedFor
+  bookedFor,
+  hasTorneoWarning = false
 }) => {
   const navigate = useNavigate();
 
@@ -102,6 +104,15 @@ const BookingSuccessDialog: React.FC<BookingSuccessDialogProps> = ({
             </div>
           </div>
         </div>
+
+        {hasTorneoWarning && (
+          <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+            <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
+            <p className="text-xs font-medium text-amber-800 leading-snug">
+              <span className="font-black">Nota:</span> questo orario rientra nelle fasce riservate al torneo sociale. La prenotazione potrebbe essere revocata dall'amministrazione per garantirne lo svolgimento.
+            </p>
+          </div>
+        )}
 
         <DialogFooter className="flex flex-col sm:flex-row gap-2">
           <Button 
