@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { ArrowLeft, Users, User, Clock, MapPin, CalendarDays, ChevronRight, Check } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError } from '@/utils/toast';
-import { format, parseISO, addHours, setHours, setMinutes, isBefore, isEqual, setSeconds, setMilliseconds, addDays, startOfDay, endOfDay, isSameDay, addMinutes } from 'date-fns';
+import { format, parseISO, addHours, setHours, setMinutes, isBefore, isEqual, setSeconds, setMilliseconds, addDays, startOfDay, endOfDay, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { useApprovalCheck } from '@/hooks/use-approval-check';
 import { Court, Reservation, BookingType, MemberType } from '@/types/supabase';
@@ -109,7 +109,6 @@ const ThirdPartyBooking = () => {
     const slotEnd = addHours(slotStart, 1);
     const now = new Date();
     if (isBefore(slotEnd, now)) return false;
-    if (isSameDay(date, now) && now > addMinutes(slotStart, 20)) return false;
 
     // Frequentatori occasionali: domenica mattina (< 12:00) non prenotabile su terra sintetica
     if (!isAdmin && memberType === 'frequentatore_occasionale') {
@@ -155,6 +154,23 @@ const ThirdPartyBooking = () => {
       const limitsStatus = getBookingLimitsStatus(userReservations, date, memberType);
       if (!limitsStatus.canBookMoreThisWeek) {
         showError(limitsStatus.limitMessage || "Limite di prenotazione raggiunto per questa settimana.");
+        return;
+      }
+
+      // Limite: max 1 prenotazione per conto di un altro socio a settimana (Lun-Dom)
+      const weekStart = startOfWeek(date, { locale: it, weekStartsOn: 1 });
+      const weekEnd = endOfWeek(date, { locale: it, weekStartsOn: 1 });
+      const thirdPartySessions = new Set(
+        userReservations
+          .filter(res =>
+            res.status !== 'cancelled' &&
+            (res.booked_for_first_name?.trim() || res.booked_for_last_name?.trim()) &&
+            isWithinInterval(parseISO(res.starts_at), { start: weekStart, end: weekEnd })
+          )
+          .map(res => `${format(parseISO(res.starts_at), 'yyyy-MM-dd')}|${res.booked_for_first_name}|${res.booked_for_last_name}`)
+      );
+      if (thirdPartySessions.size >= 1) {
+        showError("Puoi effettuare al massimo 1 prenotazione per conto di un altro socio a settimana.");
         return;
       }
     }
@@ -248,7 +264,7 @@ const ThirdPartyBooking = () => {
               <Users size={18} /> Prenotazione Libera
             </h4>
             <p className="text-xs text-gray-500 leading-relaxed font-medium">
-              Le prenotazioni effettuate per conto di altri soci non concorrono al tuo limite settimanale di 2 match.
+              Le prenotazioni effettuate per conto di altri soci non concorrono al tuo limite settimanale di 2 match. Puoi prenotare per un altro socio al massimo 1 volta a settimana.
             </p>
           </div>
         </div>

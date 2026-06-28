@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { ArrowLeft, ChevronRight, CalendarDays, MapPin, Clock, Info, User, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess } from '@/utils/toast';
-import { format, parseISO, addHours, setHours, setMinutes, isBefore, isEqual, setSeconds, setMilliseconds, addDays, startOfDay, endOfDay, isSameDay, addMinutes, isValid } from 'date-fns';
+import { format, parseISO, addHours, setHours, setMinutes, isBefore, isEqual, setSeconds, setMilliseconds, addDays, startOfDay, endOfDay, isValid } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { useApprovalCheck } from '@/hooks/use-approval-check';
 import { Court, Reservation, BookingType, MemberType } from '@/types/supabase';
@@ -142,7 +142,6 @@ const BookingCalendar = () => {
     const now = new Date();
 
     if (isBefore(slotEnd, now)) return false;
-    if (isSameDay(date, now) && now > addMinutes(slotStart, 20)) return false;
 
     // Frequentatori occasionali: domenica mattina (< 12:00) non prenotabile su campi in terra sintetica
     if (!isAdmin && memberType === 'frequentatore_occasionale') {

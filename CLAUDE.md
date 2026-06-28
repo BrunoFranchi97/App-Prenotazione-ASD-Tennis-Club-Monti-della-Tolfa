@@ -247,7 +247,7 @@ src/
 - **Max durata prenotazione:** 2 ore consecutive (max 2 slot selezionabili) — gli admin sono esenti
 - **Limite settimanale:** 2 prenotazioni per utente per settimana (Lun-Dom)
 - **Anticipo prenotazione:** max 14 giorni dalla data odierna
-- **Slot scaduto:** non prenotabile se l'ora di fine e' passata, o se oggi e' iniziato da piu' di 20 minuti
+- **Slot scaduto:** non prenotabile solo se l'ora di fine e' gia' passata (lo slot dell'ora corrente resta prenotabile fino al suo termine)
 - **Tipi prenotazione (BookingType):** `singolare` | `doppio` | `lezione`
 - **Stato prenotazione:** `confirmed` | `pending` | `cancelled`
 - La logica limiti e' centralizzata in `src/utils/bookingLimits.ts` — NON replicarla altrove
@@ -273,6 +273,7 @@ src/
 ### Prenotazioni per terzi (ThirdPartyBooking)
 - Campi aggiuntivi: `booked_for_first_name`, `booked_for_last_name`
 - NON soggette al limite settimanale dell'utente prenotante
+- **Limite:** max 1 prenotazione conto terzi per utente per settimana (Lun-Dom) — gli admin sono esenti
 
 ---
 

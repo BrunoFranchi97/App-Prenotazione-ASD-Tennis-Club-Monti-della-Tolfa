@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { ArrowLeft, Save, Clock, MapPin, CalendarDays, User, ChevronRight, AlertTriangle, Info } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
-import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, isEqual, setSeconds, setMilliseconds, addMinutes, isSameDay, startOfDay, endOfDay } from 'date-fns';
+import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, isEqual, setSeconds, setMilliseconds, startOfDay, endOfDay } from 'date-fns';
 import { it } from 'date-fns/locale';
 import type { Court, Reservation, BookingType } from '@/types/supabase';
 import { cn } from '@/lib/utils';
@@ -140,7 +140,6 @@ const EditBookingGroup = () => {
     
     // Controllo passato
     if (isBefore(slotEnd, now)) return { available: false, reason: "Orario passato" };
-    if (isSameDay(group.date, now) && now > addMinutes(slotStart, 20)) return { available: false, reason: "Troppo tardi" };
     
     // Controllo occupazione altri
     if (otherReservations.find(res => isEqual(parseISO(res.starts_at), slotStart))) {
