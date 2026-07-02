@@ -142,23 +142,35 @@ const AdminBlockSlots = () => {
     setSaving(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       if (!user) {
         showError("Utente non autenticato.");
         return;
       }
 
-      const { error } = await supabase.from('reservations').insert({
-        court_id: Number(selectedCourt),
-        user_id: user.id,
-        starts_at: startDateTime.toISOString(),
-        ends_at: endDateTime.toISOString(),
-        status: 'confirmed',
-        booking_type: 'lezione',
-        notes: `BLOCCATO: ${reason || 'Nessun motivo specificato'}`,
-        booked_for_first_name: 'SLOT',
-        booked_for_last_name: 'BLOCCATO'
-      });
+      // Le prenotazioni sono sempre slot da 1 ora (vincolo DB reservations_duration_60):
+      // per bloccare un intervallo di più ore inseriamo una riga per ogni ora coinvolta.
+      const hourlySlots: { starts_at: string; ends_at: string }[] = [];
+      let slotStart = startDateTime;
+      while (slotStart < endDateTime) {
+        const slotEnd = new Date(slotStart.getTime() + 60 * 60 * 1000);
+        hourlySlots.push({ starts_at: slotStart.toISOString(), ends_at: slotEnd.toISOString() });
+        slotStart = slotEnd;
+      }
+
+      const { error } = await supabase.from('reservations').insert(
+        hourlySlots.map(slot => ({
+          court_id: Number(selectedCourt),
+          user_id: user.id,
+          starts_at: slot.starts_at,
+          ends_at: slot.ends_at,
+          status: 'confirmed',
+          booking_type: 'lezione',
+          notes: `BLOCCATO: ${reason || 'Nessun motivo specificato'}`,
+          booked_for_first_name: 'SLOT',
+          booked_for_last_name: 'BLOCCATO'
+        }))
+      );
 
       if (error) throw error;
 

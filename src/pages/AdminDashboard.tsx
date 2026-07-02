@@ -5,7 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CalendarPlus, Lock, BarChart2, BookOpen, ArrowLeft, CheckCircle, UserCog, ChevronRight, Trophy } from 'lucide-react';
+import { CalendarPlus, Lock, BarChart2, BookOpen, ArrowLeft, CheckCircle, UserCog, ChevronRight, Trophy, GraduationCap } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError } from '@/utils/toast';
 import { isTorneoAttivo } from '@/utils/tournament';
@@ -149,12 +149,19 @@ const AdminDashboard = () => {
       description: "Visualizza e gestisci tutti i campi prenotati.",
       buttonText: "Apri Tabellone"
     },
-    { 
-      path: "/admin/block-slots", 
-      title: "Blocca Slot", 
-      icon: Lock, 
+    {
+      path: "/admin/block-slots",
+      title: "Blocca Slot",
+      icon: Lock,
       description: "Riserva campi per manutenzione o tornei.",
       buttonText: "Aggiungi Blocco"
+    },
+    {
+      path: "/admin/bulk-booking",
+      title: "Prenotazione Scuola Tennis",
+      icon: GraduationCap,
+      description: "Inserisci in blocco gli orari della scuola tennis, anche su più settimane.",
+      buttonText: "Apri Strumento"
     },
     { 
       path: "/admin/manage-schedules", 

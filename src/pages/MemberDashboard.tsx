@@ -16,6 +16,7 @@ const MemberDashboard = () => {
   const [fullName, setFullName] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isApproved, setIsApproved] = useState(true);
+  const [isSocioEffettivo, setIsSocioEffettivo] = useState(true);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -25,7 +26,7 @@ const MemberDashboard = () => {
       if (user) {
         const { data: profile, error } = await supabase
           .from('profiles')
-          .select('full_name, is_admin, status')
+          .select('full_name, is_admin, status, member_type')
           .eq('id', user.id)
           .single();
 
@@ -35,6 +36,7 @@ const MemberDashboard = () => {
           setFullName(profile.full_name);
           setIsAdmin(profile.is_admin);
           setIsApproved(profile.status === 'approved');
+          setIsSocioEffettivo(profile.member_type === 'socio_effettivo');
         } else {
           setFullName(user.email);
         }
@@ -78,8 +80,11 @@ const MemberDashboard = () => {
       path: "/book-for-third-party",
       title: "Prenota per Socio",
       icon: Users,
-      description: "Gestisci la prenotazione per un altro socio.",
-      buttonText: "Prenota per terzi"
+      description: isAdmin || isSocioEffettivo
+        ? "Gestisci la prenotazione per un altro socio."
+        : "Funzione riservata ai Soci Effettivi.",
+      buttonText: "Prenota per terzi",
+      requiresSocioEffettivo: true
     },
     {
       path: "/find-match",
@@ -161,7 +166,7 @@ const MemberDashboard = () => {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {bookingRoutes.map(item => renderCard(item, !isApproved))}
+          {bookingRoutes.map(item => renderCard(item, !isApproved || (item.requiresSocioEffettivo && !isAdmin && !isSocioEffettivo)))}
           {nonBookingRoutes.map(item => renderCard(item, false))}
           
           {isAdmin && renderCard({ 

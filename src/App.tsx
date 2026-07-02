@@ -20,6 +20,7 @@ import ThirdPartyBooking from "./pages/ThirdPartyBooking";
 import AdminReservations from "./pages/AdminReservations";
 import AdminManageSchedules from "./pages/AdminManageSchedules";
 import AdminBlockSlots from "./pages/AdminBlockSlots";
+import AdminBulkBooking from "./pages/AdminBulkBooking";
 import AdminUsageStats from "./pages/AdminUsageStats";
 import AdminApprovals from "./pages/AdminApprovals";
 import AdminUserManagement from "./pages/AdminUserManagement";
@@ -59,6 +60,7 @@ const App = () => (
               <Route path="/admin/reservations" element={<AdminReservations />} />
               <Route path="/admin/manage-schedules" element={<AdminManageSchedules />} />
               <Route path="/admin/block-slots" element={<AdminBlockSlots />} />
+              <Route path="/admin/bulk-booking" element={<AdminBulkBooking />} />
               <Route path="/admin/usage-stats" element={<AdminUsageStats />} />
               <Route path="/admin/approvals" element={<AdminApprovals />} />
               <Route path="/admin/users" element={<AdminUserManagement />} />

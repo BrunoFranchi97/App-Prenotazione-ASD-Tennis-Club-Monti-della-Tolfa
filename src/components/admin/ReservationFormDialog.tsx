@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { format, setHours, setMinutes, setSeconds, setMilliseconds, addHours, addDays, isBefore, isAfter } from "date-fns";
+import { format, setHours, setMinutes, setSeconds, setMilliseconds, addHours, isBefore, isAfter } from "date-fns";
 import { it } from "date-fns/locale";
 
 import { Button } from "@/components/ui/button";
@@ -119,7 +119,6 @@ export default function ReservationFormDialog(props: {
   const selectedCourt = courts.find(c => c.id === Number(courtId));
   const selectedProfile = profiles.find(p => p.id === userId);
   const today = new Date();
-  const maxDate = addDays(today, 14);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -182,10 +181,9 @@ export default function ReservationFormDialog(props: {
                       mode="single" 
                       selected={date} 
                       onSelect={setDate} 
-                      locale={it} 
-                      className="rounded-3xl border-none" 
+                      locale={it}
+                      className="rounded-3xl border-none"
                       fromDate={today}
-                      toDate={maxDate}
                     />
                   </CardContent>
                 </Card>

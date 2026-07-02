@@ -51,7 +51,8 @@ const BookingCalendar = () => {
 
   const today = useMemo(() => startOfDay(new Date()), []);
   const maxDate = useMemo(() => {
-    if (isAdmin) return addDays(today, 365);
+    // Gli admin non hanno alcun vincolo di orizzonte temporale
+    if (isAdmin) return undefined;
     return addDays(today, memberType === 'frequentatore_occasionale' ? 7 : 14);
   }, [today, isAdmin, memberType]);
 

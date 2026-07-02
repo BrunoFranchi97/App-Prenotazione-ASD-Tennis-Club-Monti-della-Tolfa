@@ -49,7 +49,8 @@ const ThirdPartyBooking = () => {
 
   const today = useMemo(() => startOfDay(new Date()), []);
   const maxDate = useMemo(() => {
-    if (isAdmin) return addDays(today, 365);
+    // Gli admin non hanno alcun vincolo di orizzonte temporale
+    if (isAdmin) return undefined;
     return addDays(today, memberType === 'frequentatore_occasionale' ? 7 : 14);
   }, [today, isAdmin, memberType]);
 
@@ -74,8 +75,18 @@ const ThirdPartyBooking = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data: profile } = await supabase.from('profiles').select('is_admin, member_type').eq('id', user.id).single();
-        setIsAdmin(profile?.is_admin ?? false);
-        setMemberType((profile?.member_type as MemberType) || 'socio_effettivo');
+        const admin = profile?.is_admin ?? false;
+        const type = (profile?.member_type as MemberType) || 'socio_effettivo';
+        setIsAdmin(admin);
+        setMemberType(type);
+
+        // La prenotazione per conto terzi è riservata ai Soci Effettivi (gli admin sono esenti)
+        if (!admin && type !== 'socio_effettivo') {
+          showError("La prenotazione per conto terzi è riservata ai Soci Effettivi.");
+          navigate('/dashboard');
+          return;
+        }
+
         const { data: myRes } = await supabase.from('reservations').select('*').eq('user_id', user.id).neq('status', 'cancelled');
         setUserReservations(myRes || []);
       }
