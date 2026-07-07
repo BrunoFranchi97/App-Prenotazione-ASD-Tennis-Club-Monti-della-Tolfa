@@ -44,6 +44,11 @@
     @apply border-border transition-all duration-300 ease-out;
   }
 
+  html {
+    /* Niente flash grigio al tocco su mobile: feel da app nativa */
+    -webkit-tap-highlight-color: transparent;
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
     line-height: 1.6;

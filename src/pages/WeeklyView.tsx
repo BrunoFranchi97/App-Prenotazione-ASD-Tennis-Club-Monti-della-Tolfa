@@ -294,7 +294,7 @@ export default function WeeklyView() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] pb-28 md:pb-12">
+    <div className="min-h-screen bg-[#F8FAFC] pb-[calc(7rem+env(safe-area-inset-bottom))] md:pb-12">
       {/* Header sticky */}
       <header className="sticky top-0 z-20 bg-[#F8FAFC]/90 backdrop-blur border-b border-gray-100">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-8">
@@ -519,7 +519,7 @@ export default function WeeklyView() {
       </main>
 
       {/* CTA mobile fisso in fondo */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 md:hidden border-t border-gray-100 bg-white/95 backdrop-blur px-4 py-3">
+      <div className="fixed bottom-0 left-0 right-0 z-30 md:hidden border-t border-gray-100 bg-white/95 backdrop-blur px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
         <Link to="/book">
           <Button className="w-full h-14 rounded-[1.5rem] bg-gradient-to-br from-primary to-[#23532f] text-white font-black text-base shadow-lg shadow-primary/20 hover:scale-[1.01] active:scale-[0.98]">
             Prenota ora <ChevronRight size={20} />
