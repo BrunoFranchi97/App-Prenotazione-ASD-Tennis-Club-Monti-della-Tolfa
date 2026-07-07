@@ -371,14 +371,15 @@ export default function WeeklyView() {
             <Tabs
               value={String(courtId)}
               onValueChange={v => setCourtId(Number(v))}
+              className="w-full sm:w-auto"
             >
-              <TabsList className="rounded-2xl bg-gray-100 p-1">
+              <TabsList className="grid w-full grid-cols-2 gap-1 h-auto rounded-2xl bg-gray-100 p-1 sm:inline-flex sm:w-auto">
                 {courts.map(c => (
                   <TabsTrigger
                     key={c.id}
                     value={String(c.id)}
                     className={cn(
-                      'rounded-xl px-4 text-sm font-bold',
+                      'w-full rounded-xl px-4 text-sm font-bold sm:w-auto',
                       'data-[state=active]:bg-primary data-[state=active]:text-white',
                       'data-[state=active]:shadow-sm',
                     )}

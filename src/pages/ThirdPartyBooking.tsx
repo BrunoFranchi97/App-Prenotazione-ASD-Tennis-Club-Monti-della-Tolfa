@@ -340,15 +340,15 @@ const ThirdPartyBooking = () => {
                 </div>
 
                 {selectedCourtId && (
-                  <div className="flex items-center gap-3 pt-4 animate-in fade-in slide-in-from-top-2">
-                    <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tipologia:</Label>
-                    <div className="flex gap-2">
+                  <div className="pt-4 animate-in fade-in slide-in-from-top-2 space-y-2">
+                    <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tipologia partita</Label>
+                    <div className="flex flex-wrap gap-2">
                       {(['singolare', 'doppio', 'lezione'] as BookingType[]).map(type => (
                         <button
                           key={type}
                           onClick={() => setBookingType(type)}
                           className={cn(
-                            "px-5 py-1.5 rounded-full text-xs font-bold transition-all border-2",
+                            "px-5 py-1.5 rounded-full text-xs font-bold transition-all border-2 flex-shrink-0",
                             bookingType === type 
                               ? "bg-primary border-primary text-white shadow-md shadow-primary/10" 
                               : "bg-white border-gray-100 text-gray-400 hover:border-primary/30 hover:text-primary"
