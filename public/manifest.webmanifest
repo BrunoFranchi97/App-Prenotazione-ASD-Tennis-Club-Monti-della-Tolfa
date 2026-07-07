@@ -6,8 +6,23 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#F8FAFC",
   "theme_color": "#2E6B3D",
+  "shortcuts": [
+    {
+      "name": "Prenota un campo",
+      "short_name": "Prenota",
+      "url": "/book",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Vista settimanale",
+      "short_name": "Settimanale",
+      "url": "/weekly-view",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
   "icons": [
     {
       "src": "/icons/icon-192.png",

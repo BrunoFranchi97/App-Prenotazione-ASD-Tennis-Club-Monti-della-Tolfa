@@ -29,6 +29,7 @@ import FindMatch from "./pages/FindMatch";
 import MatchBooking from "./pages/MatchBooking";
 import MedicalCertificates from "./pages/MedicalCertificates";
 import EmailVerificationHandler from "./components/EmailVerificationHandler";
+import PullToRefresh from "./components/PullToRefresh";
 import EditBookingGroup from "./pages/EditBookingGroup";
 import MyProfile from "./pages/MyProfile";
 import WeeklyView from "./pages/WeeklyView";
@@ -41,6 +42,7 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
+        <PullToRefresh />
         <BrowserRouter>
           <AuthLayout>
             <Routes>
