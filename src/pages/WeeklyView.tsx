@@ -236,7 +236,7 @@ export default function WeeklyView() {
       );
       if (userIds.length > 0) {
         const { data: profiles } = await supabase
-          .from('profiles')
+          .from('member_names')
           .select('id, full_name')
           .in('id', userIds);
         if (!cancelled && profiles) {

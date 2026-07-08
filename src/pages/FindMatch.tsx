@@ -100,7 +100,7 @@ const FindMatch = () => {
       setMyRequests(activeRequests.filter(r => r.user_id === user.id));
       setOthersRequests(activeRequests.filter(r => r.user_id !== user.id && r.status === 'open'));
 
-      const { data: profilesData } = await supabase.from('profiles').select('id, full_name');
+      const { data: profilesData } = await supabase.from('member_names').select('id, full_name');
       const profileMap: { [key: string]: string } = {};
       profilesData?.forEach(p => profileMap[p.id] = p.full_name || 'Socio');
       setProfiles(profileMap);

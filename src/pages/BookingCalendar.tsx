@@ -88,10 +88,10 @@ const BookingCalendar = () => {
       const userIds = Array.from(new Set(reservations.map(r => r.user_id)));
       if (userIds.length > 0) {
         const { data: profiles } = await supabase
-          .from('profiles')
+          .from('member_names')
           .select('id, full_name')
           .in('id', userIds);
-        
+
         const map: Record<string, string> = {};
         profiles?.forEach(p => {
           map[p.id] = p.full_name || 'Socio';
@@ -165,6 +165,12 @@ const BookingCalendar = () => {
       return `${res.booked_for_first_name} ${res.booked_for_last_name}`;
     }
     return profileMap[res.user_id] || 'Socio';
+  };
+
+  const getSlotBookingTypeLabel = (slotTime: string, courtId: number): string | null => {
+    const res = getSlotReservation(slotTime, courtId);
+    if (!res) return null;
+    return bookingTypeLabels[res.booking_type] ?? null;
   };
 
   // Restituisce true se lo slot è a rischio revoca per il torneo
@@ -424,6 +430,7 @@ const BookingCalendar = () => {
                       const available = isSlotAvailable(t, courtIdNum);
                       const endTime = format(slotEnd, 'HH:mm');
                       const occupantName = getSlotOccupantName(t, courtIdNum);
+                      const occupantType = getSlotBookingTypeLabel(t, courtIdNum);
                       const isTorneo = available && isTorneoSlot(t, date);
 
                       return (
@@ -443,13 +450,20 @@ const BookingCalendar = () => {
                           {isTorneo && (
                             <AlertTriangle className={cn("absolute top-2 right-2 h-3.5 w-3.5", isSelected ? "text-white/70" : "text-amber-400")} />
                           )}
-                          <span className={cn("text-sm font-black tracking-tight", !available && "mb-1")}>{t} - {endTime}</span>
+                          <span className="text-sm font-black tracking-tight">{t} - {endTime}</span>
                           {!available ? (
-                            <div className="flex items-center gap-1 overflow-hidden w-full justify-center">
-                              <User className="h-3 w-3 shrink-0 opacity-80" />
-                              <span className="text-[10px] font-bold uppercase truncate px-1">
-                                {occupantName}
-                              </span>
+                            <div className="flex flex-col items-center gap-0.5 overflow-hidden w-full mt-0.5">
+                              <div className="flex items-center gap-1 overflow-hidden w-full justify-center">
+                                <User className="h-3 w-3 shrink-0 opacity-80" />
+                                <span className="text-[10px] font-bold uppercase truncate px-1">
+                                  {occupantName}
+                                </span>
+                              </div>
+                              {occupantType && (
+                                <span className="text-[8px] font-black uppercase tracking-wider opacity-70 truncate max-w-full">
+                                  {occupantType}
+                                </span>
+                              )}
                             </div>
                           ) : (
                             <span className={cn("text-[9px] font-black uppercase tracking-tighter mt-0.5", isSelected ? "text-white/60" : "text-primary/30")}>
