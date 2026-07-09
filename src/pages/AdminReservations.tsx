@@ -423,9 +423,9 @@ export default function AdminReservations() {
         <div className="container mx-auto px-4 py-6">
           <div className="flex gap-2">
             {/* Timeline */}
-            <div className="sticky left-0 z-30 bg-[#F8FAFC]/80 backdrop-blur-sm pr-3 pt-14" style={{ width: '60px' }}>
+            <div className="sticky left-0 z-30 bg-[#F8FAFC]/80 backdrop-blur-sm pr-3 pt-[60px]" style={{ width: '60px' }}>
               {TIME_SLOTS.map(time => (
-                <div key={time} className="h-28 flex items-start justify-end pr-2 text-[10px] font-black text-gray-400">
+                <div key={time} className="h-28 mb-2 flex items-start justify-end pr-2 text-[10px] font-black text-gray-400">
                   {time}
                 </div>
               ))}

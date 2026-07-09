@@ -36,7 +36,7 @@ import { Court, Reservation, BookingType } from '@/types/supabase';
 // Constants
 // ─────────────────────────────────────────────────────────────
 
-const HOURS = Array.from({ length: 14 }, (_, i) => i + 8); // 08..21
+const HOURS = Array.from({ length: 15 }, (_, i) => i + 8); // 08..22
 
 const BOOKING_TYPE_META: Record<BookingType, { bg: string; label: string }> = {
   singolare: { bg: 'bg-primary',     label: 'Singolare' },
