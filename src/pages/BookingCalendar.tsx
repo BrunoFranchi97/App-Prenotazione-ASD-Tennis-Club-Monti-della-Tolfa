@@ -124,7 +124,7 @@ const BookingCalendar = () => {
 
   const allTimeSlots = useMemo(() => {
     const slots = [];
-    for (let i = 8; i < 22; i++) slots.push(format(setMinutes(setHours(new Date(), i), 0), 'HH:mm'));
+    for (let i = 8; i < 23; i++) slots.push(format(setMinutes(setHours(new Date(), i), 0), 'HH:mm'));
     return slots;
   }, []);
 
@@ -181,8 +181,8 @@ const BookingCalendar = () => {
     if (court?.surface?.toLowerCase().includes('cemento')) return false;
     const hour = parseInt(slotTime.split(':')[0]);
     const dayOfWeek = slotDate.getDay(); // 0=domenica, 6=sabato
-    // Fascia serale: 18:00-22:00
-    if (hour >= 18 && hour <= 21) return true;
+    // Fascia serale: 18:00-23:00 (include lo slot 22:00-23:00)
+    if (hour >= 18 && hour <= 22) return true;
     // Sabato e domenica mattina (< 12:00)
     if ((dayOfWeek === 6 || dayOfWeek === 0) && hour < 12) return true;
     return false;

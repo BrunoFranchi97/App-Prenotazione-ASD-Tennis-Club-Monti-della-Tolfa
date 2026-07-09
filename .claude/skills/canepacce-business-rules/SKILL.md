@@ -133,8 +133,9 @@ devono essere sempre orari contigui.
 
 ### 2.4 — Orario prenotabile e slot "scaduto"
 
-Orario: 08:00–22:00, 14 slot da un'ora per campo (`allTimeSlots`, generato con un loop
-`for (let i = 8; i < 22; i++)` in ogni pagina di prenotazione). Uno slot smette di essere
+Orario: 08:00–23:00, 15 slot da un'ora per campo (`allTimeSlots`, generato con un loop
+`for (let i = 8; i < 23; i++)` in ogni pagina di prenotazione — ultimo slot 22:00-23:00).
+Uno slot smette di essere
 prenotabile solo quando la sua **ora di fine** è già passata (`isBefore(slotEnd, now)`),
 non quando inizia — quindi lo slot dell'ora corrente resta prenotabile fino al suo
 termine. Questo è stato un aggiustamento esplicito ("slot ora corrente sempre
@@ -308,7 +309,7 @@ bloccare le prenotazioni, ma avvisare onestamente che potrebbero essere spostate
 dall'organizzazione per esigenze del torneo. Le regole di cosa sia "a rischio":
 - **Campi in cemento sono sempre esclusi** (il torneo non si gioca lì): `court.surface`
   contiene "cemento" → mai a rischio, a prescindere da orario/giorno.
-- Fascia serale 18:00–21:00 (tutti i giorni, sui campi non in cemento).
+- Fascia serale 18:00–23:00 (tutti i giorni, sui campi non in cemento) — include lo slot 22:00-23:00.
 - Sabato e domenica mattina, prima delle 12:00.
 
 Se cambi le fasce orarie del torneo o aggiungi un nuovo tipo di superficie esclusa,

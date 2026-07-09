@@ -102,8 +102,8 @@ const ThirdPartyBooking = () => {
 
   const allTimeSlots = useMemo(() => {
     const slots: string[] = [];
-    // Orario esteso dalle 08:00 alle 22:00 (ultimo slot parte alle 21:00)
-    for (let i = 8; i < 22; i++) slots.push(format(setMinutes(setHours(new Date(), i), 0), 'HH:mm'));
+    // Orario esteso dalle 08:00 alle 23:00 (ultimo slot parte alle 22:00)
+    for (let i = 8; i < 23; i++) slots.push(format(setMinutes(setHours(new Date(), i), 0), 'HH:mm'));
     return slots;
   }, []);
 

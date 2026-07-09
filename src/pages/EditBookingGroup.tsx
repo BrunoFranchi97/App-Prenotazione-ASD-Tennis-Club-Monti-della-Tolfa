@@ -58,7 +58,7 @@ const EditBookingGroup = () => {
 
   const allTimeSlots = useMemo(() => {
     const slots: string[] = [];
-    for (let i = 8; i < 22; i++) slots.push(format(setMinutes(setHours(new Date(), i), 0), 'HH:mm'));
+    for (let i = 8; i < 23; i++) slots.push(format(setMinutes(setHours(new Date(), i), 0), 'HH:mm'));
     return slots;
   }, []);
 

@@ -243,7 +243,7 @@ src/
 ## 6. LOGICA DI BUSINESS — REGOLE CRITICHE
 
 ### Prenotazioni
-- **Orario prenotabile:** 08:00 - 22:00 (slot da 1 ora, 14 slot totali per campo)
+- **Orario prenotabile:** 08:00 - 23:00 (slot da 1 ora, 15 slot totali per campo — ultimo slot 22:00-23:00)
 - **Max durata prenotazione:** 2 ore consecutive (max 2 slot selezionabili) — gli admin sono esenti
 - **Limite settimanale:** 2 prenotazioni per utente per settimana (Lun-Dom)
 - **Anticipo prenotazione:** max 14 giorni dalla data odierna
