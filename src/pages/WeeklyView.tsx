@@ -31,6 +31,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import UserNav from '@/components/UserNav';
 import { supabase } from '@/integrations/supabase/client';
 import { Court, Reservation, BookingType } from '@/types/supabase';
+import { BLOCK_TYPE_META } from '@/utils/blockType';
 
 // ─────────────────────────────────────────────────────────────
 // Constants
@@ -40,7 +41,7 @@ const HOURS = Array.from({ length: 15 }, (_, i) => i + 8); // 08..22
 
 const BOOKING_TYPE_META: Record<BookingType, { bg: string; label: string }> = {
   singolare: { bg: 'bg-primary',     label: 'Singolare' },
-  doppio:    { bg: 'bg-teal-700',    label: 'Doppio'    },
+  doppio:    { bg: 'bg-blue-600',    label: 'Doppio'    },
   lezione:   { bg: 'bg-club-orange', label: 'Lezione'   },
 };
 
@@ -80,7 +81,9 @@ const BookingCell = memo(function BookingCell({
     );
   }
 
-  const meta = BOOKING_TYPE_META[reservation.booking_type];
+  const meta = reservation.block_type
+    ? BLOCK_TYPE_META[reservation.block_type]
+    : BOOKING_TYPE_META[reservation.booking_type];
 
   return (
     <div

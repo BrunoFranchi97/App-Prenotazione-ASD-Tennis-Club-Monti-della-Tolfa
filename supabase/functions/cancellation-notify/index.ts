@@ -34,6 +34,22 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    // Interruttore globale: consente di sospendere temporaneamente le notifiche
+    // senza dover ridistribuire la function (riattivazione via UPDATE su app_settings)
+    const { data: setting } = await supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", "notifiche_whatsapp_disdetta_attive")
+      .maybeSingle();
+
+    if (setting?.value !== "true") {
+      console.log("[cancellation-notify] Notifiche disattivate da app_settings.");
+      return new Response(JSON.stringify({ sent: false, disabled: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
+
     // Recupera il nome del campo
     const { data: court } = await supabase
       .from("courts")

@@ -7,6 +7,7 @@ export interface Court {
 
 export type BookingType = 'singolare' | 'doppio' | 'lezione';
 export type ProfileStatus = 'pending' | 'approved' | 'rejected';
+export type BlockType = 'lezione' | 'manutenzione' | 'torneo';
 
 export interface Reservation {
   id: string;
@@ -16,6 +17,7 @@ export interface Reservation {
   ends_at: string; // ISO string
   status: 'confirmed' | 'pending' | 'cancelled';
   booking_type: BookingType;
+  block_type?: BlockType | null;
   notes?: string | null;
   created_at: string;
   booked_for_first_name?: string | null;
