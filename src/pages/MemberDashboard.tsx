@@ -8,6 +8,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { CalendarDays, History, LogOut, Users, Settings, Search, FileText, AlertTriangle, ShieldCheck, ChevronRight, LayoutGrid } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
+import { format } from 'date-fns';
 import Footer from '@/components/Footer';
 import UserNav from '@/components/UserNav';
 
@@ -18,12 +19,27 @@ const MemberDashboard = () => {
   const [isApproved, setIsApproved] = useState(true);
   const [isSocioEffettivo, setIsSocioEffettivo] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [hasOpenChallenges, setHasOpenChallenges] = useState(false);
 
   useEffect(() => {
-    const fetchUserProfile = async () => {
+    let isMounted = true;
+    let userId: string | null = null;
+
+    const fetchOpenChallenges = async (uid: string) => {
+      const { count } = await supabase
+        .from('match_requests')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'open')
+        .neq('user_id', uid)
+        .gte('requested_date', format(new Date(), 'yyyy-MM-dd'));
+      if (isMounted) setHasOpenChallenges((count || 0) > 0);
+    };
+
+    const initialize = async () => {
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
+        userId = user.id;
         const { data: profile, error } = await supabase
           .from('profiles')
           .select('full_name, is_admin, status, member_type')
@@ -40,10 +56,25 @@ const MemberDashboard = () => {
         } else {
           setFullName(user.email);
         }
+
+        await fetchOpenChallenges(user.id);
       }
-      setLoading(false);
+      if (isMounted) setLoading(false);
     };
-    fetchUserProfile();
+
+    initialize();
+
+    const channel = supabase
+      .channel('schema-match-requests-badge')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'match_requests' }, () => {
+        if (userId) fetchOpenChallenges(userId);
+      })
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   // Estrai solo il primo nome
@@ -91,7 +122,8 @@ const MemberDashboard = () => {
       title: "Cerco Partita",
       icon: Search,
       description: "Trova nuovi avversari e organizza sfide.",
-      buttonText: "Apri la Bacheca"
+      buttonText: "Apri la Bacheca",
+      liveBadge: hasOpenChallenges
     },
   ];
 
@@ -116,10 +148,17 @@ const MemberDashboard = () => {
     const Icon = item.icon;
     return (
       <Card key={item.path} className={`group relative border-none shadow-[0_2px_12px_rgba(0,0,0,0.06)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] rounded-[1.5rem] transition-all duration-500 overflow-hidden bg-white ${disabled ? 'opacity-60 cursor-not-allowed' : 'hover:-translate-y-2'}`}>
-        <div className={`h-1.5 w-full ${isAdminCard ? 'bg-club-orange' : item.isPrimary ? 'bg-primary' : 'bg-gray-100'}`}></div>
+        <div className={`h-1.5 w-full ${item.liveBadge ? 'bg-amber-400' : isAdminCard ? 'bg-club-orange' : item.isPrimary ? 'bg-primary' : 'bg-gray-100'}`}></div>
         <CardHeader className="pb-2">
-          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-2 ${isAdminCard ? 'bg-club-orange/10 text-club-orange' : item.isPrimary ? 'bg-primary/10 text-primary' : 'bg-gray-50 text-gray-400'}`}>
-            <Icon size={24} />
+          <div className="flex justify-between items-start">
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-2 ${item.liveBadge ? 'bg-amber-100 text-amber-600' : isAdminCard ? 'bg-club-orange/10 text-club-orange' : item.isPrimary ? 'bg-primary/10 text-primary' : 'bg-gray-50 text-gray-400'}`}>
+              <Icon size={24} />
+            </div>
+            {item.liveBadge && (
+              <div className="bg-amber-500 text-white text-[10px] font-black px-2.5 py-1 rounded-full animate-pulse shadow-md shadow-amber-500/20">
+                SFIDE APERTE
+              </div>
+            )}
           </div>
           <CardTitle className={`text-xl font-bold tracking-tight ${isAdminCard ? 'text-club-orange' : 'text-gray-900'}`}>
             {item.title}

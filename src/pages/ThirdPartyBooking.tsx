@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, Users, User, Clock, MapPin, CalendarDays, ChevronRight, Check } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { showError } from '@/utils/toast';
+import { showError, showSuccess } from '@/utils/toast';
 import { format, parseISO, addHours, setHours, setMinutes, isBefore, isEqual, setSeconds, setMilliseconds, addDays, startOfDay, endOfDay, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { useApprovalCheck } from '@/hooks/use-approval-check';
@@ -152,6 +152,25 @@ const ThirdPartyBooking = () => {
         if (!isAdmin && lastIdx - firstIdx + 1 > 2) return;
         const range: string[] = [];
         for (let i = firstIdx; i <= lastIdx; i++) range.push(allTimeSlots[i]);
+
+        // Verifica che nessuno slot intermedio sia già occupato
+        const hasOccupiedIntermediate = range.some(slot =>
+          !newSelected.includes(slot) && slot !== slotTime && !isSlotAvailable(slot, courtIdNum)
+        );
+        if (hasOccupiedIntermediate) {
+          showError("Non puoi selezionare un blocco con slot già occupati nel mezzo. Scegli orari consecutivi liberi.");
+          return;
+        }
+
+        // Notifica se sono stati auto-selezionati slot intermedi per formare un blocco consecutivo
+        const autoFilled = range.length - newSelected.length - 1;
+        if (autoFilled > 0) {
+          showSuccess(
+            autoFilled === 1
+              ? "Slot intermedio auto-selezionato per completare il blocco."
+              : `${autoFilled} slot intermedi auto-selezionati per completare il blocco.`
+          );
+        }
         setSelectedSlots(range);
       }
     }

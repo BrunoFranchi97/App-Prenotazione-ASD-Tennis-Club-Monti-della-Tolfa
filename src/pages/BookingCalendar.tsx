@@ -16,6 +16,7 @@ import { useApprovalCheck } from '@/hooks/use-approval-check';
 import { Court, Reservation, BookingType, MemberType } from '@/types/supabase';
 import { getBookingLimitsStatus } from '@/utils/bookingLimits';
 import { isTorneoAttivo } from '@/utils/tournament';
+import { BLOCK_TYPE_META } from '@/utils/blockType';
 import BookingLimitsBox from '@/components/BookingLimitsBox';
 import BookingSuccessDialog from '@/components/BookingSuccessDialog';
 import UserNav from '@/components/UserNav';
@@ -170,6 +171,7 @@ const BookingCalendar = () => {
   const getSlotBookingTypeLabel = (slotTime: string, courtId: number): string | null => {
     const res = getSlotReservation(slotTime, courtId);
     if (!res) return null;
+    if (res.block_type) return BLOCK_TYPE_META[res.block_type].label;
     return bookingTypeLabels[res.booking_type] ?? null;
   };
 
