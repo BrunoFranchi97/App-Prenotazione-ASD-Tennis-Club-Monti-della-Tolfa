@@ -109,3 +109,113 @@ export interface ReservationGroup {
   notes?: string;
   bookingType?: BookingType;
 }
+// --- Portafoglio (wallet) e pagamenti — vedi docs/piano-wallet-pagamenti.md ---
+
+export type PaymentMode = 'wallet' | 'free' | 'legacy' | 'admin';
+export type WalletLedgerKind =
+  | 'topup_card'
+  | 'topup_cash'
+  | 'booking_charge'
+  | 'booking_cover'
+  | 'booking_refund'
+  | 'admin_correction'
+  | 'chargeback';
+export type WalletTopupStatus = 'pending' | 'paid' | 'failed' | 'expired' | 'refunded' | 'chargeback';
+
+export interface Wallet {
+  user_id: string;
+  balance_cents: number;
+  updated_at: string;
+}
+
+export interface WalletLedgerEntry {
+  id: number;
+  user_id: string;
+  amount_cents: number; // + accredito, - addebito
+  balance_after_cents: number;
+  kind: WalletLedgerKind;
+  booking_id?: string | null;
+  topup_id?: string | null;
+  covers_user_id?: string | null; // quota di un altro socio coperta dal prenotante
+  created_by?: string | null;
+  note?: string | null;
+  created_at: string;
+}
+
+export interface WalletTopup {
+  id: string;
+  user_id: string;
+  amount_cents: number;
+  provider: string;
+  provider_ref?: string | null;
+  checkout_url?: string | null;
+  status: WalletTopupStatus;
+  unrecovered_cents: number;
+  created_at: string;
+  paid_at?: string | null;
+  updated_at: string;
+}
+
+export interface CourtRate {
+  id: string;
+  valid_from: string;
+  rate_day_cents: number;
+  rate_lights_cents: number;
+  note?: string | null;
+  created_by?: string | null;
+  created_at: string;
+}
+
+export interface Booking {
+  id: string;
+  booker_id: string;
+  court_id: number;
+  booking_type: BookingType;
+  coach_name?: string | null;
+  coach_fee_cents?: number | null;
+  booker_pays_all: boolean;
+  payment_mode: PaymentMode;
+  status: 'active' | 'cancelled';
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BookingParticipant {
+  id: string;
+  booking_id: string;
+  user_id?: string | null; // null = ospite
+  guest_name?: string | null;
+  created_at: string;
+}
+
+// Partecipante passato alle RPC create_booking / update_booking / quote_booking
+export type BookingParticipantInput = { user_id: string } | { guest_name: string };
+
+// Risposta di create_booking / update_booking / cancel_booking / quote_booking
+export interface BookingSummary {
+  ok?: boolean; // solo quote_booking
+  error?: string; // solo quote_booking, se l'operazione non sarebbe possibile
+  code?: string; // solo quote_booking: codice errore (es. SALDO_INSUFFICIENTE, SLOT_OCCUPATO)
+  booking_id: string;
+  version: number;
+  status: 'active' | 'cancelled';
+  payment_mode: PaymentMode;
+  quota_cents: number; // costo per partecipante
+  hours: {
+    reservation_id: string;
+    starts_at: string;
+    ends_at: string;
+    lights: boolean | null;
+    unit_price_cents: number | null;
+  }[];
+  movements: {
+    user_id: string;
+    full_name: string | null;
+    amount_cents: number;
+    kind: WalletLedgerKind;
+    covers_user_id: string | null;
+    covers_full_name: string | null;
+  }[];
+  booker_balance_cents: number | null;
+}
