@@ -48,7 +48,7 @@ Serve la CLI di Supabase (`npx supabase …`, nessuna installazione globale).
 
 ```bash
 npx supabase login
-npx supabase link --project-ref <REF_STAGING>        # ATTENZIONE: il ref di STAGING, non di produzione
+npx supabase link --project-ref pihibucdmdvmexxwxvws        # ATTENZIONE: il ref di STAGING, non di produzione
 
 npx supabase secrets set \
   PAYMENT_PROVIDER=stripe \
@@ -71,7 +71,7 @@ ma sono comunque protetti: firma del fornitore e header `x-cron-secret`.
 
 ### Stripe (modalità test)
 *Developers → Webhooks → Add endpoint*
-- URL: `https://<REF_STAGING>.supabase.co/functions/v1/payment-webhook`
+- URL: `https://pihibucdmdvmexxwxvws.supabase.co/functions/v1/payment-webhook`
 - Eventi: `checkout.session.completed`, `checkout.session.async_payment_succeeded`,
   `checkout.session.async_payment_failed`, `checkout.session.expired`, `charge.refunded`, `charge.dispute.created`
 - Copia il *Signing secret* (`whsec_…`) in `STRIPE_WEBHOOK_SECRET`.
@@ -86,7 +86,7 @@ Nessuna configurazione: l'indirizzo del webhook viene passato a ogni pagamento.
 ```sql
 SELECT cron.schedule('wallet-reconcile', '0 * * * *', $$
   SELECT net.http_post(
-    url := 'https://<REF_STAGING>.supabase.co/functions/v1/wallet-reconcile',
+    url := 'https://pihibucdmdvmexxwxvws.supabase.co/functions/v1/wallet-reconcile',
     headers := jsonb_build_object('Content-Type', 'application/json', 'x-cron-secret', '<CRON_SECRET>'),
     body := '{}'::jsonb
   );
@@ -99,7 +99,7 @@ Vercel → progetto → *Settings → Environment Variables*, **solo per l'ambie
 
 | Variabile | Valore |
 |---|---|
-| `VITE_SUPABASE_URL` | `https://<REF_STAGING>.supabase.co` |
+| `VITE_SUPABASE_URL` | `https://pihibucdmdvmexxwxvws.supabase.co` |
 | `VITE_SUPABASE_ANON_KEY` | anon key di staging |
 
 Production resta invariato. Poi ridistribuisci l'anteprima del branch `feature/payments-wallet`.

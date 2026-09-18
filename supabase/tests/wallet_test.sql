@@ -30,7 +30,7 @@ CREATE FUNCTION pg_temp.bal(p_user uuid) RETURNS integer LANGUAGE sql AS $$
   SELECT COALESCE((SELECT balance_cents FROM public.wallets WHERE user_id = p_user), 0);
 $$;
 
--- Esegue p_sql e verifica che fallisca con l'HINT (codice) atteso o con lo SQLSTATE atteso
+-- Esegue p_sql e verifica che fallisca con l'HINT (codice) o lo SQLSTATE atteso (alternative separate da |)
 CREATE FUNCTION pg_temp.expect_error(p_sql text, p_expected text, p_msg text) RETURNS void LANGUAGE plpgsql AS $$
 DECLARE
   v_hint text;
@@ -41,7 +41,7 @@ BEGIN
     EXECUTE p_sql;
   EXCEPTION WHEN OTHERS THEN
     GET STACKED DIAGNOSTICS v_hint = PG_EXCEPTION_HINT, v_state = RETURNED_SQLSTATE, v_text = MESSAGE_TEXT;
-    PERFORM pg_temp.check(v_hint = p_expected OR v_state = p_expected,
+    PERFORM pg_temp.check(v_hint = ANY (string_to_array(p_expected, '|')) OR v_state = ANY (string_to_array(p_expected, '|')),
       format('%s (atteso %s, ottenuto %s/%s: %s)', p_msg, p_expected, v_hint, v_state, v_text));
     RETURN;
   END;
@@ -79,7 +79,7 @@ BEGIN
   UPDATE public.profiles p SET full_name = u.raw_user_meta_data ->> 'full_name'
     FROM auth.users u WHERE u.id = p.id AND p.id::text LIKE '00000000-0000-4000-8000-0000000000%';
 
-  INSERT INTO public.courts (name, surface, is_active) VALUES ('Campo Test Wallet', 'cemento', true)
+  INSERT INTO public.courts (name, surface, is_active) VALUES ('Campo Test Wallet', enum_first(NULL::public.court_surface), true)
   RETURNING id INTO v_court;
   INSERT INTO t_ids VALUES ('court', v_court::text), ('day', v_day::text);
 
@@ -188,7 +188,7 @@ BEGIN
   -- T19: stesso slot già occupato
   PERFORM pg_temp.expect_error(format($q$SELECT public.create_booking(%s, ARRAY[%L::timestamptz], 'singolare',
       '[{"user_id":"%s"},{"user_id":"%s"}]')$q$, v_court, pg_temp.at(v_day, 10), A, B),
-    '23505', 'T19 slot già occupato: violazione indice univoco');
+    '23505|23P01', 'T19 slot già occupato: bloccato dai vincoli anti-sovrapposizione');
   PERFORM pg_temp.check(pg_temp.bal(A) = 1700, 'T19 nessun addebito sul tentativo fallito');
   v_res := public.quote_booking(v_court, ARRAY[pg_temp.at(v_day, 10)], 'singolare',
     jsonb_build_array(jsonb_build_object('user_id', A), jsonb_build_object('user_id', B)));

@@ -610,7 +610,7 @@ BEGIN
   EXCEPTION
     WHEN SQLSTATE 'WQ001' THEN
       NULL;
-    WHEN unique_violation THEN
+    WHEN unique_violation OR exclusion_violation THEN
       v_result := jsonb_build_object('ok', false, 'code', 'SLOT_OCCUPATO',
         'error', 'Uno o più slot sono stati appena prenotati da qualcun altro. Ricarica la pagina e riprova.');
     WHEN OTHERS THEN
