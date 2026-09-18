@@ -5,7 +5,7 @@
 -- supabase/migrations/. Ordine di esecuzione su staging:
 --   1. questo file
 --   2. tutte le migration in supabase/migrations/, in ordine di nome
---   3. supabase/staging/01_seed_staging.sql (campi)
+--   3. supabase/staging/01_seed_staging.sql (i 4 campi, come in produzione)
 --
 -- Esclusioni volute:
 --  - trigger "cancellation-notify" su reservations: in produzione chiama la Edge Function di
@@ -13,7 +13,7 @@
 --  - funzione notify_admin_on_new_profile: in produzione non è collegata a nessun trigger.
 --  - tabelle/policy create dalle migration (app_settings, tournaments, member_names, ...).
 --
--- DA CONFERMARE con inspect_schema_extra.sql: valori degli enum e corpo di private.is_admin/is_approved.
+-- Enum e funzioni private verificati con inspect_schema_extra.sql (18/09/2026).
 
 -- ---------------------------------------------------------------------------
 -- Estensioni e tipi
@@ -21,11 +21,11 @@
 CREATE EXTENSION IF NOT EXISTS btree_gist WITH SCHEMA extensions;
 
 DO $$ BEGIN
-  CREATE TYPE public.reservation_status AS ENUM ('confirmed', 'pending', 'cancelled'); -- DA CONFERMARE
+  CREATE TYPE public.reservation_status AS ENUM ('confirmed', 'cancelled');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE TYPE public.court_surface AS ENUM ('terra', 'sintetico', 'cemento'); -- DA CONFERMARE
+  CREATE TYPE public.court_surface AS ENUM ('cemento', 'erba_sintetica', 'terra_sintetica');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ---------------------------------------------------------------------------
@@ -131,28 +131,28 @@ CREATE TABLE IF NOT EXISTS public.medical_certificates (
 -- ---------------------------------------------------------------------------
 CREATE SCHEMA IF NOT EXISTS private;
 
-CREATE OR REPLACE FUNCTION private.is_admin() -- DA CONFERMARE
+CREATE OR REPLACE FUNCTION private.is_admin()
 RETURNS boolean
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = ''
+SET search_path TO 'public'
 AS $$
   SELECT COALESCE((SELECT p.is_admin FROM public.profiles p WHERE p.id = auth.uid()), false);
 $$;
 
-CREATE OR REPLACE FUNCTION private.is_approved() -- DA CONFERMARE
+CREATE OR REPLACE FUNCTION private.is_approved()
 RETURNS boolean
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = ''
+SET search_path TO 'public'
 AS $$
   SELECT COALESCE((SELECT p.approved FROM public.profiles p WHERE p.id = auth.uid()), false);
 $$;
 
-GRANT USAGE ON SCHEMA private TO authenticated;
-GRANT EXECUTE ON FUNCTION private.is_admin(), private.is_approved() TO authenticated;
+-- Come in produzione: nessun USAGE sullo schema private per anon/authenticated (le policy
+-- risolvono le funzioni alla creazione), EXECUTE lasciato al default PUBLIC.
 
 -- ---------------------------------------------------------------------------
 -- Creazione automatica del profilo alla registrazione (versione iniziale:

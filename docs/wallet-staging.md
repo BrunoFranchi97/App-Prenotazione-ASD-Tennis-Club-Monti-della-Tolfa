@@ -26,11 +26,11 @@ Piano completo: [piano-wallet-pagamenti.md](piano-wallet-pagamenti.md).
 
 ## 3. Applicare schema e migration a staging
 
-Progetto di **staging** → *SQL Editor*, eseguire **in ordine**, un file alla volta:
+Progetto di **staging** → *SQL Editor* → *New query* → incolla **tutto** `supabase/staging/setup_staging_completo.sql` → *Run*.
 
-1. `supabase/staging/00_base_schema.sql` (dal passo 2)
-2. tutte le migration in `supabase/migrations/`, in ordine di nome (dalla `20260602…` alla `20260918000001_wallet_functions.sql`)
-3. almeno un campo attivo in `courts` e i profili di prova (li creano anche i test, ma servono per provare l'app)
+Il file unisce, in ordine: `00_base_schema.sql` (struttura di produzione), tutte le migration, `01_seed_staging.sql` (i 4 campi).
+Va eseguito una sola volta su un progetto vuoto. Esito atteso: *Success* senza errori.
+Se si modifica uno dei file di origine, rigenerare il file unico (vedi intestazione).
 
 ## 4. Eseguire i test SQL su staging
 
