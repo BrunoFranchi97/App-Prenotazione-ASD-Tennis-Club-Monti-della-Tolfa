@@ -36,8 +36,11 @@ Se si modifica uno dei file di origine, rigenerare il file unico (vedi intestazi
 
 *SQL Editor* di staging → incolla `supabase/tests/wallet_test.sql` → *Run*.
 
-- Se finisce **senza errori**, tutti i test sono passati (lo script termina con `ROLLBACK`, non lascia dati).
-- Se un test fallisce compare un errore `TEST FALLITO: <nome del test>`.
+Il test è un unico blocco che alla fine **si annulla da solo sollevando un errore voluto**, così non lascia dati:
+
+- errore `OK - TUTTI I TEST SUPERATI…` → tutto bene;
+- errore `TEST FALLITO: <nome del test>` → un controllo non è passato;
+- qualsiasi altro errore → problema da analizzare.
 
 In locale gli stessi test sono già stati eseguiti con successo su un Postgres in memoria;
 su staging verificano anche la compatibilità con lo schema reale.
