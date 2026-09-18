@@ -23,10 +23,10 @@ serve(async (req) => {
   }
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-  const provider = getPaymentProvider();
   const report = { checked: 0, credited: 0, closed: 0, errors: [] as string[], mismatches: 0 };
 
   try {
+    const provider = getPaymentProvider();
     const pendingBefore = new Date(Date.now() - PENDING_CHECK_AFTER_MINUTES * 60_000).toISOString();
     const { data: pending, error } = await supabase
       .from("wallet_topups")

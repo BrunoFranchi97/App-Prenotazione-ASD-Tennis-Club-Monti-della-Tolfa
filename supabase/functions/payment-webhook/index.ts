@@ -20,7 +20,13 @@ const formatEur = (cents: number) => `€${(cents / 100).toFixed(2).replace(".",
 serve(async (req) => {
   if (req.method !== "POST") return json({ error: "Metodo non consentito" }, 405);
 
-  const provider = getPaymentProvider();
+  let provider;
+  try {
+    provider = getPaymentProvider();
+  } catch (error: any) {
+    console.error("[payment-webhook] Configurazione mancante:", error?.message ?? error);
+    return json({ error: "Funzione non configurata" }, 500);
+  }
   const rawBody = await req.text();
 
   let event: TopupEvent | null;
