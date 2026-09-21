@@ -170,6 +170,8 @@ DECLARE
   v_balance integer;
   v_key text;
   v_delta record;
+  v_totals record;
+  v_full_name text;
 BEGIN
   SELECT * INTO v_booking FROM public.bookings WHERE id = p_booking FOR UPDATE;
   IF NOT FOUND OR v_booking.payment_mode <> 'wallet' THEN
@@ -221,6 +223,65 @@ BEGIN
       v_targets := jsonb_set(v_targets, ARRAY[v_key], to_jsonb(COALESCE((v_targets ->> v_key)::integer, 0) + v_quota));
     END LOOP;
   END IF;
+
+  -- Validazione preventiva: somma il netto di QUESTO aggiornamento per ciascun beneficiario
+  -- (la propria quota più ogni copertura che sta assorbendo, es. D7) e verifica che il saldo
+  -- lo copra TUTTO in un colpo solo — senza fermarsi al primo addebito insufficiente
+  -- incontrato, altrimenti l'utente scoprirebbe l'importo mancante un pezzo alla volta a
+  -- ogni ricarica (bug segnalato da Bruno il 21/09/2026 testando su staging). Nessun
+  -- movimento viene scritto finché questo controllo non è passato per tutti.
+  FOR v_totals IN
+    WITH existing AS (
+      SELECT user_id::text || '|' || COALESCE(covers_user_id::text, '') AS k,
+             -SUM(amount_cents)::integer AS paid
+      FROM public.wallet_ledger
+      WHERE booking_id = p_booking
+      GROUP BY 1
+    ),
+    target AS (
+      SELECT key AS k, value::integer AS due FROM jsonb_each_text(v_targets)
+    ),
+    lines AS (
+      SELECT split_part(COALESCE(e.k, t.k), '|', 1)::uuid AS user_id,
+             NULLIF(split_part(COALESCE(e.k, t.k), '|', 2), '')::uuid AS covers,
+             COALESCE(e.paid, 0) - COALESCE(t.due, 0) AS amount
+      FROM existing e
+      FULL JOIN target t ON t.k = e.k
+      WHERE COALESCE(e.paid, 0) <> COALESCE(t.due, 0)
+    )
+    SELECT user_id,
+           SUM(amount)::integer AS net,
+           jsonb_agg(
+             jsonb_build_object(
+               'label', CASE WHEN covers IS NULL THEN 'Quota propria'
+                              ELSE 'Quota di ' || COALESCE((SELECT full_name FROM public.profiles WHERE id = covers), 'un socio') END,
+               'amount_cents', -amount
+             ) ORDER BY amount
+           ) AS lines
+    FROM lines
+    GROUP BY user_id
+  LOOP
+    IF v_totals.net < 0 THEN
+      SELECT balance_cents INTO v_balance FROM public.wallets WHERE user_id = v_totals.user_id;
+      IF COALESCE(v_balance, 0) + v_totals.net < 0 THEN
+        SELECT full_name INTO v_full_name FROM public.profiles WHERE id = v_totals.user_id;
+        -- Messaggio in chiaro (fallback) + DETAIL strutturato in JSON: la UI usa quest'ultimo
+        -- per disegnare il dettaglio a righe invece di una frase unica (richiesta di Bruno).
+        RAISE EXCEPTION USING
+          ERRCODE = 'P0001',
+          MESSAGE = format('Saldo insufficiente per %s: servono %s in totale, disponibili %s.',
+            COALESCE(v_full_name, 'il socio'), public.wallet_format_eur(-v_totals.net), public.wallet_format_eur(COALESCE(v_balance, 0))),
+          HINT = 'SALDO_INSUFFICIENTE',
+          DETAIL = jsonb_build_object(
+            'user_id', v_totals.user_id,
+            'full_name', COALESCE(v_full_name, 'il socio'),
+            'needed_cents', -v_totals.net,
+            'available_cents', COALESCE(v_balance, 0),
+            'lines', v_totals.lines
+          )::text;
+      END IF;
+    END IF;
+  END LOOP;
 
   FOR v_delta IN
     WITH existing AS (
@@ -601,6 +662,7 @@ DECLARE
   v_id uuid;
   v_result jsonb;
   v_hint text;
+  v_detail text;
 BEGIN
   BEGIN
     v_id := public.wallet_save_booking(p_booking_id, false, p_expected_version, p_court_id, p_starts,
@@ -614,8 +676,17 @@ BEGIN
       v_result := jsonb_build_object('ok', false, 'code', 'SLOT_OCCUPATO',
         'error', 'Uno o più slot sono stati appena prenotati da qualcun altro. Ricarica la pagina e riprova.');
     WHEN OTHERS THEN
-      GET STACKED DIAGNOSTICS v_hint = PG_EXCEPTION_HINT;
+      GET STACKED DIAGNOSTICS v_hint = PG_EXCEPTION_HINT, v_detail = PG_EXCEPTION_DETAIL;
       v_result := jsonb_build_object('ok', false, 'code', COALESCE(NULLIF(v_hint, ''), SQLSTATE), 'error', SQLERRM);
+      -- DETAIL strutturato (es. saldo insufficiente): permette alla UI di mostrare un
+      -- dettaglio a righe invece della sola frase in SQLERRM.
+      IF NULLIF(v_detail, '') IS NOT NULL THEN
+        BEGIN
+          v_result := v_result || jsonb_build_object('detail', v_detail::jsonb);
+        EXCEPTION WHEN OTHERS THEN
+          NULL; -- DETAIL non era JSON valido: si ignora, resta il solo messaggio testuale
+        END;
+      END IF;
   END;
   RETURN v_result;
 END;

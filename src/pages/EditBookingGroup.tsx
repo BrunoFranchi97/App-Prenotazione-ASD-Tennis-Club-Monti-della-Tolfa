@@ -12,10 +12,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { format, parseISO, addHours, setHours, setMinutes, isBefore, isAfter, isEqual, setSeconds, setMilliseconds, startOfDay, endOfDay } from 'date-fns';
 import { it } from 'date-fns/locale';
-import type { Court, Reservation, BookingType } from '@/types/supabase';
+import type { Court, Reservation, BookingType, Booking, BookingParticipant, BookingParticipantInput, BookingSummary } from '@/types/supabase';
 import { cn } from '@/lib/utils';
 import UserNav from '@/components/UserNav';
 import { Input } from "@/components/ui/input";
+import ParticipantPicker from '@/components/ParticipantPicker';
+import BookingQuoteDialog from '@/components/BookingQuoteDialog';
 
 interface ReservationGroup {
   id: string;
@@ -38,6 +40,12 @@ const bookingTypeLabels: Record<BookingType, string> = {
   lezione: 'Lezione'
 };
 
+const PARTICIPANT_RANGE: Record<BookingType, { min: number; max: number }> = {
+  singolare: { min: 2, max: 2 },
+  doppio: { min: 4, max: 4 },
+  lezione: { min: 1, max: 4 },
+};
+
 const EditBookingGroup = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -50,11 +58,24 @@ const EditBookingGroup = () => {
   const [otherReservations, setOtherReservations] = useState<Reservation[]>([]); // Prenotazioni di altri su questo campo
   const [myOtherReservations, setMyOtherReservations] = useState<Reservation[]>([]); // Mie prenotazioni su altri campi
   
-  const [selectedSlots, setSelectedSlots] = useState<string[]>([]); 
+  const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
   const [bookingType, setBookingType] = useState<BookingType>('singolare');
   const [notes, setNotes] = useState('');
   const [bookedForFirstName, setBookedForFirstName] = useState('');
   const [bookedForLastName, setBookedForLastName] = useState('');
+
+  // Prenotazione creata con le nuove RPC wallet (booking_id valorizzato): modifica/disdetta
+  // passano per update_booking invece delle 3 chiamate dirette. Le prenotazioni legacy/admin
+  // (booking_id assente) restano sul percorso invariato.
+  const [walletBooking, setWalletBooking] = useState<(Booking & { booking_participants: BookingParticipant[] }) | null>(null);
+  const [bookerName, setBookerName] = useState('Tu');
+  const [participants, setParticipants] = useState<BookingParticipantInput[]>([]);
+  const [coachName, setCoachName] = useState('');
+  const [showQuoteDialog, setShowQuoteDialog] = useState(false);
+  const isWalletBooking = !!walletBooking;
+  const requiredParticipants = PARTICIPANT_RANGE[bookingType];
+  const participantsValid = participants.length >= requiredParticipants.min && participants.length <= requiredParticipants.max;
+  const coachValid = bookingType !== 'lezione' || coachName.trim().length > 0;
 
   const allTimeSlots = useMemo(() => {
     const slots: string[] = [];
@@ -78,11 +99,32 @@ const EditBookingGroup = () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single();
+          const { data: profile } = await supabase.from('profiles').select('is_admin, full_name').eq('id', user.id).single();
           setIsAdmin(profile?.is_admin ?? false);
+          setBookerName(profile?.full_name || 'Tu');
         }
         const { data: courtsData } = await supabase.from('courts').select('*').eq('is_active', true);
         setCourts(courtsData || []);
+
+        const bookingId = group.reservations[0]?.booking_id;
+        if (bookingId) {
+          const { data: bookingRow } = await supabase
+            .from('bookings')
+            .select('*, booking_participants(*)')
+            .eq('id', bookingId)
+            .single();
+          if (bookingRow) {
+            setWalletBooking(bookingRow as Booking & { booking_participants: BookingParticipant[] });
+            setCoachName(bookingRow.coach_name || '');
+            const rows: BookingParticipant[] = bookingRow.booking_participants || [];
+            const bookerRow = rows.find(p => p.user_id === bookingRow.booker_id);
+            const others = rows.filter(p => p !== bookerRow);
+            setParticipants([
+              { user_id: bookingRow.booker_id },
+              ...others.map(p => (p.user_id ? { user_id: p.user_id } : { guest_name: p.guest_name })),
+            ]);
+          }
+        }
 
         const startDay = startOfDay(group.date).toISOString();
         const endDay = endOfDay(group.date).toISOString();
@@ -198,9 +240,35 @@ const EditBookingGroup = () => {
     }
   };
 
+  const getSelectedStarts = (): string[] => {
+    return [...selectedSlots].sort().map(t => {
+      const start = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(group.date), parseInt(t.split(':')[0])), 0), 0), 0);
+      return start.toISOString();
+    });
+  };
+
+  const handleConfirmedUpdate = (_summary: BookingSummary) => {
+    showSuccess("Prenotazione aggiornata con successo!");
+    setShowQuoteDialog(false);
+    navigate('/history');
+  };
+
   const handleSave = async () => {
     if (selectedSlots.length === 0) {
       showError("Seleziona almeno un orario o elimina la prenotazione dai tuoi campi prenotati.");
+      return;
+    }
+
+    if (isWalletBooking) {
+      if (!participantsValid) {
+        showError(`Seleziona ${requiredParticipants.min === requiredParticipants.max ? requiredParticipants.min : `da ${requiredParticipants.min} a ${requiredParticipants.max}`} partecipanti.`);
+        return;
+      }
+      if (!coachValid) {
+        showError("Indica il nome del maestro.");
+        return;
+      }
+      setShowQuoteDialog(true);
       return;
     }
 
@@ -384,14 +452,42 @@ const EditBookingGroup = () => {
                    </div>
                 </div>
 
-                <div className="pt-8">
-                  <Button 
-                    onClick={handleSave} 
+                {isWalletBooking && (
+                  <div className="space-y-6 pt-8 border-t border-gray-50">
+                    <ParticipantPicker
+                      bookingType={bookingType}
+                      bookerId={walletBooking!.booker_id}
+                      bookerName={bookerName}
+                      value={participants}
+                      onChange={setParticipants}
+                    />
+                    {bookingType === 'lezione' && (
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Nome maestro</Label>
+                        <Input
+                          value={coachName}
+                          onChange={e => setCoachName(e.target.value)}
+                          placeholder="Nome e cognome del maestro"
+                          className="h-11 rounded-xl border-gray-100 text-sm"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="pt-8 space-y-2">
+                  {isWalletBooking && selectedSlots.length > 0 && (!participantsValid || !coachValid) && (
+                    <p className="text-xs font-bold text-club-orange text-center">
+                      {!participantsValid ? 'Completa la selezione dei partecipanti per continuare.' : 'Indica il nome del maestro per continuare.'}
+                    </p>
+                  )}
+                  <Button
+                    onClick={handleSave}
                     className={cn(
                       "w-full h-16 rounded-[1.5rem] font-black text-xl shadow-xl transition-all flex items-center justify-center gap-3",
                       selectedSlots.length > 0 ? "bg-gradient-to-br from-primary to-[#23532f] text-white hover:scale-[1.01] active:scale-[0.98]" : "bg-gray-100 text-gray-400"
                     )}
-                    disabled={saving || selectedSlots.length === 0}
+                    disabled={saving || selectedSlots.length === 0 || (isWalletBooking && (!participantsValid || !coachValid))}
                   >
                     {saving ? <div className="w-6 h-6 border-3 border-white/20 border-t-white rounded-full animate-spin"></div> : <>Salva Modifiche <ChevronRight size={24} /></>}
                   </Button>
@@ -400,6 +496,22 @@ const EditBookingGroup = () => {
           </Card>
         </div>
       </div>
+      {isWalletBooking && walletBooking && (
+        <BookingQuoteDialog
+          open={showQuoteDialog}
+          onOpenChange={setShowQuoteDialog}
+          courtId={group.courtId}
+          courtName={group.courtName}
+          starts={getSelectedStarts()}
+          bookingType={bookingType}
+          participants={participants}
+          coachName={coachName}
+          bookerId={walletBooking.booker_id}
+          bookingId={walletBooking.id}
+          expectedVersion={walletBooking.version}
+          onConfirmed={handleConfirmedUpdate}
+        />
+      )}
     </div>
   );
 };

@@ -25,6 +25,10 @@ export interface Reservation {
   booked_for_user_id?: string | null;
   updated_at?: string;
   is_paid?: boolean | null;
+  booking_id?: string | null;
+  lights?: boolean | null;
+  unit_price_cents?: number | null;
+  rate_id?: string | null;
 }
 
 export type SkillLevel = 'principiante' | 'intermedio' | 'avanzato' | 'agonista';
@@ -192,11 +196,22 @@ export interface BookingParticipant {
 // Partecipante passato alle RPC create_booking / update_booking / quote_booking
 export type BookingParticipantInput = { user_id: string } | { guest_name: string };
 
+// Dettaglio strutturato di un errore SALDO_INSUFFICIENTE (vedi wallet_settle_booking),
+// così la UI può mostrarlo a righe invece che come frase unica.
+export interface WalletShortfallDetail {
+  user_id: string;
+  full_name: string;
+  needed_cents: number;
+  available_cents: number;
+  lines: { label: string; amount_cents: number }[];
+}
+
 // Risposta di create_booking / update_booking / cancel_booking / quote_booking
 export interface BookingSummary {
   ok?: boolean; // solo quote_booking
   error?: string; // solo quote_booking, se l'operazione non sarebbe possibile
   code?: string; // solo quote_booking: codice errore (es. SALDO_INSUFFICIENTE, SLOT_OCCUPATO)
+  detail?: WalletShortfallDetail; // solo quote_booking, presente solo per SALDO_INSUFFICIENTE
   booking_id: string;
   version: number;
   status: 'active' | 'cancelled';

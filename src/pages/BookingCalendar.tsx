@@ -7,20 +7,29 @@ import { Calendar } from "@/components/ui/calendar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { ArrowLeft, ChevronRight, CalendarDays, MapPin, Clock, Info, User, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess } from '@/utils/toast';
 import { format, parseISO, addHours, setHours, setMinutes, isBefore, isEqual, setSeconds, setMilliseconds, addDays, startOfDay, endOfDay, isValid } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { useApprovalCheck } from '@/hooks/use-approval-check';
-import { Court, Reservation, BookingType, MemberType } from '@/types/supabase';
+import { Court, Reservation, BookingType, MemberType, BookingParticipantInput, BookingSummary } from '@/types/supabase';
 import { getBookingLimitsStatus } from '@/utils/bookingLimits';
 import { isTorneoAttivo } from '@/utils/tournament';
 import { BLOCK_TYPE_META } from '@/utils/blockType';
 import BookingLimitsBox from '@/components/BookingLimitsBox';
 import BookingSuccessDialog from '@/components/BookingSuccessDialog';
+import ParticipantPicker from '@/components/ParticipantPicker';
+import BookingQuoteDialog from '@/components/BookingQuoteDialog';
 import UserNav from '@/components/UserNav';
 import { cn } from '@/lib/utils';
+
+const PARTICIPANT_RANGE: Record<BookingType, { min: number; max: number }> = {
+  singolare: { min: 2, max: 2 },
+  doppio: { min: 4, max: 4 },
+  lezione: { min: 1, max: 4 },
+};
 
 const bookingTypeLabels: Record<BookingType, string> = {
   singolare: 'Singolare',
@@ -38,17 +47,34 @@ const BookingCalendar = () => {
   const [allReservations, setAllReservations] = useState<Reservation[]>([]);
   const [userReservations, setUserReservations] = useState<Reservation[]>([]);
   const [profileMap, setProfileMap] = useState<Record<string, string>>({});
-  const [selectedSlots, setSelectedSlots] = useState<string[]>([]); 
+  const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
   const [bookingType, setBookingType] = useState<BookingType>('singolare');
-  const [loading, setLoading] = useState(false);
   const [fetchingData, setFetchingData] = useState(true);
   const [bookerFullName, setBookerFullName] = useState<string | null>(null);
+  const [bookerId, setBookerId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [memberType, setMemberType] = useState<MemberType>('socio_effettivo');
   const [torneoInCorso, setTorneoInCorso] = useState(false);
+  const [participants, setParticipants] = useState<BookingParticipantInput[]>([]);
+  const [coachName, setCoachName] = useState('');
+  const [showQuoteDialog, setShowQuoteDialog] = useState(false);
 
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [lastBookingData, setLastBookingData] = useState<{ reservations: Reservation[], courtName: string, hasTorneoWarning: boolean } | null>(null);
+  const [lastBookingData, setLastBookingData] = useState<{
+    reservations: Pick<Reservation, 'starts_at' | 'ends_at'>[],
+    courtName: string,
+    hasTorneoWarning: boolean,
+    quotaCents?: number,
+    paymentMode?: BookingSummary['payment_mode'],
+    movements?: BookingSummary['movements'],
+  } | null>(null);
+
+  // Il prenotante è sempre incluso; si azzera quando cambia la tipologia (il numero
+  // richiesto di partecipanti cambia con essa)
+  useEffect(() => {
+    if (bookerId) setParticipants([{ user_id: bookerId }]);
+    setCoachName('');
+  }, [bookerId, bookingType]);
 
   const today = useMemo(() => startOfDay(new Date()), []);
   const maxDate = useMemo(() => {
@@ -60,7 +86,8 @@ const BookingCalendar = () => {
   const fetchUserData = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    
+    setBookerId(user.id);
+
     const { data: profile } = await supabase.from('profiles').select('full_name, is_admin, member_type').eq('id', user.id).single();
     if (profile) {
       setBookerFullName(profile.full_name);
@@ -231,9 +258,21 @@ const BookingCalendar = () => {
     }
   };
 
-  const handleBooking = async () => {
+  const getSelectedStarts = (): string[] => {
+    if (!date || !isValid(date)) return [];
+    return [...selectedSlots].sort().map(t => {
+      const start = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date), parseInt(t.split(':')[0])), 0), 0), 0);
+      return start.toISOString();
+    });
+  };
+
+  const requiredParticipants = PARTICIPANT_RANGE[bookingType];
+  const participantsValid = participants.length >= requiredParticipants.min && participants.length <= requiredParticipants.max;
+  const coachValid = bookingType !== 'lezione' || coachName.trim().length > 0;
+
+  const openQuoteDialog = () => {
     if (!date || !isValid(date)) return;
-    
+
     // Controllo Policy Settimanale (EFFETTIVO) — bypass per gli admin
     if (!isAdmin) {
       const limitsStatus = getBookingLimitsStatus(userReservations, date, memberType);
@@ -243,8 +282,6 @@ const BookingCalendar = () => {
       }
     }
 
-    const { data: { user } } = await supabase.auth.getUser();
-    
     const hasOverlap = selectedSlots.some(slotTime => {
       const slotStart = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date), parseInt(slotTime.split(':')[0])), 0), 0), 0);
       return userReservations.some(r => isEqual(parseISO(r.starts_at), slotStart));
@@ -252,41 +289,27 @@ const BookingCalendar = () => {
 
     if (hasOverlap) return showError("Hai già una prenotazione in questo orario su un altro campo.");
 
-    setLoading(true);
-    try {
-      const courtIdNum = parseInt(selectedCourtId!);
-      const courtName = courts.find(c => c.id === courtIdNum)?.name || `Campo ${courtIdNum}`;
-      const inserts = selectedSlots.map(t => {
-        let start = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date), parseInt(t.split(':')[0])), 0), 0), 0);
-        return {
-          court_id: courtIdNum, 
-          user_id: user?.id,
-          starts_at: start.toISOString(), 
-          ends_at: addHours(start, 1).toISOString(),
-          status: 'confirmed', 
-          booking_type: bookingType,
-          notes: `${bookingTypeLabels[bookingType]} - Socio: ${bookerFullName}`
-        };
-      });
+    setShowQuoteDialog(true);
+  };
 
-      const { data: inserted, error } = await supabase.from('reservations').insert(inserts).select();
-      if (error) throw error;
-      
-      const hasTorneoWarning = torneoInCorso && selectedSlots.some(s => isTorneoSlot(s, date));
-      setLastBookingData({ reservations: inserted || [], courtName, hasTorneoWarning });
-      setShowSuccessModal(true);
-      setSelectedSlots([]);
-      fetchUserData();
-      fetchReservations();
-    } catch (e: any) {
-      if (e.code === '23505') {
-        showError("Uno o più slot sono stati appena prenotati da qualcun altro. Ricarica la pagina e riprova.");
-        fetchReservations();
-      } else {
-        showError(e.message);
-      }
-    }
-    finally { setLoading(false); }
+  const handleConfirmed = (summary: BookingSummary) => {
+    const courtIdNum = parseInt(selectedCourtId!);
+    const courtName = courts.find(c => c.id === courtIdNum)?.name || `Campo ${courtIdNum}`;
+    const hasTorneoWarning = !!(torneoInCorso && date && isValid(date) && selectedSlots.some(s => isTorneoSlot(s, date)));
+
+    setLastBookingData({
+      reservations: summary.hours.map(h => ({ starts_at: h.starts_at, ends_at: h.ends_at })),
+      courtName,
+      hasTorneoWarning,
+      quotaCents: summary.quota_cents,
+      paymentMode: summary.payment_mode,
+      movements: summary.movements,
+    });
+    setShowQuoteDialog(false);
+    setShowSuccessModal(true);
+    setSelectedSlots([]);
+    fetchUserData();
+    fetchReservations();
   };
 
   const getCourtAvailability = (courtId: number) => {
@@ -405,6 +428,29 @@ const BookingCalendar = () => {
                     </div>
                   </div>
                 )}
+
+                {selectedCourtId && bookerId && (
+                  <div className="pt-6 space-y-6 animate-in fade-in slide-in-from-top-2">
+                    <ParticipantPicker
+                      bookingType={bookingType}
+                      bookerId={bookerId}
+                      bookerName={bookerFullName || 'Tu'}
+                      value={participants}
+                      onChange={setParticipants}
+                    />
+                    {bookingType === 'lezione' && (
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Nome maestro</Label>
+                        <Input
+                          value={coachName}
+                          onChange={e => setCoachName(e.target.value)}
+                          placeholder="Nome e cognome del maestro"
+                          className="h-11 rounded-xl border-gray-100 text-sm"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {selectedCourtId && date && isValid(date) && (
@@ -487,16 +533,23 @@ const BookingCalendar = () => {
                     </div>
                   )}
 
-                  <div className="pt-4">
+                  <div className="pt-4 space-y-2">
+                    {selectedSlots.length > 0 && (!participantsValid || !coachValid) && (
+                      <p className="text-xs font-bold text-club-orange text-center">
+                        {!participantsValid
+                          ? `Seleziona ${requiredParticipants.min === requiredParticipants.max ? requiredParticipants.min : `da ${requiredParticipants.min} a ${requiredParticipants.max}`} partecipanti per continuare.`
+                          : 'Indica il nome del maestro per continuare.'}
+                      </p>
+                    )}
                     <Button
-                      onClick={handleBooking}
+                      onClick={openQuoteDialog}
                       className={cn(
                         "w-full h-16 rounded-[1.5rem] font-black text-xl shadow-xl transition-all flex items-center justify-center gap-3",
-                        selectedSlots.length > 0 ? "bg-gradient-to-br from-primary to-[#23532f] text-white hover:scale-[1.01] active:scale-[0.98] shadow-primary/20" : "bg-gray-100 text-gray-400 cursor-not-allowed shadow-none"
+                        selectedSlots.length > 0 && participantsValid && coachValid ? "bg-gradient-to-br from-primary to-[#23532f] text-white hover:scale-[1.01] active:scale-[0.98] shadow-primary/20" : "bg-gray-100 text-gray-400 cursor-not-allowed shadow-none"
                       )}
-                      disabled={selectedSlots.length === 0 || loading}
+                      disabled={selectedSlots.length === 0 || !participantsValid || !coachValid}
                     >
-                      {loading ? <div className="w-6 h-6 border-3 border-white/20 border-t-white rounded-full animate-spin"></div> : <>Conferma Prenotazione <ChevronRight size={24} /></>}
+                      Conferma Prenotazione <ChevronRight size={24} />
                     </Button>
                   </div>
                 </div>
@@ -512,12 +565,30 @@ const BookingCalendar = () => {
           </Card>
         </div>
       </div>
+      {selectedCourtId && bookerId && (
+        <BookingQuoteDialog
+          open={showQuoteDialog}
+          onOpenChange={setShowQuoteDialog}
+          courtId={parseInt(selectedCourtId)}
+          courtName={courts.find(c => c.id === parseInt(selectedCourtId))?.name || ''}
+          starts={getSelectedStarts()}
+          bookingType={bookingType}
+          participants={participants}
+          coachName={coachName}
+          bookerId={bookerId}
+          onConfirmed={handleConfirmed}
+        />
+      )}
       <BookingSuccessDialog
         open={showSuccessModal}
         onOpenChange={setShowSuccessModal}
         reservations={lastBookingData?.reservations || null}
         courtName={lastBookingData?.courtName || ''}
         hasTorneoWarning={lastBookingData?.hasTorneoWarning || false}
+        quotaCents={lastBookingData?.quotaCents}
+        paymentMode={lastBookingData?.paymentMode}
+        movements={lastBookingData?.movements}
+        bookerId={bookerId ?? undefined}
       />
     </div>
   );

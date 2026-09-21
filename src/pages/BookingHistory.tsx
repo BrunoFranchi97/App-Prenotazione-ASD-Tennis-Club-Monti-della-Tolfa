@@ -156,12 +156,22 @@ const BookingHistory = () => {
   const handleDelete = async (group: ReservationGroup) => {
     setDeletingGroupId(group.id);
     try {
-      const ids = group.reservations.map(r => r.id);
-      const { error } = await supabase
-        .from('reservations')
-        .update({ status: 'cancelled', updated_at: new Date().toISOString() })
-        .in('id', ids);
-      if (error) throw error;
+      // Prenotazioni create con le nuove RPC wallet (booking_id valorizzato) passano per
+      // cancel_booking, che annulla testata + righe orarie ed eventuale rimborso in un'unica
+      // transazione atomica. Le prenotazioni legacy/admin (booking_id assente) restano sul
+      // vecchio percorso diretto, invariato.
+      const bookingId = group.reservations[0]?.booking_id;
+      if (bookingId) {
+        const { error } = await supabase.rpc('cancel_booking', { p_booking_id: bookingId });
+        if (error) throw error;
+      } else {
+        const ids = group.reservations.map(r => r.id);
+        const { error } = await supabase
+          .from('reservations')
+          .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+          .in('id', ids);
+        if (error) throw error;
+      }
       showSuccess("Prenotazione annullata.");
       fetchData();
     } catch (err: any) { showError(err.message); }

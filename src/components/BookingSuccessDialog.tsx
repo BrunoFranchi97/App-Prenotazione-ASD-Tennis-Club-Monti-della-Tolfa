@@ -14,15 +14,20 @@ import { Button } from "@/components/ui/button";
 import { CheckCircle2, CalendarDays, Clock, MapPin, User, ArrowRight, History, AlertTriangle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { it } from 'date-fns/locale';
-import { Reservation } from '@/types/supabase';
+import { Reservation, PaymentMode, BookingSummary } from '@/types/supabase';
+import WalletMovementsSummary from '@/components/WalletMovementsSummary';
 
 interface BookingSuccessDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  reservations: Reservation[] | null;
+  reservations: Pick<Reservation, 'starts_at' | 'ends_at'>[] | null;
   courtName: string;
   bookedFor?: string;
   hasTorneoWarning?: boolean;
+  quotaCents?: number;
+  paymentMode?: PaymentMode;
+  movements?: BookingSummary['movements'];
+  bookerId?: string;
 }
 
 const BookingSuccessDialog: React.FC<BookingSuccessDialogProps> = ({
@@ -31,7 +36,11 @@ const BookingSuccessDialog: React.FC<BookingSuccessDialogProps> = ({
   reservations,
   courtName,
   bookedFor,
-  hasTorneoWarning = false
+  hasTorneoWarning = false,
+  quotaCents,
+  paymentMode,
+  movements,
+  bookerId,
 }) => {
   const navigate = useNavigate();
 
@@ -104,6 +113,13 @@ const BookingSuccessDialog: React.FC<BookingSuccessDialogProps> = ({
             </div>
           </div>
         </div>
+
+        {paymentMode === 'wallet' && !!quotaCents && quotaCents > 0 && movements && movements.length > 0 && bookerId && (
+          <div className="space-y-2">
+            <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em] px-1">Riepilogo pagamenti</p>
+            <WalletMovementsSummary movements={movements} bookerId={bookerId} mode="confirmed" />
+          </div>
+        )}
 
         {hasTorneoWarning && (
           <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
