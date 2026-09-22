@@ -58,8 +58,8 @@ serve(async (req) => {
         topupId: topup.id,
         amountCents,
         email: user.email,
-        successUrl: `${appBaseUrl}/profile?ricarica=in-corso&topup=${topup.id}`,
-        cancelUrl: `${appBaseUrl}/profile?ricarica=annullata`,
+        successUrl: `${appBaseUrl}/wallet?ricarica=in-corso&topup=${topup.id}`,
+        cancelUrl: `${appBaseUrl}/wallet?ricarica=annullata`,
         webhookUrl: `${supabaseUrl}/functions/v1/payment-webhook`,
       });
 

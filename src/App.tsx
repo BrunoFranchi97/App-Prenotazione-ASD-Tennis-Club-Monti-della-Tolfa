@@ -25,6 +25,7 @@ import AdminUsageStats from "./pages/AdminUsageStats";
 import AdminApprovals from "./pages/AdminApprovals";
 import AdminUserManagement from "./pages/AdminUserManagement";
 import AdminTournament from "./pages/AdminTournament";
+import AdminWallets from "./pages/AdminWallets";
 import FindMatch from "./pages/FindMatch";
 import MatchBooking from "./pages/MatchBooking";
 import MedicalCertificates from "./pages/MedicalCertificates";
@@ -32,6 +33,7 @@ import EmailVerificationHandler from "./components/EmailVerificationHandler";
 import PullToRefresh from "./components/PullToRefresh";
 import EditBookingGroup from "./pages/EditBookingGroup";
 import MyProfile from "./pages/MyProfile";
+import MyWallet from "./pages/MyWallet";
 import WeeklyView from "./pages/WeeklyView";
 
 const queryClient = new QueryClient();
@@ -53,6 +55,7 @@ const App = () => (
               <Route path="/update-password" element={<UpdatePassword />} />
               <Route path="/dashboard" element={<MemberDashboard />} />
               <Route path="/profile" element={<MyProfile />} />
+              <Route path="/wallet" element={<MyWallet />} />
               <Route path="/book" element={<BookingCalendar />} />
               <Route path="/booking-confirmation" element={<BookingConfirmation />} />
               <Route path="/history" element={<BookingHistory />} />
@@ -67,6 +70,7 @@ const App = () => (
               <Route path="/admin/approvals" element={<AdminApprovals />} />
               <Route path="/admin/users" element={<AdminUserManagement />} />
               <Route path="/admin/tournament" element={<AdminTournament />} />
+              <Route path="/admin/wallets" element={<AdminWallets />} />
               <Route path="/find-match" element={<FindMatch />} />
               <Route path="/match-booking" element={<MatchBooking />} />
               <Route path="/medical-certificates" element={<MedicalCertificates />} />

@@ -15,6 +15,9 @@ interface ParticipantPickerProps {
   bookingType: BookingType;
   bookerId: string;
   bookerName: string;
+  // Secondo partecipante fisso, non rimovibile, diverso dal prenotante — usato in
+  // MatchBooking.tsx per lo sfidante che ha pubblicato la richiesta su Cerca Partita.
+  extraFixed?: { id: string; name: string; badge?: string };
   value: BookingParticipantInput[]; // include sempre il prenotante ({ user_id: bookerId })
   onChange: (value: BookingParticipantInput[]) => void;
 }
@@ -32,10 +35,12 @@ const isMember = (p: BookingParticipantInput): p is { user_id: string } => 'user
 const initials = (name: string) =>
   name.trim().split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('') || '?';
 
-const ParticipantPicker: React.FC<ParticipantPickerProps> = ({ bookingType, bookerId, bookerName, value, onChange }) => {
+const ParticipantPicker: React.FC<ParticipantPickerProps> = ({ bookingType, bookerId, bookerName, extraFixed, value, onChange }) => {
   const { min, max } = REQUIRED[bookingType];
   const [allMembers, setAllMembers] = useState<{ id: string; full_name: string }[]>([]);
-  const [namesById, setNamesById] = useState<Record<string, string>>({ [bookerId]: bookerName });
+  const [namesById, setNamesById] = useState<Record<string, string>>(
+    extraFixed ? { [bookerId]: bookerName, [extraFixed.id]: extraFixed.name } : { [bookerId]: bookerName }
+  );
   const [comboboxOpen, setComboboxOpen] = useState(false);
   const [addingGuest, setAddingGuest] = useState(false);
   const [guestName, setGuestName] = useState('');
@@ -68,8 +73,8 @@ const ParticipantPicker: React.FC<ParticipantPickerProps> = ({ bookingType, book
   }, [value, namesById]);
 
   const availableMembers = useMemo(
-    () => allMembers.filter(m => m.id !== bookerId && !selectedMemberIds.has(m.id)),
-    [allMembers, bookerId, selectedMemberIds]
+    () => allMembers.filter(m => m.id !== bookerId && m.id !== extraFixed?.id && !selectedMemberIds.has(m.id)),
+    [allMembers, bookerId, extraFixed, selectedMemberIds]
   );
 
   const atMax = value.length >= max;
@@ -95,7 +100,8 @@ const ParticipantPicker: React.FC<ParticipantPickerProps> = ({ bookingType, book
   };
 
   const removeAt = (index: number) => {
-    if (index === 0) return; // il prenotante non si rimuove
+    const p = value[index];
+    if (isMember(p) && (p.user_id === bookerId || p.user_id === extraFixed?.id)) return; // partecipanti fissi: non si rimuovono
     onChange(value.filter((_, i) => i !== index));
   };
 
@@ -113,7 +119,8 @@ const ParticipantPicker: React.FC<ParticipantPickerProps> = ({ bookingType, book
 
       <div className="flex flex-wrap gap-2">
         {value.map((p, i) => {
-          if (i === 0) {
+          const isBooker = isMember(p) && p.user_id === bookerId;
+          if (isBooker) {
             return (
               <div key="booker" className="flex items-center gap-2 pl-1 pr-3 py-1 rounded-full bg-primary/10 border-2 border-primary/20">
                 <div className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-[10px] font-black">
@@ -121,6 +128,18 @@ const ParticipantPicker: React.FC<ParticipantPickerProps> = ({ bookingType, book
                 </div>
                 <span className="text-xs font-bold text-primary">{bookerName}</span>
                 <span className="text-[8px] font-black uppercase tracking-tighter text-primary/60">Tu</span>
+              </div>
+            );
+          }
+          const isExtraFixed = extraFixed && isMember(p) && p.user_id === extraFixed.id;
+          if (isExtraFixed) {
+            return (
+              <div key="extra-fixed" className="flex items-center gap-2 pl-1 pr-3 py-1 rounded-full bg-club-orange/10 border-2 border-club-orange/20">
+                <div className="w-6 h-6 rounded-full bg-club-orange text-white flex items-center justify-center text-[10px] font-black">
+                  {initials(extraFixed!.name)}
+                </div>
+                <span className="text-xs font-bold text-club-orange">{extraFixed!.name}</span>
+                <span className="text-[8px] font-black uppercase tracking-tighter text-club-orange/60">{extraFixed!.badge || 'Sfidante'}</span>
               </div>
             );
           }

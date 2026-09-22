@@ -8,15 +8,17 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Users, User, Clock, MapPin, CalendarDays, ChevronRight, Check } from 'lucide-react';
+import { ArrowLeft, Users, MapPin, CalendarDays, ChevronRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess } from '@/utils/toast';
 import { format, parseISO, addHours, setHours, setMinutes, isBefore, isEqual, setSeconds, setMilliseconds, addDays, startOfDay, endOfDay, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { useApprovalCheck } from '@/hooks/use-approval-check';
-import { Court, Reservation, BookingType, MemberType } from '@/types/supabase';
+import { Court, Reservation, BookingType, MemberType, BookingParticipantInput, BookingSummary } from '@/types/supabase';
 import { getBookingLimitsStatus } from '@/utils/bookingLimits';
 import BookingSuccessDialog from '@/components/BookingSuccessDialog';
+import ParticipantPicker from '@/components/ParticipantPicker';
+import BookingQuoteDialog from '@/components/BookingQuoteDialog';
 import UserNav from '@/components/UserNav';
 import { cn } from '@/lib/utils';
 
@@ -24,6 +26,22 @@ const bookingTypeLabels: Record<BookingType, string> = {
   singolare: 'Singolare',
   doppio: 'Doppio',
   lezione: 'Lezione'
+};
+
+const PARTICIPANT_RANGE: Record<BookingType, { min: number; max: number }> = {
+  singolare: { min: 2, max: 2 },
+  doppio: { min: 4, max: 4 },
+  lezione: { min: 1, max: 4 },
+};
+
+// Il primo partecipante selezionato è il socio beneficiario della prenotazione
+// (finisce in booked_for_first_name/last_name/user_id). Il full_name non è mai
+// diviso in nome/cognome nel DB: si divide qui sulla prima spaziatura.
+const splitFullName = (fullName: string): { firstName: string; lastName: string } => {
+  const trimmed = fullName.trim();
+  const idx = trimmed.indexOf(' ');
+  if (idx === -1) return { firstName: trimmed, lastName: '' };
+  return { firstName: trimmed.slice(0, idx), lastName: trimmed.slice(idx + 1) };
 };
 
 const ThirdPartyBooking = () => {
@@ -35,17 +53,33 @@ const ThirdPartyBooking = () => {
   const [selectedCourtId, setSelectedCourtId] = useState<string | undefined>(undefined);
   const [allReservations, setAllReservations] = useState<Reservation[]>([]);
   const [userReservations, setUserReservations] = useState<Reservation[]>([]);
+  const [membersById, setMembersById] = useState<Record<string, string>>({});
   const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
   const [bookingType, setBookingType] = useState<BookingType>('singolare');
-  const [bookedForFirstName, setBookedForFirstName] = useState('');
-  const [bookedForLastName, setBookedForLastName] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [participants, setParticipants] = useState<BookingParticipantInput[]>([]);
+  const [coachName, setCoachName] = useState('');
   const [fetchingData, setFetchingData] = useState(true);
+  const [bookerId, setBookerId] = useState<string | null>(null);
+  const [bookerFullName, setBookerFullName] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [memberType, setMemberType] = useState<MemberType>('socio_effettivo');
+  const [showQuoteDialog, setShowQuoteDialog] = useState(false);
 
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [lastBookingData, setLastBookingData] = useState<{ reservations: Reservation[], courtName: string, bookedFor: string } | null>(null);
+  const [lastBookingData, setLastBookingData] = useState<{
+    reservations: Pick<Reservation, 'starts_at' | 'ends_at'>[],
+    courtName: string,
+    bookedFor: string,
+    quotaCents?: number,
+    paymentMode?: BookingSummary['payment_mode'],
+    movements?: BookingSummary['movements'],
+  } | null>(null);
+
+  // Si azzera quando cambia la tipologia (il numero richiesto di partecipanti cambia con essa)
+  useEffect(() => {
+    setParticipants([]);
+    setCoachName('');
+  }, [bookingType]);
 
   const today = useMemo(() => startOfDay(new Date()), []);
   const maxDate = useMemo(() => {
@@ -66,31 +100,41 @@ const ThirdPartyBooking = () => {
     setFetchingData(false);
   };
 
+  const fetchCourtsAndUserRes = async () => {
+    const { data: courtsData } = await supabase.from('courts').select('*').eq('is_active', true).order('id');
+    if (courtsData) setCourts(courtsData);
+
+    const { data: membersData } = await supabase.from('member_names').select('id, full_name');
+    if (membersData) {
+      const map: Record<string, string> = {};
+      membersData.forEach(m => { map[m.id] = m.full_name || 'Socio'; });
+      setMembersById(map);
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      setBookerId(user.id);
+      const { data: profile } = await supabase.from('profiles').select('full_name, is_admin, member_type').eq('id', user.id).single();
+      const admin = profile?.is_admin ?? false;
+      const type = (profile?.member_type as MemberType) || 'socio_effettivo';
+      setBookerFullName(profile?.full_name || 'Tu');
+      setIsAdmin(admin);
+      setMemberType(type);
+
+      // La prenotazione per conto terzi è riservata ai Soci Effettivi (gli admin sono esenti)
+      if (!admin && type !== 'socio_effettivo') {
+        showError("La prenotazione per conto terzi è riservata ai Soci Effettivi.");
+        navigate('/dashboard');
+        return;
+      }
+
+      const { data: myRes } = await supabase.from('reservations').select('*').eq('user_id', user.id).neq('status', 'cancelled');
+      setUserReservations(myRes || []);
+    }
+  };
+
   useEffect(() => {
     if (!isApproved) return;
-    const fetchCourtsAndUserRes = async () => {
-      const { data: courtsData } = await supabase.from('courts').select('*').eq('is_active', true).order('id');
-      if (courtsData) setCourts(courtsData);
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase.from('profiles').select('is_admin, member_type').eq('id', user.id).single();
-        const admin = profile?.is_admin ?? false;
-        const type = (profile?.member_type as MemberType) || 'socio_effettivo';
-        setIsAdmin(admin);
-        setMemberType(type);
-
-        // La prenotazione per conto terzi è riservata ai Soci Effettivi (gli admin sono esenti)
-        if (!admin && type !== 'socio_effettivo') {
-          showError("La prenotazione per conto terzi è riservata ai Soci Effettivi.");
-          navigate('/dashboard');
-          return;
-        }
-
-        const { data: myRes } = await supabase.from('reservations').select('*').eq('user_id', user.id).neq('status', 'cancelled');
-        setUserReservations(myRes || []);
-      }
-    };
     fetchCourtsAndUserRes();
   }, [isApproved]);
 
@@ -139,7 +183,7 @@ const ThirdPartyBooking = () => {
     if (!selectedCourtId) return;
     const courtIdNum = parseInt(selectedCourtId);
     if (!isSlotAvailable(slotTime, courtIdNum) && !selectedSlots.includes(slotTime)) return;
-    
+
     const newSelected = [...selectedSlots];
     if (newSelected.includes(slotTime)) {
       setSelectedSlots(newSelected.filter(s => s !== slotTime));
@@ -176,7 +220,27 @@ const ThirdPartyBooking = () => {
     }
   };
 
-  const handleBooking = async () => {
+  const getSelectedStarts = (): string[] => {
+    if (!date) return [];
+    return [...selectedSlots].sort().map(t => {
+      const start = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date), parseInt(t.split(':')[0])), 0), 0), 0);
+      return start.toISOString();
+    });
+  };
+
+  const requiredParticipants = PARTICIPANT_RANGE[bookingType];
+  const participantsValid = participants.length >= requiredParticipants.min && participants.length <= requiredParticipants.max;
+  const coachValid = bookingType !== 'lezione' || coachName.trim().length > 0;
+
+  // Il primo partecipante selezionato è il socio beneficiario della prenotazione
+  const beneficiary = participants[0];
+  const beneficiaryName = beneficiary
+    ? ('user_id' in beneficiary ? (membersById[beneficiary.user_id] || 'Socio') : beneficiary.guest_name)
+    : '';
+  const beneficiaryUserId = beneficiary && 'user_id' in beneficiary ? beneficiary.user_id : null;
+  const { firstName: beneficiaryFirstName, lastName: beneficiaryLastName } = splitFullName(beneficiaryName);
+
+  const openQuoteDialog = () => {
     if (!date) return;
 
     // Controllo Policy Settimanale — bypass per gli admin (come in BookingCalendar)
@@ -205,43 +269,28 @@ const ThirdPartyBooking = () => {
       }
     }
 
-    setLoading(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const sortedSlots = [...selectedSlots].sort();
-      const courtIdNum = parseInt(selectedCourtId!);
-      const courtName = courts.find(c => c.id === courtIdNum)?.name || `Campo ${courtIdNum}`;
+    setShowQuoteDialog(true);
+  };
 
-      // Cerca l'ID del beneficiario per nome (unambiguo solo se esiste un solo match)
-      const { data: matchedProfiles } = await supabase
-        .from('profiles')
-        .select('id')
-        .ilike('full_name', `${bookedForFirstName.trim()} ${bookedForLastName.trim()}`);
-      const bookedForUserId = matchedProfiles?.length === 1 ? matchedProfiles[0].id : null;
+  const handleConfirmed = (summary: BookingSummary) => {
+    const courtIdNum = parseInt(selectedCourtId!);
+    const courtName = courts.find(c => c.id === courtIdNum)?.name || `Campo ${courtIdNum}`;
 
-      const reservationsToInsert = sortedSlots.map(slotTime => {
-        let slotStart = setSeconds(setMilliseconds(setMinutes(setHours(startOfDay(date!), parseInt(slotTime.split(':')[0])), 0), 0), 0);
-        return {
-          court_id: courtIdNum, user_id: user?.id,
-          starts_at: slotStart.toISOString(), ends_at: addHours(slotStart, 1).toISOString(),
-          status: 'confirmed', booking_type: bookingType,
-          notes: `Per ${bookedForFirstName} ${bookedForLastName} (${bookingTypeLabels[bookingType]})`,
-          booked_for_first_name: bookedForFirstName, booked_for_last_name: bookedForLastName,
-          booked_for_user_id: bookedForUserId,
-        };
-      });
-
-      const { data: inserted, error } = await supabase.from('reservations').insert(reservationsToInsert).select();
-      if (error) throw error;
-      // Aggiorna userReservations localmente per il controllo limite nella stessa sessione
-      setUserReservations(prev => [...prev, ...(inserted || [])]);
-      setLastBookingData({ reservations: inserted || reservationsToInsert as any, courtName, bookedFor: `${bookedForFirstName} ${bookedForLastName}` });
-      setShowSuccessModal(true);
-      setSelectedSlots([]);
-      setBookedForFirstName('');
-      setBookedForLastName('');
-    } catch (e: any) { showError(e.message); }
-    finally { setLoading(false); }
+    setLastBookingData({
+      reservations: summary.hours.map(h => ({ starts_at: h.starts_at, ends_at: h.ends_at })),
+      courtName,
+      bookedFor: beneficiaryName,
+      quotaCents: summary.quota_cents,
+      paymentMode: summary.payment_mode,
+      movements: summary.movements,
+    });
+    setShowQuoteDialog(false);
+    setShowSuccessModal(true);
+    setSelectedSlots([]);
+    setParticipants([]);
+    setCoachName('');
+    fetchCourtsAndUserRes();
+    fetchData();
   };
 
   const getCourtAvailability = (courtId: number) => {
@@ -277,18 +326,18 @@ const ThirdPartyBooking = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-4 flex justify-center">
-              <Calendar 
-                mode="single" 
-                selected={date} 
-                onSelect={(d) => { setDate(d); setSelectedSlots([]); }} 
-                locale={it} 
-                className="rounded-3xl border-none" 
+              <Calendar
+                mode="single"
+                selected={date}
+                onSelect={(d) => { setDate(d); setSelectedSlots([]); }}
+                locale={it}
+                className="rounded-3xl border-none"
                 fromDate={today}
                 toDate={maxDate}
               />
             </CardContent>
           </Card>
-          
+
           <div className="bg-primary/5 p-8 rounded-[2rem] border border-primary/10">
             <h4 className="text-sm font-bold text-primary mb-3 flex items-center gap-2">
               <Users size={18} /> Prenotazione Libera
@@ -310,30 +359,8 @@ const ThirdPartyBooking = () => {
                 {format(date || new Date(), 'EEEE d MMMM', { locale: it })}
               </CardTitle>
             </CardHeader>
-            
-            <CardContent className="py-8 space-y-10 flex-grow">
-              <div className="space-y-6">
-                <Label className="text-xs font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Socio Beneficiario</Label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Input 
-                      placeholder="Nome" 
-                      className="h-14 rounded-2xl border-gray-100 bg-gray-50 focus:ring-primary/20 text-base font-medium px-6"
-                      value={bookedForFirstName} 
-                      onChange={e => setBookedForFirstName(e.target.value)} 
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Input 
-                      placeholder="Cognome" 
-                      className="h-14 rounded-2xl border-gray-100 bg-gray-50 focus:ring-primary/20 text-base font-medium px-6"
-                      value={bookedForLastName} 
-                      onChange={e => setBookedForLastName(e.target.value)} 
-                    />
-                  </div>
-                </div>
-              </div>
 
+            <CardContent className="py-8 space-y-10 flex-grow">
               <div className="space-y-6">
                 <Label className="text-xs font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Selezione Campo</Label>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -368,8 +395,8 @@ const ThirdPartyBooking = () => {
                           onClick={() => setBookingType(type)}
                           className={cn(
                             "px-5 py-1.5 rounded-full text-xs font-bold transition-all border-2 flex-shrink-0",
-                            bookingType === type 
-                              ? "bg-primary border-primary text-white shadow-md shadow-primary/10" 
+                            bookingType === type
+                              ? "bg-primary border-primary text-white shadow-md shadow-primary/10"
                               : "bg-white border-gray-100 text-gray-400 hover:border-primary/30 hover:text-primary"
                           )}
                         >
@@ -377,6 +404,32 @@ const ThirdPartyBooking = () => {
                         </button>
                       ))}
                     </div>
+                  </div>
+                )}
+
+                {selectedCourtId && bookerId && (
+                  <div className="pt-6 space-y-2 animate-in fade-in slide-in-from-top-2">
+                    <ParticipantPicker
+                      bookingType={bookingType}
+                      bookerId={bookerId}
+                      bookerName={bookerFullName || 'Tu'}
+                      value={participants}
+                      onChange={setParticipants}
+                    />
+                    <p className="text-[10px] text-gray-400 font-medium leading-snug px-1">
+                      Il primo socio selezionato è il <span className="font-bold text-gray-500">beneficiario</span> della prenotazione.
+                    </p>
+                    {bookingType === 'lezione' && (
+                      <div className="space-y-2 pt-2">
+                        <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Nome maestro</Label>
+                        <Input
+                          value={coachName}
+                          onChange={e => setCoachName(e.target.value)}
+                          placeholder="Nome e cognome del maestro"
+                          className="h-11 rounded-xl border-gray-100 text-sm"
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -390,7 +443,7 @@ const ThirdPartyBooking = () => {
                     </span>
                   )}
                 </div>
-                
+
                 {!selectedCourtId ? (
                   <div className="flex flex-col items-center justify-center py-16 px-6 bg-gray-50/50 rounded-[2rem] border-2 border-dashed border-gray-100 text-gray-400">
                     <MapPin className="h-8 w-8 mb-3 opacity-20" />
@@ -411,16 +464,16 @@ const ThirdPartyBooking = () => {
                       const res = getSlotReservation(t, courtIdNum);
                       const available = isSlotAvailable(t, courtIdNum);
                       const endTime = format(slotEnd, 'HH:mm');
-                      
+
                       return (
-                        <button 
-                          key={t} 
+                        <button
+                          key={t}
                           disabled={!available && !isSelected}
-                          onClick={() => available && handleSlotClick(t)} 
+                          onClick={() => available && handleSlotClick(t)}
                           className={cn(
                             "relative h-16 rounded-2xl flex flex-col items-center justify-center p-2 transition-all duration-150 border-2",
-                            isSelected ? "bg-primary border-primary text-white scale-[1.02] shadow-lg shadow-primary/10" : 
-                            available ? "bg-gray-50 border-transparent text-gray-700 hover:border-primary/20" : 
+                            isSelected ? "bg-primary border-primary text-white scale-[1.02] shadow-lg shadow-primary/10" :
+                            available ? "bg-gray-50 border-transparent text-gray-700 hover:border-primary/20" :
                             "bg-gray-100 border-transparent text-gray-300 cursor-not-allowed opacity-40"
                           )}
                         >
@@ -436,22 +489,56 @@ const ThirdPartyBooking = () => {
               </div>
 
               <div className="pt-8">
-                <Button 
-                  onClick={handleBooking} 
+                {selectedSlots.length > 0 && (!participantsValid || !coachValid) && (
+                  <p className="text-xs font-bold text-club-orange text-center pb-2">
+                    {!participantsValid
+                      ? `Seleziona ${requiredParticipants.min === requiredParticipants.max ? requiredParticipants.min : `da ${requiredParticipants.min} a ${requiredParticipants.max}`} partecipanti per continuare.`
+                      : 'Indica il nome del maestro per continuare.'}
+                  </p>
+                )}
+                <Button
+                  onClick={openQuoteDialog}
                   className={cn(
                     "w-full h-16 rounded-[1.5rem] font-black text-xl shadow-xl transition-all flex items-center justify-center gap-3",
-                    (selectedSlots.length > 0 && bookedForFirstName && bookedForLastName) ? "bg-gradient-to-br from-primary to-[#23532f] text-white hover:scale-[1.01] active:scale-[0.98] shadow-primary/20" : "bg-gray-100 text-gray-400 cursor-not-allowed shadow-none"
+                    (selectedSlots.length > 0 && participantsValid && coachValid) ? "bg-gradient-to-br from-primary to-[#23532f] text-white hover:scale-[1.01] active:scale-[0.98] shadow-primary/20" : "bg-gray-100 text-gray-400 cursor-not-allowed shadow-none"
                   )}
-                  disabled={selectedSlots.length === 0 || loading || !bookedForFirstName || !bookedForLastName}
+                  disabled={selectedSlots.length === 0 || !participantsValid || !coachValid}
                 >
-                  {loading ? <div className="w-6 h-6 border-3 border-white/20 border-t-white rounded-full animate-spin"></div> : <>Conferma Prenotazione <ChevronRight size={24} /></>}
+                  Conferma Prenotazione <ChevronRight size={24} />
                 </Button>
               </div>
             </CardContent>
           </Card>
         </div>
       </div>
-      <BookingSuccessDialog open={showSuccessModal} onOpenChange={setShowSuccessModal} reservations={lastBookingData?.reservations || null} courtName={lastBookingData?.courtName || ''} bookedFor={lastBookingData?.bookedFor} />
+      {selectedCourtId && bookerId && (
+        <BookingQuoteDialog
+          open={showQuoteDialog}
+          onOpenChange={setShowQuoteDialog}
+          courtId={parseInt(selectedCourtId)}
+          courtName={courts.find(c => c.id === parseInt(selectedCourtId))?.name || ''}
+          starts={getSelectedStarts()}
+          bookingType={bookingType}
+          participants={participants}
+          coachName={coachName}
+          bookerId={bookerId}
+          bookedForFirstName={beneficiaryFirstName}
+          bookedForLastName={beneficiaryLastName}
+          bookedForUserId={beneficiaryUserId}
+          onConfirmed={handleConfirmed}
+        />
+      )}
+      <BookingSuccessDialog
+        open={showSuccessModal}
+        onOpenChange={setShowSuccessModal}
+        reservations={lastBookingData?.reservations || null}
+        courtName={lastBookingData?.courtName || ''}
+        bookedFor={lastBookingData?.bookedFor}
+        quotaCents={lastBookingData?.quotaCents}
+        paymentMode={lastBookingData?.paymentMode}
+        movements={lastBookingData?.movements}
+        bookerId={bookerId ?? undefined}
+      />
     </div>
   );
 };

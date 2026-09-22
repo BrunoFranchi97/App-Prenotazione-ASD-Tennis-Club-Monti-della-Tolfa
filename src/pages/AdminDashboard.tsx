@@ -5,7 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CalendarPlus, Lock, BarChart2, BookOpen, ArrowLeft, CheckCircle, UserCog, ChevronRight, Trophy, GraduationCap } from 'lucide-react';
+import { CalendarPlus, Lock, BarChart2, BookOpen, ArrowLeft, CheckCircle, UserCog, ChevronRight, Trophy, GraduationCap, Wallet } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError } from '@/utils/toast';
 import { isTorneoAttivo } from '@/utils/tournament';
@@ -184,6 +184,13 @@ const AdminDashboard = () => {
       description: "Imposta date, locandina e avvisi del torneo sociale.",
       buttonText: "Configura Torneo",
       torneoBadge: torneoInCorso
+    },
+    {
+      path: "/admin/wallets",
+      title: "Portafogli Soci",
+      icon: Wallet,
+      description: "Ricariche in contanti, correzioni saldo e tariffe dei campi.",
+      buttonText: "Gestisci Portafogli"
     },
   ];
 

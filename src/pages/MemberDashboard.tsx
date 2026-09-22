@@ -11,6 +11,7 @@ import { showSuccess, showError } from '@/utils/toast';
 import { format } from 'date-fns';
 import Footer from '@/components/Footer';
 import UserNav from '@/components/UserNav';
+import WalletDashboardTile from '@/components/WalletDashboardTile';
 
 const MemberDashboard = () => {
   const navigate = useNavigate();
@@ -20,10 +21,11 @@ const MemberDashboard = () => {
   const [isSocioEffettivo, setIsSocioEffettivo] = useState(true);
   const [loading, setLoading] = useState(true);
   const [hasOpenChallenges, setHasOpenChallenges] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
-    let userId: string | null = null;
+    let localUserId: string | null = null;
 
     const fetchOpenChallenges = async (uid: string) => {
       const { count } = await supabase
@@ -39,7 +41,8 @@ const MemberDashboard = () => {
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        userId = user.id;
+        localUserId = user.id;
+        setUserId(user.id);
         const { data: profile, error } = await supabase
           .from('profiles')
           .select('full_name, is_admin, status, member_type')
@@ -67,7 +70,7 @@ const MemberDashboard = () => {
     const channel = supabase
       .channel('schema-match-requests-badge')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'match_requests' }, () => {
-        if (userId) fetchOpenChallenges(userId);
+        if (localUserId) fetchOpenChallenges(localUserId);
       })
       .subscribe();
 
@@ -205,7 +208,9 @@ const MemberDashboard = () => {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {bookingRoutes.map(item => renderCard(item, !isApproved || (item.requiresSocioEffettivo && !isAdmin && !isSocioEffettivo)))}
+          {bookingRoutes.slice(0, 2).map(item => renderCard(item, !isApproved || (item.requiresSocioEffettivo && !isAdmin && !isSocioEffettivo)))}
+          <WalletDashboardTile userId={userId} />
+          {bookingRoutes.slice(2).map(item => renderCard(item, !isApproved || (item.requiresSocioEffettivo && !isAdmin && !isSocioEffettivo)))}
           {nonBookingRoutes.map(item => renderCard(item, false))}
           
           {isAdmin && renderCard({ 

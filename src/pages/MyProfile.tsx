@@ -17,7 +17,7 @@ import type { SkillLevel } from '@/types/supabase';
 const MyProfile = () => {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -49,7 +49,7 @@ const MyProfile = () => {
         .single();
 
       if (error) throw error;
-      
+
       setProfile(data);
       setFullName(data.full_name || '');
       setPhone(data.phone || '');

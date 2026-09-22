@@ -31,6 +31,11 @@ interface BookingQuoteDialogProps {
   bookerId: string;
   bookingId?: string;
   expectedVersion?: number;
+  // Prenotazione per conto terzi: chi è il socio beneficiario (v. ThirdPartyBooking.tsx).
+  // quote_booking li ignora sempre (l'anteprima non li usa), create_booking/update_booking li scrivono.
+  bookedForFirstName?: string | null;
+  bookedForLastName?: string | null;
+  bookedForUserId?: string | null;
   onConfirmed: (summary: BookingSummary) => void;
 }
 
@@ -38,7 +43,8 @@ const formatEur = (cents: number) => `€${(Math.abs(cents) / 100).toFixed(2).re
 
 const BookingQuoteDialog: React.FC<BookingQuoteDialogProps> = ({
   open, onOpenChange, courtName, courtId, starts, bookingType, participants,
-  coachName, bookerPaysAll, bookerId, bookingId, expectedVersion, onConfirmed,
+  coachName, bookerPaysAll, bookerId, bookingId, expectedVersion,
+  bookedForFirstName, bookedForLastName, bookedForUserId, onConfirmed,
 }) => {
   const [loading, setLoading] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -87,6 +93,9 @@ const BookingQuoteDialog: React.FC<BookingQuoteDialogProps> = ({
           p_participants: participants,
           p_coach_name: coachName || null,
           p_booker_pays_all: !!bookerPaysAll,
+          p_booked_for_first_name: bookedForFirstName ?? null,
+          p_booked_for_last_name: bookedForLastName ?? null,
+          p_booked_for_user_id: bookedForUserId ?? null,
         }
       : {
           p_court_id: courtId,
@@ -95,6 +104,9 @@ const BookingQuoteDialog: React.FC<BookingQuoteDialogProps> = ({
           p_participants: participants,
           p_coach_name: coachName || null,
           p_booker_pays_all: !!bookerPaysAll,
+          p_booked_for_first_name: bookedForFirstName ?? null,
+          p_booked_for_last_name: bookedForLastName ?? null,
+          p_booked_for_user_id: bookedForUserId ?? null,
         };
     const { data, error } = await supabase.rpc(rpcName, params);
     setConfirming(false);
