@@ -12,7 +12,11 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Search, Loader2, Wallet as WalletIcon, PlusCircle, MinusCircle, History, Users, Tag } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { ArrowLeft, Search, Loader2, Wallet as WalletIcon, PlusCircle, MinusCircle, History, Users, Tag, Lightbulb, Sun, Moon, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { format, parseISO, isAfter } from 'date-fns';
@@ -22,7 +26,7 @@ import { useWallet } from '@/hooks/use-wallet';
 import { formatEur } from '@/utils/wallet';
 import WalletMovementRow from '@/components/WalletMovementRow';
 import UserNav from '@/components/UserNav';
-import type { MemberType, CourtRate } from '@/types/supabase';
+import type { MemberType, CourtRate, LightsOverride } from '@/types/supabase';
 
 interface MemberRow {
   id: string;
@@ -52,6 +56,16 @@ const AdminWallets = () => {
   const [newRateNote, setNewRateNote] = useState('');
   const [rateSubmitting, setRateSubmitting] = useState(false);
 
+  const [lightsThreshold, setLightsThreshold] = useState('30');
+  const [thresholdSaving, setThresholdSaving] = useState(false);
+  const [overrides, setOverrides] = useState<LightsOverride[]>([]);
+  const [overrideDay, setOverrideDay] = useState('');
+  const [overrideForce, setOverrideForce] = useState<'on' | 'off'>('on');
+  const [overrideReason, setOverrideReason] = useState('');
+  const [overrideSubmitting, setOverrideSubmitting] = useState(false);
+  const [overrideToRemove, setOverrideToRemove] = useState<LightsOverride | null>(null);
+  const [removingOverride, setRemovingOverride] = useState(false);
+
   useEffect(() => {
     const init = async () => {
       setLoading(true);
@@ -65,12 +79,16 @@ const AdminWallets = () => {
       }
       setIsAdmin(true);
 
-      const [{ data: membersData }, { data: ratesData }] = await Promise.all([
+      const [{ data: membersData }, { data: ratesData }, { data: settingData }, { data: overridesData }] = await Promise.all([
         supabase.from('profiles').select('id, full_name, member_type, approved').order('full_name'),
         supabase.from('court_rates').select('*').order('valid_from', { ascending: false }),
+        supabase.from('app_settings').select('value').eq('key', 'luci_soglia_minuti').single(),
+        supabase.from('lights_overrides').select('*').order('day', { ascending: true }),
       ]);
       setMembers(membersData || []);
       setRates(ratesData || []);
+      if (settingData?.value) setLightsThreshold(settingData.value);
+      setOverrides(overridesData || []);
       setLoading(false);
     };
     init();
@@ -79,6 +97,11 @@ const AdminWallets = () => {
   const fetchRates = async () => {
     const { data } = await supabase.from('court_rates').select('*').order('valid_from', { ascending: false });
     setRates(data || []);
+  };
+
+  const fetchOverrides = async () => {
+    const { data } = await supabase.from('lights_overrides').select('*').order('day', { ascending: true });
+    setOverrides(data || []);
   };
 
   const filteredMembers = members.filter(m => (m.full_name || '').toLowerCase().includes(search.toLowerCase()));
@@ -101,6 +124,44 @@ const AdminWallets = () => {
     showSuccess("Nuova tariffa registrata.");
     setNewValidFrom(''); setNewRateDay(''); setNewRateLights(''); setNewRateNote('');
     fetchRates();
+  };
+
+  const handleSaveThreshold = async () => {
+    const minutes = parseInt(lightsThreshold, 10);
+    if (!Number.isInteger(minutes) || minutes < 0) { showError("Indica un numero di minuti valido."); return; }
+    setThresholdSaving(true);
+    const { error } = await supabase.from('app_settings').update({ value: String(minutes) }).eq('key', 'luci_soglia_minuti');
+    setThresholdSaving(false);
+    if (error) { showError(error.message); return; }
+    showSuccess("Soglia luci aggiornata: vale da subito per i nuovi calcoli.");
+  };
+
+  const handleSetOverride = async () => {
+    if (!overrideDay) { showError("Scegli una data."); return; }
+    setOverrideSubmitting(true);
+    const { error } = await supabase.rpc('admin_set_lights_override', {
+      p_day: overrideDay,
+      p_force_lights: overrideForce === 'on',
+      p_reason: overrideReason.trim() || null,
+    });
+    setOverrideSubmitting(false);
+    if (error) { showError(error.message); return; }
+    showSuccess("Override luci salvato per quel giorno.");
+    setOverrideDay(''); setOverrideReason(''); setOverrideForce('on');
+    fetchOverrides();
+  };
+
+  const handleRemoveOverride = async () => {
+    if (!overrideToRemove) return;
+    setRemovingOverride(true);
+    const { error } = await supabase.rpc('admin_set_lights_override', {
+      p_day: overrideToRemove.day, p_force_lights: null, p_reason: null,
+    });
+    setRemovingOverride(false);
+    if (error) { showError(error.message); return; }
+    showSuccess("Override rimosso: quel giorno torna al calcolo automatico.");
+    setOverrideToRemove(null);
+    fetchOverrides();
   };
 
   if (loading) {
@@ -131,12 +192,15 @@ const AdminWallets = () => {
       </header>
 
       <Tabs defaultValue="soci" className="max-w-7xl mx-auto w-full">
-        <TabsList className="bg-white/50 p-1.5 rounded-[1.5rem] border border-gray-100 shadow-sm mb-10 grid grid-cols-2 max-w-md h-auto">
+        <TabsList className="bg-white/50 p-1.5 rounded-[1.5rem] border border-gray-100 shadow-sm mb-10 grid grid-cols-3 max-w-xl h-auto">
           <TabsTrigger value="soci" className="rounded-2xl py-3 font-bold text-sm data-[state=active]:bg-club-orange data-[state=active]:text-white">
             <Users size={16} className="mr-2" /> Soci
           </TabsTrigger>
           <TabsTrigger value="tariffe" className="rounded-2xl py-3 font-bold text-sm data-[state=active]:bg-club-orange data-[state=active]:text-white">
             <Tag size={16} className="mr-2" /> Tariffe
+          </TabsTrigger>
+          <TabsTrigger value="luci" className="rounded-2xl py-3 font-bold text-sm data-[state=active]:bg-club-orange data-[state=active]:text-white">
+            <Lightbulb size={16} className="mr-2" /> Luci
           </TabsTrigger>
         </TabsList>
 
@@ -346,6 +410,157 @@ const AdminWallets = () => {
             </div>
           </div>
         </TabsContent>
+
+        <TabsContent value="luci" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <div className="lg:col-span-7 space-y-6">
+              <Card className="border-none shadow-[0_2px_12px_rgba(0,0,0,0.04)] rounded-[2rem] bg-primary/5 border border-primary/10">
+                <CardContent className="p-8 space-y-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0">
+                      <Sun className="h-7 w-7 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black text-primary/70 uppercase tracking-widest mb-1">Come funziona il calcolo automatico</p>
+                      <p className="text-sm text-gray-700 font-medium leading-relaxed">
+                        Un'ora di gioco paga la tariffa "con luci" quando finisce più tardi del tramonto
+                        di quel giorno, oltre un margine di tolleranza. Il tramonto è calcolato ogni volta
+                        per Tolfa nel fuso orario italiano, quindi la soglia si sposta da sola con le stagioni.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-end gap-3 pt-2">
+                    <div className="space-y-2 flex-1">
+                      <Label className="text-xs font-black text-primary/70 uppercase tracking-widest ml-1">Margine di tolleranza (minuti dopo il tramonto)</Label>
+                      <Input
+                        value={lightsThreshold}
+                        onChange={e => setLightsThreshold(e.target.value)}
+                        inputMode="numeric"
+                        placeholder="30"
+                        className="h-12 rounded-xl border-primary/20 bg-white text-sm"
+                      />
+                    </div>
+                    <Button
+                      onClick={handleSaveThreshold}
+                      disabled={thresholdSaving}
+                      className="h-12 rounded-xl font-bold bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/10 shrink-0"
+                    >
+                      {thresholdSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Salva'}
+                    </Button>
+                  </div>
+                  <p className="text-[10px] text-primary/60 font-medium leading-snug px-1">
+                    Vale da subito per tutti i giorni senza un override manuale sotto. Le prenotazioni già
+                    fatte mantengono il prezzo pagato: cambia solo il calcolo per le prenotazioni future.
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="border-none shadow-[0_2px_12px_rgba(0,0,0,0.04)] rounded-[2rem] bg-white">
+                <CardHeader className="px-8 pt-8 pb-4">
+                  <CardTitle className="text-lg font-extrabold text-gray-900">Override Impostati</CardTitle>
+                </CardHeader>
+                <CardContent className="px-8 pb-8">
+                  {overrides.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-10 px-6 bg-gray-50/50 rounded-2xl border-2 border-dashed border-gray-100 text-gray-400">
+                      <Lightbulb className="h-8 w-8 mb-2 opacity-20" />
+                      <p className="text-xs font-bold uppercase tracking-widest text-center">Nessun override: vale ovunque il calcolo automatico</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {overrides.map(o => (
+                        <div key={o.day} className="flex justify-between items-center px-4 py-3 rounded-xl bg-gray-50/50 gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className={cn(
+                              "w-9 h-9 rounded-xl flex items-center justify-center shrink-0",
+                              o.force_lights ? "bg-club-orange/10 text-club-orange" : "bg-gray-200 text-gray-500"
+                            )}>
+                              {o.force_lights ? <Sun size={16} /> : <Moon size={16} />}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold text-gray-700 truncate">
+                                {format(parseISO(o.day), "d MMMM yyyy", { locale: it })}
+                                <span className={cn("ml-2 text-[10px] font-black uppercase tracking-widest", o.force_lights ? "text-club-orange" : "text-gray-400")}>
+                                  {o.force_lights ? 'Sempre luci' : 'Mai luci'}
+                                </span>
+                              </p>
+                              {o.reason && <p className="text-[10px] text-gray-400 font-medium truncate">{o.reason}</p>}
+                            </div>
+                          </div>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-9 w-9 rounded-lg text-gray-400 hover:text-destructive hover:bg-destructive/10 shrink-0"
+                            onClick={() => setOverrideToRemove(o)}
+                          >
+                            <Trash2 size={16} />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="lg:col-span-5">
+              <Card className="border-none shadow-[0_2px_12px_rgba(0,0,0,0.04)] rounded-[2rem] bg-white">
+                <CardHeader className="px-8 pt-8 pb-4">
+                  <CardTitle className="text-lg font-extrabold text-gray-900">Forza un Giorno Specifico</CardTitle>
+                </CardHeader>
+                <CardContent className="px-8 pb-8 space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Data</Label>
+                    <Input
+                      type="date"
+                      value={overrideDay}
+                      onChange={e => setOverrideDay(e.target.value)}
+                      className="h-12 rounded-xl border-gray-100 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Calcolo per quel giorno</Label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setOverrideForce('on')}
+                        className={cn("flex-1 h-11 rounded-xl text-sm font-bold border-2 transition-all flex items-center justify-center gap-2", overrideForce === 'on' ? "bg-club-orange border-club-orange text-white" : "bg-white border-gray-100 text-gray-400 hover:border-club-orange/30")}
+                      >
+                        <Sun size={16} /> Sempre luci
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setOverrideForce('off')}
+                        className={cn("flex-1 h-11 rounded-xl text-sm font-bold border-2 transition-all flex items-center justify-center gap-2", overrideForce === 'off' ? "bg-gray-700 border-gray-700 text-white" : "bg-white border-gray-100 text-gray-400 hover:border-gray-300")}
+                      >
+                        <Moon size={16} /> Mai luci
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Motivo (opzionale)</Label>
+                    <Textarea
+                      value={overrideReason}
+                      onChange={e => setOverrideReason(e.target.value)}
+                      placeholder="Es: torneo serale, evento sociale..."
+                      className="rounded-xl border-gray-100 text-sm min-h-[80px]"
+                    />
+                  </div>
+                  <Button
+                    onClick={handleSetOverride}
+                    disabled={overrideSubmitting}
+                    className="w-full h-12 rounded-xl font-bold bg-gradient-to-br from-primary to-[#23532f] text-white shadow-lg shadow-primary/10"
+                  >
+                    {overrideSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Salva Override'}
+                  </Button>
+                  <p className="text-[10px] text-gray-400 font-medium leading-snug px-1">
+                    Sostituisce il calcolo automatico solo per questa data. Impostarne uno nuovo sulla
+                    stessa data sovrascrive quello precedente.
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
       </Tabs>
 
       {selectedMember && (
@@ -364,6 +579,31 @@ const AdminWallets = () => {
           }}
         />
       )}
+
+      <AlertDialog open={!!overrideToRemove} onOpenChange={(open) => { if (!open && !removingOverride) setOverrideToRemove(null); }}>
+        <AlertDialogContent className="rounded-[2rem] border-none shadow-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-center text-xl font-black">Rimuovi override luci</AlertDialogTitle>
+            <AlertDialogDescription className="text-center text-gray-500">
+              {overrideToRemove && (
+                <>Il {format(parseISO(overrideToRemove.day), "d MMMM yyyy", { locale: it })} tornerà al calcolo automatico basato sul tramonto.</>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-3">
+            <AlertDialogCancel className="h-12 flex-1 rounded-2xl font-bold" disabled={removingOverride}>
+              Annulla
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleRemoveOverride}
+              disabled={removingOverride}
+              className="h-12 flex-1 rounded-2xl font-bold bg-destructive hover:bg-destructive/90"
+            >
+              {removingOverride ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Rimuovi'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {selectedMember && (
         <AdjustBalanceDialog

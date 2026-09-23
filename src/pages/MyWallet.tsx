@@ -47,14 +47,27 @@ const MyWallet = () => {
   // sola non appena il saldo cambia (payment-webhook ha accreditato).
   useEffect(() => {
     if (!userId || !ricaricaPending) return;
+    const clearPending = () => {
+      setRicaricaPending(false);
+      showSuccess("Ricarica completata! Saldo aggiornato.");
+      setSearchParams(prev => { const next = new URLSearchParams(prev); next.delete('ricarica'); next.delete('topup'); return next; }, { replace: true });
+    };
+
     const channel = supabase
       .channel(`wallet-confirm-${userId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'wallets', filter: `user_id=eq.${userId}` }, () => {
-        setRicaricaPending(false);
-        showSuccess("Ricarica completata! Saldo aggiornato.");
-        setSearchParams(prev => { const next = new URLSearchParams(prev); next.delete('ricarica'); next.delete('topup'); return next; }, { replace: true });
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'wallets', filter: `user_id=eq.${userId}` }, clearPending)
       .subscribe();
+
+    // Controllo immediato: se il webhook ha già accreditato prima che questo canale si
+    // collegasse (finestra tipica tra redirect e sottoscrizione Realtime), l'evento non
+    // arriverebbe mai. Un solo controllo all'avvio, non polling.
+    const topupId = searchParams.get('topup');
+    if (topupId) {
+      supabase.from('wallet_topups').select('status').eq('id', topupId).maybeSingle().then(({ data }) => {
+        if (data && data.status !== 'pending') clearPending();
+      });
+    }
+
     return () => { supabase.removeChannel(channel); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, ricaricaPending]);

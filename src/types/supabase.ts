@@ -170,6 +170,14 @@ export interface CourtRate {
   created_at: string;
 }
 
+export interface LightsOverride {
+  day: string;
+  force_lights: boolean;
+  reason?: string | null;
+  created_by?: string | null;
+  created_at: string;
+}
+
 export interface Booking {
   id: string;
   booker_id: string;

@@ -190,7 +190,7 @@ const BookingQuoteDialog: React.FC<BookingQuoteDialogProps> = ({
 
             {hasCharge && (
               <div className="space-y-2">
-                <WalletMovementsSummary movements={movements} bookerId={bookerId} mode="preview" />
+                <WalletMovementsSummary movements={movements} bookerId={bookerId} mode="preview" hours={quote.hours} />
                 <div className="flex justify-between items-center px-4 pt-1">
                   <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Saldo dopo l'operazione</span>
                   <span className="text-sm font-bold text-gray-600">

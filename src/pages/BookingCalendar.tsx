@@ -67,6 +67,7 @@ const BookingCalendar = () => {
     quotaCents?: number,
     paymentMode?: BookingSummary['payment_mode'],
     movements?: BookingSummary['movements'],
+    hours?: BookingSummary['hours'],
   } | null>(null);
 
   // Il prenotante è sempre incluso; si azzera quando cambia la tipologia (il numero
@@ -304,6 +305,7 @@ const BookingCalendar = () => {
       quotaCents: summary.quota_cents,
       paymentMode: summary.payment_mode,
       movements: summary.movements,
+      hours: summary.hours,
     });
     setShowQuoteDialog(false);
     setShowSuccessModal(true);
@@ -588,6 +590,7 @@ const BookingCalendar = () => {
         quotaCents={lastBookingData?.quotaCents}
         paymentMode={lastBookingData?.paymentMode}
         movements={lastBookingData?.movements}
+        hours={lastBookingData?.hours}
         bookerId={bookerId ?? undefined}
       />
     </div>

@@ -27,6 +27,7 @@ interface BookingSuccessDialogProps {
   quotaCents?: number;
   paymentMode?: PaymentMode;
   movements?: BookingSummary['movements'];
+  hours?: BookingSummary['hours'];
   bookerId?: string;
 }
 
@@ -40,6 +41,7 @@ const BookingSuccessDialog: React.FC<BookingSuccessDialogProps> = ({
   quotaCents,
   paymentMode,
   movements,
+  hours,
   bookerId,
 }) => {
   const navigate = useNavigate();
@@ -117,7 +119,7 @@ const BookingSuccessDialog: React.FC<BookingSuccessDialogProps> = ({
         {paymentMode === 'wallet' && !!quotaCents && quotaCents > 0 && movements && movements.length > 0 && bookerId && (
           <div className="space-y-2">
             <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em] px-1">Riepilogo pagamenti</p>
-            <WalletMovementsSummary movements={movements} bookerId={bookerId} mode="confirmed" />
+            <WalletMovementsSummary movements={movements} bookerId={bookerId} mode="confirmed" hours={hours} />
           </div>
         )}
 

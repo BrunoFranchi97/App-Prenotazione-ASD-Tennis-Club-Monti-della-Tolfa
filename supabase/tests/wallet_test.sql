@@ -454,6 +454,88 @@ BEGIN
 END;
 
 -- ---------------------------------------------------------------------------
+-- Conto terzi: booked_for_* tramite create_booking/update_booking (T-CT)
+-- ---------------------------------------------------------------------------
+DECLARE
+  v_court integer := (SELECT v::integer FROM wallet_test.ids WHERE k = 'court');
+  v_day date := (SELECT v::date FROM wallet_test.ids WHERE k = 'day') + 5;
+  A uuid := '00000000-0000-4000-8000-00000000000a'; -- prenotante, mai tra i partecipanti
+  B uuid := '00000000-0000-4000-8000-00000000000b';
+  D uuid := '00000000-0000-4000-8000-00000000000d';
+  v_res jsonb;
+  v_a integer;
+  v_d integer;
+  v_version integer;
+BEGIN
+  PERFORM wallet_test.as_user('00000000-0000-4000-8000-0000000000ad');
+  PERFORM public.admin_wallet_topup_cash(D, 1000, 'test conto terzi');
+  PERFORM public.admin_wallet_topup_cash(B, 1000, 'test conto terzi');
+  PERFORM wallet_test.as_user(A);
+
+  -- T-CT1: A prenota per conto terzi (D beneficiario ufficiale), senza comparire tra i partecipanti
+  v_a := wallet_test.bal(A); v_d := wallet_test.bal(D);
+  v_res := public.create_booking(v_court, ARRAY[wallet_test.at(v_day, 10)], 'singolare',
+    jsonb_build_array(jsonb_build_object('user_id', D), jsonb_build_object('user_id', B)),
+    NULL, false, NULL, 'Mario', 'Rossi', D);
+  INSERT INTO wallet_test.ids VALUES ('ct_booking', v_res ->> 'booking_id');
+  PERFORM wallet_test.check(wallet_test.bal(A) = v_a, 'T-CT1 conto terzi: A (prenotante, non partecipante) non paga nulla di suo');
+  PERFORM wallet_test.check(wallet_test.bal(D) = v_d - 300, 'T-CT1 conto terzi: D (beneficiario e partecipante) paga la propria quota');
+  PERFORM wallet_test.check((SELECT bool_and(user_id = A AND booked_for_first_name = 'Mario'
+      AND booked_for_last_name = 'Rossi' AND booked_for_user_id = D)
+    FROM public.reservations WHERE booking_id = (v_res ->> 'booking_id')::uuid),
+    'T-CT1 riga: intestata al prenotante A, beneficiario D salvato in booked_for_*');
+
+  -- T-CT2: D senza credito → il prenotante A copre comunque, pur non essendo tra i partecipanti (D7)
+  PERFORM wallet_test.as_user('00000000-0000-4000-8000-0000000000ad');
+  PERFORM public.admin_wallet_adjust(D, -wallet_test.bal(D), 'test: azzera saldo D');
+  PERFORM wallet_test.as_user(A);
+  v_a := wallet_test.bal(A);
+  v_res := public.create_booking(v_court, ARRAY[wallet_test.at(v_day, 11)], 'singolare',
+    jsonb_build_array(jsonb_build_object('user_id', D), jsonb_build_object('user_id', B)),
+    NULL, false, NULL, 'Mario', 'Rossi', D);
+  PERFORM wallet_test.check(wallet_test.bal(A) = v_a - 300,
+    'T-CT2 conto terzi: D senza credito, A (prenotante non partecipante) copre la sua quota');
+  PERFORM wallet_test.check((SELECT count(*) FROM public.wallet_ledger WHERE booking_id = (v_res ->> 'booking_id')::uuid
+      AND kind = 'booking_cover' AND covers_user_id = D AND amount_cents = -300) = 1,
+    'T-CT2 movimento di copertura registrato a carico di A per D');
+
+  -- T-CT3: modifica di una prenotazione conto terzi aggiorna il beneficiario salvato
+  SELECT version INTO v_version FROM public.bookings WHERE id = (SELECT v::uuid FROM wallet_test.ids WHERE k = 'ct_booking');
+  v_res := public.update_booking((SELECT v::uuid FROM wallet_test.ids WHERE k = 'ct_booking'), v_version,
+    ARRAY[wallet_test.at(v_day, 10)], 'singolare',
+    jsonb_build_array(jsonb_build_object('user_id', B), jsonb_build_object('user_id', D)),
+    NULL, false, NULL, 'Luca', 'Bianchi', B);
+  PERFORM wallet_test.check((SELECT bool_and(booked_for_first_name = 'Luca' AND booked_for_last_name = 'Bianchi' AND booked_for_user_id = B)
+    FROM public.reservations WHERE booking_id = (SELECT v::uuid FROM wallet_test.ids WHERE k = 'ct_booking') AND status <> 'cancelled'),
+    'T-CT3 modifica conto terzi: beneficiario aggiornato da D a B');
+END;
+
+-- ---------------------------------------------------------------------------
+-- Tariffe campo, storicizzate (admin_set_court_rate) — T-TR
+-- ---------------------------------------------------------------------------
+DECLARE
+  ADM uuid := '00000000-0000-4000-8000-0000000000ad';
+  A uuid := '00000000-0000-4000-8000-00000000000a';
+  v_rates_before integer;
+  v_id uuid;
+BEGIN
+  SELECT count(*) INTO v_rates_before FROM public.court_rates;
+  PERFORM wallet_test.as_user(ADM);
+  PERFORM wallet_test.expect_error($q$SELECT public.admin_set_court_rate(now() - interval '1 day', 300, 500, 'nota')$q$,
+    'TARIFFE', 'T-TR1 tariffa con decorrenza nel passato rifiutata');
+  PERFORM wallet_test.expect_error($q$SELECT public.admin_set_court_rate(now() + interval '1 day', -100, 500, 'nota')$q$,
+    'TARIFFE', 'T-TR2 tariffa con importo giornaliero negativo rifiutata');
+  v_id := public.admin_set_court_rate(now() + interval '1 day', 350, 600, 'nuova tariffa test');
+  PERFORM wallet_test.check((SELECT count(*) FROM public.court_rates) = v_rates_before + 1,
+    'T-TR3 nuova tariffa inserita come riga aggiuntiva (mai UPDATE su quelle esistenti)');
+  PERFORM wallet_test.check((SELECT rate_day_cents = 350 AND rate_lights_cents = 600 FROM public.court_rates WHERE id = v_id),
+    'T-TR3 valori tariffa salvati correttamente');
+  PERFORM wallet_test.as_user(A);
+  PERFORM wallet_test.expect_error($q$SELECT public.admin_set_court_rate(now() + interval '2 days', 300, 500, 'nota')$q$,
+    'NON_AUTORIZZATO', 'T-TR4 socio non può creare una tariffa');
+END;
+
+-- ---------------------------------------------------------------------------
 -- Pagamenti spenti (T36)
 -- ---------------------------------------------------------------------------
 DECLARE

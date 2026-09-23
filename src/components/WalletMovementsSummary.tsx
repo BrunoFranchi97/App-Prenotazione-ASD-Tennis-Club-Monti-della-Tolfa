@@ -1,7 +1,8 @@
 "use client";
 
 import React from 'react';
-import { AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Lightbulb } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
 import { BookingSummary } from '@/types/supabase';
 import { cn } from '@/lib/utils';
 
@@ -12,12 +13,16 @@ interface WalletMovementsSummaryProps {
    *  'confirmed' = dopo la scrittura riuscita: stesso specchietto ma con toni affermativi
    *  ("hai pagato", "ha pagato"), per rassicurare chi controlla che i conti tornino. */
   mode: 'preview' | 'confirmed';
+  /** Se presente e almeno un'ora ha le luci, mostra il dettaglio orario prima della
+   *  scomposizione per persona: spiega perché il totale è più alto (tariffa con luci). */
+  hours?: BookingSummary['hours'];
   className?: string;
 }
 
 const formatEur = (cents: number) => `€${(Math.abs(cents) / 100).toFixed(2).replace('.', ',')}`;
 
-const WalletMovementsSummary: React.FC<WalletMovementsSummaryProps> = ({ movements, bookerId, mode, className }) => {
+const WalletMovementsSummary: React.FC<WalletMovementsSummaryProps> = ({ movements, bookerId, mode, hours, className }) => {
+  const hasLights = !!hours?.some(h => h.lights);
   // Scomposizione (vedi anche wallet_settle_booking):
   // - 'booking_charge' del prenotante = sua quota, comprende ospiti/segnaposto (non hanno un saldo proprio)
   // - 'booking_cover' = quota di un socio reale che il prenotante sta coprendo (D7)
@@ -39,6 +44,26 @@ const WalletMovementsSummary: React.FC<WalletMovementsSummaryProps> = ({ movemen
 
   return (
     <div className={cn('space-y-2', className)}>
+      {hasLights && (
+        <div className="space-y-1 px-1 pb-1">
+          <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Dettaglio orario</p>
+          {hours!.map(h => (
+            <div key={h.reservation_id} className="flex justify-between items-center text-xs">
+              <span className="text-gray-500 font-medium">
+                {format(parseISO(h.starts_at), 'HH:mm')}–{format(parseISO(h.ends_at), 'HH:mm')}
+              </span>
+              <span className="font-semibold text-gray-600 flex items-center gap-1">
+                {formatEur(h.unit_price_cents ?? 0)}
+                {h.lights && (
+                  <span className="inline-flex items-center gap-0.5 text-club-orange font-bold">
+                    <Lightbulb className="h-3 w-3" /> con luci
+                  </span>
+                )}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
       {ownCharge && (
         <div className={cn(
           'flex justify-between items-center rounded-xl px-4 py-3',

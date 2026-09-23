@@ -41,6 +41,7 @@ const MatchBooking = () => {
     quotaCents?: number,
     paymentMode?: BookingSummary['payment_mode'],
     movements?: BookingSummary['movements'],
+    hours?: BookingSummary['hours'],
   } | null>(null);
 
   const bookingType = matchRequest?.match_type as BookingType | undefined;
@@ -138,6 +139,7 @@ const MatchBooking = () => {
       quotaCents: summary.quota_cents,
       paymentMode: summary.payment_mode,
       movements: summary.movements,
+      hours: summary.hours,
     });
     setShowQuoteDialog(false);
     setShowSuccessModal(true);
@@ -255,6 +257,7 @@ const MatchBooking = () => {
         quotaCents={lastBookingData?.quotaCents}
         paymentMode={lastBookingData?.paymentMode}
         movements={lastBookingData?.movements}
+        hours={lastBookingData?.hours}
         bookerId={bookerId ?? undefined}
       />
     </div>
