@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { format, parseISO, addDays, subDays, startOfDay, endOfDay, isSameDay, setHours, setMinutes, addHours, differenceInMinutes } from "date-fns";
 import { it } from "date-fns/locale";
@@ -133,6 +133,7 @@ export default function AdminReservations() {
   const [profiles, setProfiles] = useState<ProfileLite[]>([]);
   const [reservations, setReservations] = useState<ReservationRow[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string>("");
+  const latestRequest = useRef(0);
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [visibleCourts, setVisibleCourts] = useState<number[]>([]);
@@ -152,6 +153,8 @@ export default function AdminReservations() {
   const [formNotes, setFormNotes] = useState("");
 
   const refreshAll = async () => {
+    // Cambiando giorno velocemente le risposte possono arrivare fuori ordine: vale solo l'ultima richiesta
+    const requestId = ++latestRequest.current;
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -167,6 +170,7 @@ export default function AdminReservations() {
         supabase.from("profiles").select("id, full_name").order("full_name"),
         supabase.from("reservations").select("*").gte("starts_at", startOfDay(selectedDate).toISOString()).lte("ends_at", endOfDay(selectedDate).toISOString()).neq("status", "cancelled")
       ]);
+      if (requestId !== latestRequest.current) return;
 
       const profileMap = new Map(profilesData.data?.map(p => [p.id, p.full_name || "Socio"]) || []);
       const courtMap = new Map(courtsData.data?.map(c => [c.id, c]) || []);
@@ -187,7 +191,7 @@ export default function AdminReservations() {
     } catch (err: any) {
       showError("Errore nel caricamento: " + err.message);
     } finally {
-      setLoading(false);
+      if (requestId === latestRequest.current) setLoading(false);
     }
   };
 

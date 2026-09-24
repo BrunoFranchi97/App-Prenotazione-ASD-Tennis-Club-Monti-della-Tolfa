@@ -23,3 +23,8 @@ dist-ssr
 *.sln
 *.sw?
 .dyad/
+
+# Test automatici (Playwright): sessioni salvate e report
+e2e/.auth/
+test-results/
+playwright-report/

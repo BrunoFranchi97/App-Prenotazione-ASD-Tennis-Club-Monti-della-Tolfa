@@ -130,7 +130,10 @@ const BookingHistory = () => {
       const date = parseISO(res.starts_at);
       const dateKey = format(date, 'yyyy-MM-dd');
       const isRecipientOnly = res.user_id !== currentUserId;
-      const groupKey = `${dateKey}_${res.court_id}_${res.user_id}_${res.booked_for_first_name || 'self'}`;
+      // Stato e booking_id nella chiave: una prenotazione annullata e una nuova sullo
+      // stesso campo e giorno restano gruppi distinti (altrimenti la nuova ereditava lo
+      // stato "annullata", spariva dall'elenco e il cestino annullava quella vecchia).
+      const groupKey = `${dateKey}_${res.court_id}_${res.user_id}_${res.booked_for_first_name || 'self'}_${res.booking_id || 'legacy'}_${res.status}`;
 
       if (!grouped.has(groupKey)) {
         const court = courtMap.get(res.court_id);

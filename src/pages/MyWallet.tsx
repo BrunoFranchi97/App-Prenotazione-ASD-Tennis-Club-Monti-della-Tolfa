@@ -22,6 +22,8 @@ const MyWallet = () => {
   const [checkingSession, setCheckingSession] = useState(true);
   // ?importo=<centesimi>: arriva dal bottone "Ricarica €X" del riepilogo prenotazione
   // quando manca credito — precompila l'importo mancante, il socio può cambiarlo.
+  // Il parametro resta nell'indirizzo: AuthLayout smonta e rimonta la pagina a ogni evento
+  // di sessione, e se lo togliessimo l'importo sparirebbe al rimontaggio.
   const [customAmount, setCustomAmount] = useState(() => {
     const cents = parseInt(searchParams.get('importo') || '', 10);
     return cents > 0 ? (cents / 100).toFixed(2).replace('.', ',') : '';
@@ -46,9 +48,6 @@ const MyWallet = () => {
     if (searchParams.get('ricarica') === 'annullata') {
       showError("Ricarica annullata.");
       setSearchParams(prev => { const next = new URLSearchParams(prev); next.delete('ricarica'); return next; }, { replace: true });
-    }
-    if (searchParams.get('importo')) {
-      setSearchParams(prev => { const next = new URLSearchParams(prev); next.delete('importo'); return next; }, { replace: true });
     }
   }, []);
 
