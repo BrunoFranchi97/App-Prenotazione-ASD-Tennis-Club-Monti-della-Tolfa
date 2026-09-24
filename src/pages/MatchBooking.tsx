@@ -247,6 +247,7 @@ const MatchBooking = () => {
           bookedForLastName={opponentLastName}
           bookedForUserId={matchRequest.user_id}
           onConfirmed={handleConfirmed}
+          returnTo={{ path: '/find-match', label: 'Torna alle sfide' }}
         />
       )}
       <BookingSuccessDialog

@@ -18,6 +18,7 @@ import UserNav from '@/components/UserNav';
 import { Input } from "@/components/ui/input";
 import ParticipantPicker from '@/components/ParticipantPicker';
 import BookingQuoteDialog from '@/components/BookingQuoteDialog';
+import { formatEur } from '@/utils/wallet';
 
 interface ReservationGroup {
   id: string;
@@ -247,8 +248,13 @@ const EditBookingGroup = () => {
     });
   };
 
-  const handleConfirmedUpdate = (_summary: BookingSummary) => {
-    showSuccess("Prenotazione aggiornata con successo!");
+  const handleConfirmedUpdate = (summary: BookingSummary) => {
+    const bookerNet = (summary.movements || [])
+      .filter(m => m.user_id === walletBooking?.booker_id)
+      .reduce((s, m) => s + m.amount_cents, 0);
+    showSuccess(bookerNet > 0
+      ? `Prenotazione aggiornata: ${formatEur(bookerNet)} rimborsati sul tuo saldo.`
+      : "Prenotazione aggiornata con successo!");
     setShowQuoteDialog(false);
     navigate('/history');
   };
@@ -510,6 +516,7 @@ const EditBookingGroup = () => {
           bookingId={walletBooking.id}
           expectedVersion={walletBooking.version}
           onConfirmed={handleConfirmedUpdate}
+          returnTo={{ path: '/history', label: 'Torna ai miei campi' }}
         />
       )}
     </div>

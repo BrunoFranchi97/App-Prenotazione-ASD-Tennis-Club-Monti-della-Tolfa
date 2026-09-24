@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { AlertTriangle, CheckCircle2, Lightbulb } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Lightbulb, Undo2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { BookingSummary } from '@/types/supabase';
 import { cn } from '@/lib/utils';
@@ -100,10 +100,22 @@ const WalletMovementsSummary: React.FC<WalletMovementsSummaryProps> = ({ movemen
           <span className="text-sm font-black text-green-800 shrink-0">{formatEur(m.amount_cents)}</span>
         </div>
       ))}
+      {refundLines.length > 0 && (
+        <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 px-1 pt-1">Rimborsi</p>
+      )}
       {refundLines.map((m, i) => (
-        <div key={`refund-${i}`} className="flex justify-between items-center bg-green-50 rounded-xl px-4 py-3">
-          <span className="text-xs font-bold text-green-800">Rimborso a {m.full_name}</span>
-          <span className="text-sm font-black text-green-800">{formatEur(m.amount_cents)}</span>
+        // Stile volutamente diverso dalle righe "ha pagato" (sfondo verde pieno): bordo e
+        // segno "+" dicono a colpo d'occhio che qui i soldi TORNANO sul saldo.
+        <div key={`refund-${i}`} className="flex justify-between items-center bg-white border-2 border-primary/15 rounded-xl px-4 py-3">
+          <span className="text-xs font-bold text-primary flex items-center gap-1.5">
+            <Undo2 className="h-3.5 w-3.5 shrink-0" />
+            {m.covers_full_name
+              ? <>{confirmed ? 'Ti è tornata' : 'Ti torna'} la quota che avevi coperto per {m.covers_full_name}</>
+              : m.user_id === bookerId
+                ? (confirmed ? 'Rimborsato sul tuo saldo' : 'Rimborso sul tuo saldo')
+                : <>{confirmed ? 'Rimborsato a' : 'Rimborso a'} {m.full_name}</>}
+          </span>
+          <span className="text-sm font-black text-primary shrink-0">+{formatEur(m.amount_cents)}</span>
         </div>
       ))}
       {totalCents > 0 && (

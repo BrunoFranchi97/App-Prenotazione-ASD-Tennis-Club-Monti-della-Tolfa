@@ -6,10 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Loader2, Wallet as WalletIcon, History } from 'lucide-react';
+import { ArrowLeft, Loader2, Wallet as WalletIcon, History, ChevronRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
-import { formatEur, startWalletTopup, walletBalanceColor } from '@/utils/wallet';
+import { formatEur, startWalletTopup, walletBalanceColor, getWalletReturnTarget, clearWalletReturnTarget, type WalletReturnTarget } from '@/utils/wallet';
 import { useWallet } from '@/hooks/use-wallet';
 import WalletMovementRow from '@/components/WalletMovementRow';
 import UserNav from '@/components/UserNav';
@@ -20,7 +20,13 @@ const MyWallet = () => {
 
   const [userId, setUserId] = useState<string | null>(null);
   const [checkingSession, setCheckingSession] = useState(true);
-  const [customAmount, setCustomAmount] = useState('');
+  // ?importo=<centesimi>: arriva dal bottone "Ricarica €X" del riepilogo prenotazione
+  // quando manca credito — precompila l'importo mancante, il socio può cambiarlo.
+  const [customAmount, setCustomAmount] = useState(() => {
+    const cents = parseInt(searchParams.get('importo') || '', 10);
+    return cents > 0 ? (cents / 100).toFixed(2).replace('.', ',') : '';
+  });
+  const [returnTarget, setReturnTarget] = useState<WalletReturnTarget | null>(() => getWalletReturnTarget());
   const [topupSubmitting, setTopupSubmitting] = useState(false);
   // true se si torna dal checkout con ?ricarica=in-corso: sparisce da sola non appena la
   // Realtime subscription dedicata (sotto) segnala l'accredito fatto da payment-webhook.
@@ -41,7 +47,21 @@ const MyWallet = () => {
       showError("Ricarica annullata.");
       setSearchParams(prev => { const next = new URLSearchParams(prev); next.delete('ricarica'); return next; }, { replace: true });
     }
+    if (searchParams.get('importo')) {
+      setSearchParams(prev => { const next = new URLSearchParams(prev); next.delete('importo'); return next; }, { replace: true });
+    }
   }, []);
+
+  const handleReturn = () => {
+    if (!returnTarget) return;
+    clearWalletReturnTarget();
+    navigate(returnTarget.path);
+  };
+
+  const handleDismissReturn = () => {
+    clearWalletReturnTarget();
+    setReturnTarget(null);
+  };
 
   // Conferma visiva della ricarica: attiva solo mentre ricaricaPending è true, si smonta da
   // sola non appena il saldo cambia (payment-webhook ha accreditato).
@@ -119,6 +139,22 @@ const MyWallet = () => {
           <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4">
             <Loader2 className="h-4 w-4 text-amber-600 animate-spin shrink-0" />
             <p className="text-sm font-medium text-amber-800">Pagamento in verifica: il saldo si aggiornerà automaticamente non appena confermato.</p>
+          </div>
+        )}
+
+        {/* Mostrato solo a ricarica chiusa (o annullata), così non si torna a prenotare
+            prima che il credito sia arrivato. */}
+        {returnTarget && !ricaricaPending && (
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 bg-primary/5 border border-primary/10 rounded-2xl px-5 py-4 animate-in fade-in slide-in-from-top-2">
+            <p className="text-sm font-medium text-gray-700 flex-1">Hai una prenotazione da completare: quando il saldo è sufficiente, torna a confermarla.</p>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button variant="ghost" onClick={handleDismissReturn} className="h-10 rounded-xl text-gray-400 font-semibold">
+                Non ora
+              </Button>
+              <Button onClick={handleReturn} className="h-10 rounded-xl font-bold bg-primary text-white hover:scale-[1.01] active:scale-[0.98]">
+                {returnTarget.label} <ChevronRight className="ml-1 h-4 w-4" />
+              </Button>
+            </div>
           </div>
         )}
 

@@ -102,6 +102,11 @@ const AdminUserManagement = () => {
       // Nota: Questa azione rimuove solo il profilo dal DB. 
       // La rimozione dall'auth richiederebbe un edge function con service role key.
       const { error } = await supabase.from('profiles').delete().eq('id', profileToDelete.id);
+      // 23503 = il socio ha portafoglio, movimenti o prenotazioni collegate: il DB lo protegge
+      if (error?.code === '23503') {
+        showError("Non è possibile eliminare questo socio: ha un portafoglio con movimenti o prenotazioni collegate. Puoi revocargli l'accesso invece di eliminarlo.");
+        return;
+      }
       if (error) throw error;
       
       showSuccess("Profilo socio rimosso con successo.");

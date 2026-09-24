@@ -5,7 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { format, parseISO, addDays, subDays, startOfDay, endOfDay, isSameDay, setHours, setMinutes, addHours, differenceInMinutes } from "date-fns";
 import { it } from "date-fns/locale";
 import {
-  ArrowLeft, ChevronLeft, ChevronRight, Eye, Edit, Trash2, Plus, Clock, MapPin, CircleDollarSign
+  ArrowLeft, ChevronLeft, ChevronRight, Eye, Edit, Trash2, Plus, Clock, MapPin, CircleDollarSign, Wallet
 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -114,6 +114,10 @@ const groupReservations = (reservations: ReservationRow[]): ReservationRow[] => 
   if (currentGroup.length > 0) currentGroup.forEach(res => grouped.push({ ...res, groupId: `group-${groupId}` }));
   return grouped;
 };
+
+// Ora pagata dai soci col portafoglio in app: è pagata per costruzione, il toggle manuale
+// is_paid (registro contanti del pannello) non si applica.
+const isWalletPaid = (r: Reservation) => !!r.booking_id && (r.unit_price_cents ?? 0) > 0;
 
 const getGroupColor = (groupId: string): string => {
   if (!groupId) return SLOT_COLORS[0];
@@ -269,12 +273,16 @@ export default function AdminReservations() {
     if (!selectedReservation) return;
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from('reservations')
-        .update({ status: 'cancelled', updated_at: new Date().toISOString() })
-        .eq('id', selectedReservation.id);
+      // Stessa RPC per tutte le righe: senza booking_id nessun movimento (come prima),
+      // con booking_id rimborso sul portafoglio di chi aveva pagato l'ora annullata.
+      const { error } = await supabase.rpc('admin_cancel_reservations', {
+        p_reservation_ids: [selectedReservation.id],
+        p_note: null,
+      });
       if (error) throw error;
-      showSuccess("Prenotazione annullata.");
+      showSuccess(selectedReservation.booking_id
+        ? "Prenotazione annullata. Chi aveva pagato è stato rimborsato sul portafoglio."
+        : "Prenotazione annullata.");
       setDeleteDialogOpen(false);
       refreshAll();
     } catch (err: any) { showError(err.message); } finally { setLoading(false); }
@@ -302,7 +310,7 @@ export default function AdminReservations() {
   const visibleCourtsList = courts.filter(c => visibleCourts.includes(c.id));
 
   const bookedHours = reservations.length;
-  const paidHours = reservations.filter(r => r.is_paid).length;
+  const paidHours = reservations.filter(r => r.is_paid || isWalletPaid(r)).length;
   const unpaidHours = bookedHours - paidHours;
 
   return (
@@ -445,7 +453,7 @@ export default function AdminReservations() {
                     const slotKey = `${court.id}-${time}`;
                     const isHovered = hoveredSlot === slotKey;
                     const slotColor = res
-                      ? res.is_paid
+                      ? res.is_paid || isWalletPaid(res)
                         ? "bg-green-50 border-green-200 text-green-800"
                         : "bg-[#FFFBEB] border-amber-200 text-amber-800"
                       : "";
@@ -477,6 +485,15 @@ export default function AdminReservations() {
                             </div>
 
                             {/* Badge pagamento — sempre visibile, top-right */}
+                            {isWalletPaid(res) ? (
+                              <div
+                                title="Pagata col portafoglio in app"
+                                aria-label="Pagata col portafoglio in app"
+                                className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center bg-primary text-white shadow-md"
+                              >
+                                <Wallet className="h-3.5 w-3.5" />
+                              </div>
+                            ) : (
                             <button
                               onClick={(e) => handleTogglePaid(res, e)}
                               title={res.is_paid ? "Pagata — clicca per annullare" : "Non pagata — clicca per segnare come pagata"}
@@ -489,6 +506,7 @@ export default function AdminReservations() {
                             >
                               <CircleDollarSign className="h-3.5 w-3.5" />
                             </button>
+                            )}
 
                             <div className={cn(
                               "absolute bottom-2 right-2 flex gap-1 transition-all duration-300",
@@ -535,12 +553,19 @@ export default function AdminReservations() {
                 <div><Label className="text-[9px] font-black text-gray-400 uppercase">Creato da</Label><p className="font-bold text-gray-700 text-[10px]">{selectedReservation.bookedByName}</p></div>
               </div>
               {selectedReservation.notes && <p className="text-xs text-gray-500 italic px-2">"{selectedReservation.notes}"</p>}
+              {isWalletPaid(selectedReservation) ? (
+                <div className="flex items-center gap-2 px-2">
+                  <Wallet className="h-4 w-4 text-primary" />
+                  <span className="text-xs font-bold text-primary">Pagata col portafoglio in app</span>
+                </div>
+              ) : (
               <div className="flex items-center gap-2 px-2">
                 <CircleDollarSign className={cn("h-4 w-4", selectedReservation.is_paid ? "text-green-500" : "text-gray-300")} />
                 <span className={cn("text-xs font-bold", selectedReservation.is_paid ? "text-green-600" : "text-gray-400")}>
                   {selectedReservation.is_paid ? "Ora pagata" : "Non ancora pagata"}
                 </span>
               </div>
+              )}
             </div>
           )}
           <DialogFooter><Button variant="outline" onClick={() => setViewDialogOpen(false)} className="rounded-xl h-12 w-full">Chiudi</Button></DialogFooter>
@@ -588,7 +613,7 @@ export default function AdminReservations() {
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent className="max-w-[90vw] rounded-[2rem] p-6 text-center">
-          <AlertDialogHeader><AlertDialogTitle className="text-xl font-black">Eliminare?</AlertDialogTitle><AlertDialogDescription className="text-sm">L'azione è definitiva.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogHeader><AlertDialogTitle className="text-xl font-black">Eliminare?</AlertDialogTitle><AlertDialogDescription className="text-sm">{selectedReservation?.booking_id ? "L'azione è definitiva. Chi ha pagato quest'ora dal portafoglio verrà rimborsato." : "L'azione è definitiva."}</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter className="gap-2 mt-4"><AlertDialogCancel className="h-11 flex-1 rounded-xl">No</AlertDialogCancel><AlertDialogAction onClick={handleDelete} className="h-11 flex-1 rounded-xl bg-red-600">Sì, elimina</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

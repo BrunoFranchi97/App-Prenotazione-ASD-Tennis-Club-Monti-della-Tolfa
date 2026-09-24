@@ -1,6 +1,26 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { WalletLedgerKind } from '@/types/supabase';
 
+// Pagina a cui riportare il socio dopo una ricarica partita da "saldo insufficiente".
+// sessionStorage: sopravvive al redirect verso il checkout e ritorno nella stessa scheda.
+const WALLET_RETURN_KEY = 'canepacce_wallet_return';
+export type WalletReturnTarget = { path: string; label: string };
+
+export const setWalletReturnTarget = (target: WalletReturnTarget) => {
+  try { sessionStorage.setItem(WALLET_RETURN_KEY, JSON.stringify(target)); } catch { /* storage non disponibile */ }
+};
+
+export const getWalletReturnTarget = (): WalletReturnTarget | null => {
+  try {
+    const raw = sessionStorage.getItem(WALLET_RETURN_KEY);
+    return raw ? JSON.parse(raw) as WalletReturnTarget : null;
+  } catch { return null; }
+};
+
+export const clearWalletReturnTarget = () => {
+  try { sessionStorage.removeItem(WALLET_RETURN_KEY); } catch { /* storage non disponibile */ }
+};
+
 export const formatEur = (cents: number) => `€${(Math.abs(cents) / 100).toFixed(2).replace('.', ',')}`;
 
 export const walletKindLabels: Record<WalletLedgerKind, string> = {

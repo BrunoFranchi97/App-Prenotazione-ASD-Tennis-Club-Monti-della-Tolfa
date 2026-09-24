@@ -20,13 +20,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Clock, Users, Trash2, Info, CalendarDays, MapPin, Edit, X, Filter, Layers, Target, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Clock, Users, Trash2, Info, CalendarDays, MapPin, Edit, X, Filter, Layers, Target, ChevronDown, Undo2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { cleanReservationNotes } from '@/utils/noteCleaner';
 import UserNav from '@/components/UserNav';
 import { cn } from '@/lib/utils';
-import type { Court, Reservation } from '@/types/supabase';
+import type { Court, Reservation, BookingSummary } from '@/types/supabase';
+import { formatEur } from '@/utils/wallet';
 
 interface ReservationGroup {
   id: string;
@@ -59,6 +60,9 @@ const BookingHistory = () => {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
   const [groupToDelete, setGroupToDelete] = useState<ReservationGroup | null>(null);
+  // Quanto il socio ha pagato dal proprio saldo per la prenotazione che sta annullando
+  // (null = non ancora calcolato / non pertinente): gli mostriamo cosa gli torna PRIMA di confermare.
+  const [ownPaidCents, setOwnPaidCents] = useState<number | null>(null);
 
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedSurface, setSelectedSurface] = useState<string>("all");
@@ -100,6 +104,22 @@ const BookingHistory = () => {
   };
 
   useEffect(() => { fetchData(); }, []);
+
+  // Le RLS di wallet_ledger mostrano al socio solo i propri movimenti: basta per dirgli
+  // quanto riceve lui; per gli altri partecipanti si mostra una frase generica.
+  useEffect(() => {
+    setOwnPaidCents(null);
+    const bookingId = groupToDelete?.reservations[0]?.booking_id;
+    if (!bookingId || !currentUserId) return;
+    supabase.from('wallet_ledger').select('amount_cents')
+      .eq('booking_id', bookingId).eq('user_id', currentUserId)
+      .then(({ data }) => {
+        setOwnPaidCents(-(data || []).reduce((s, m) => s + m.amount_cents, 0));
+      });
+  }, [groupToDelete, currentUserId]);
+
+  const groupToDeleteIsPaid = !!groupToDelete?.reservations[0]?.booking_id
+    && groupToDelete.reservations.some(r => (r.unit_price_cents ?? 0) > 0);
 
   const allGroups = useMemo(() => {
     if (!reservations.length || !courts.length) return [];
@@ -162,8 +182,20 @@ const BookingHistory = () => {
       // vecchio percorso diretto, invariato.
       const bookingId = group.reservations[0]?.booking_id;
       if (bookingId) {
-        const { error } = await supabase.rpc('cancel_booking', { p_booking_id: bookingId });
+        const { data, error } = await supabase.rpc('cancel_booking', { p_booking_id: bookingId });
         if (error) throw error;
+        // cancel_booking restituisce i movimenti di TUTTI i partecipanti (SECURITY DEFINER)
+        const refunds = ((data as BookingSummary | null)?.movements || []).filter(m => m.kind === 'booking_refund');
+        const ownRefund = refunds.filter(m => m.user_id === currentUserId).reduce((s, m) => s + m.amount_cents, 0);
+        const othersRefunded = refunds.some(m => m.user_id !== currentUserId);
+        if (ownRefund > 0 || othersRefunded) {
+          showSuccess(
+            `Prenotazione annullata.${ownRefund > 0 ? ` ${formatEur(ownRefund)} rimborsati sul tuo saldo.` : ''}`
+            + (othersRefunded ? ' Anche gli altri partecipanti sono stati rimborsati.' : '')
+          );
+          fetchData();
+          return;
+        }
       } else {
         const ids = group.reservations.map(r => r.id);
         const { error } = await supabase
@@ -391,6 +423,21 @@ const BookingHistory = () => {
             <span className="block mt-1 text-xs text-destructive font-semibold">Questa azione non può essere annullata.</span>
           </AlertDialogDescription>
         </AlertDialogHeader>
+        {groupToDeleteIsPaid && (
+          <div className="space-y-2">
+            {ownPaidCents !== null && ownPaidCents > 0 && (
+              <div className="flex justify-between items-center bg-white border-2 border-primary/15 rounded-xl px-4 py-3">
+                <span className="text-xs font-bold text-primary flex items-center gap-1.5">
+                  <Undo2 className="h-3.5 w-3.5 shrink-0" /> Ti verranno rimborsati sul saldo
+                </span>
+                <span className="text-sm font-black text-primary shrink-0">+{formatEur(ownPaidCents)}</span>
+              </div>
+            )}
+            <p className="text-[11px] text-gray-400 text-center leading-snug px-2">
+              Chi ha pagato la propria quota dal portafoglio la riceve indietro per intero.
+            </p>
+          </div>
+        )}
         <AlertDialogFooter className="gap-3">
           <AlertDialogCancel className="h-12 flex-1 rounded-2xl font-bold" onClick={() => setGroupToDelete(null)}>
             Annulla

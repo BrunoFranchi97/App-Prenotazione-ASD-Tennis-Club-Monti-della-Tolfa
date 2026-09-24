@@ -10,7 +10,9 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, ShieldAlert } from 'lucide-react';
+import { CheckCircle2, ShieldAlert, Wallet as WalletIcon } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { setWalletReturnTarget } from '@/utils/wallet';
 import { format, parseISO, addHours } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
@@ -37,6 +39,10 @@ interface BookingQuoteDialogProps {
   bookedForLastName?: string | null;
   bookedForUserId?: string | null;
   onConfirmed: (summary: BookingSummary) => void;
+  // Dove riportare il socio dopo una ricarica per saldo insufficiente. Default: la pagina
+  // corrente. Le pagine che dipendono da location.state (modifica, sfida) non si possono
+  // riaprire dopo il checkout, quindi passano la loro pagina "madre".
+  returnTo?: { path: string; label: string };
 }
 
 const formatEur = (cents: number) => `€${(Math.abs(cents) / 100).toFixed(2).replace('.', ',')}`;
@@ -44,8 +50,10 @@ const formatEur = (cents: number) => `€${(Math.abs(cents) / 100).toFixed(2).re
 const BookingQuoteDialog: React.FC<BookingQuoteDialogProps> = ({
   open, onOpenChange, courtName, courtId, starts, bookingType, participants,
   coachName, bookerPaysAll, bookerId, bookingId, expectedVersion,
-  bookedForFirstName, bookedForLastName, bookedForUserId, onConfirmed,
+  bookedForFirstName, bookedForLastName, bookedForUserId, onConfirmed, returnTo,
 }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [quote, setQuote] = useState<BookingSummary | null>(null);
@@ -121,6 +129,12 @@ const BookingQuoteDialog: React.FC<BookingQuoteDialogProps> = ({
     onConfirmed(data as BookingSummary);
   };
 
+  const handleGoToTopup = (missingCents: number) => {
+    setWalletReturnTarget(returnTo ?? { path: location.pathname, label: 'Torna a prenotare' });
+    onOpenChange(false);
+    navigate(`/wallet?importo=${missingCents}`);
+  };
+
   const dateStr = starts.length > 0 ? format(parseISO(starts[0]), 'EEEE dd MMMM yyyy', { locale: it }) : '';
   const timeRange = starts.length > 0
     ? `${format(parseISO(starts[0]), 'HH:mm')} - ${format(addHours(parseISO(starts[starts.length - 1]), 1), 'HH:mm')}`
@@ -129,12 +143,18 @@ const BookingQuoteDialog: React.FC<BookingQuoteDialogProps> = ({
   const movements = quote?.movements || [];
   const bookerTotalCents = movements.filter(m => m.user_id === bookerId).reduce((s, m) => s + m.amount_cents, 0);
   const hasCharge = quote ? quote.quota_cents > 0 : false;
+  // Nella modifica i movimenti sono solo la differenza: negativo = il prenotante paga,
+  // positivo = riceve un rimborso (es. da 2 ore a 1), zero = per lui non cambia nulla.
+  const isEdit = !!bookingId;
+  const bookerGetsRefund = bookerTotalCents > 0;
+  const bookerPays = bookerTotalCents < 0;
+  const plainConfirmLabel = isEdit ? 'Conferma modifica' : 'Conferma prenotazione';
 
   return (
     <Dialog open={open} onOpenChange={(v) => !confirming && onOpenChange(v)}>
       <DialogContent className="sm:max-w-md border-t-8 border-t-primary rounded-2xl">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold text-gray-900">Conferma prenotazione</DialogTitle>
+          <DialogTitle className="text-xl font-bold text-gray-900">{isEdit ? 'Conferma modifica' : 'Conferma prenotazione'}</DialogTitle>
           <DialogDescription className="text-sm">
             {courtName} · <span className="capitalize">{dateStr}</span> · {timeRange}
           </DialogDescription>
@@ -175,7 +195,28 @@ const BookingQuoteDialog: React.FC<BookingQuoteDialogProps> = ({
                 <span className="text-xs text-red-700">Disponibili</span>
                 <span className="text-xs font-semibold text-red-700">{formatEur(quoteErrorDetail.available_cents)}</span>
               </div>
+              <div className="flex justify-between items-center pt-2 mt-1 border-t border-red-200">
+                <span className="text-xs font-black text-red-900">Ti mancano</span>
+                <span className="text-sm font-black text-red-900">{formatEur(quoteErrorDetail.needed_cents - quoteErrorDetail.available_cents)}</span>
+              </div>
             </div>
+          </div>
+        )}
+
+        {/* Il saldo che manca è sempre del prenotante (le quote degli altri senza credito
+            passano a lui, D7): il controllo sull'id è solo una sicurezza in più. */}
+        {!loading && quoteErrorDetail && quoteErrorDetail.user_id === bookerId && (
+          <div className="space-y-1.5">
+            <Button
+              className="w-full h-12 rounded-xl font-bold bg-gradient-to-br from-primary to-[#23532f] text-white shadow-lg shadow-primary/10 hover:scale-[1.01] active:scale-[0.98]"
+              onClick={() => handleGoToTopup(quoteErrorDetail.needed_cents - quoteErrorDetail.available_cents)}
+            >
+              <WalletIcon className="mr-2 h-4 w-4" />
+              Ricarica {formatEur(quoteErrorDetail.needed_cents - quoteErrorDetail.available_cents)}
+            </Button>
+            <p className="text-[11px] text-gray-400 text-center leading-snug">
+              Puoi anche ricaricare in contanti presso il circolo.
+            </p>
           </div>
         )}
 
@@ -190,6 +231,18 @@ const BookingQuoteDialog: React.FC<BookingQuoteDialogProps> = ({
 
             {hasCharge && (
               <div className="space-y-2">
+                {bookerGetsRefund && (
+                  <div className="flex items-center gap-3 bg-primary/5 border border-primary/10 rounded-xl px-4 py-3">
+                    <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
+                    <p className="text-xs font-semibold text-gray-700">Con questa modifica non paghi nulla: ricevi un rimborso sul tuo saldo.</p>
+                  </div>
+                )}
+                {isEdit && movements.length === 0 && (
+                  <div className="flex items-center gap-3 bg-primary/5 border border-primary/10 rounded-xl px-4 py-3">
+                    <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
+                    <p className="text-xs font-semibold text-gray-700">Il costo non cambia: nessun addebito e nessun rimborso.</p>
+                  </div>
+                )}
                 <WalletMovementsSummary movements={movements} bookerId={bookerId} mode="preview" hours={quote.hours} />
                 <div className="flex justify-between items-center px-4 pt-1">
                   <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Saldo dopo l'operazione</span>
@@ -218,9 +271,11 @@ const BookingQuoteDialog: React.FC<BookingQuoteDialogProps> = ({
           >
             {confirming
               ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-              : hasCharge
-                ? `Conferma e paga ${formatEur(Math.abs(bookerTotalCents))}`
-                : 'Conferma prenotazione'}
+              : hasCharge && bookerPays
+                ? `Conferma e paga ${formatEur(bookerTotalCents)}`
+                : hasCharge && bookerGetsRefund
+                  ? `Conferma e ricevi ${formatEur(bookerTotalCents)}`
+                  : plainConfirmLabel}
           </Button>
         </DialogFooter>
       </DialogContent>
