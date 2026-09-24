@@ -257,12 +257,15 @@ export default function AdminReservations() {
   };
 
   const handleEdit = async () => {
-    if (!selectedReservation || !firstName || !lastName || !formCourtId || !formStartTime) return showError("Compila i campi obbligatori.");
+    // Nome e cognome servono solo dove esistevano già (prenotazioni da pannello o per terzi):
+    // quelle fatte da un socio per sé non li hanno, e inventarli le trasformerebbe in "per conto terzi".
+    const hadBookedFor = !!(selectedReservation?.booked_for_first_name || selectedReservation?.booked_for_last_name);
+    if (!selectedReservation || (hadBookedFor && (!firstName.trim() || !lastName.trim())) || !formCourtId || !formStartTime) return showError("Compila i campi obbligatori.");
     setLoading(true);
     try {
       const start = setMinutes(setHours(startOfDay(selectedDate), parseInt(formStartTime.split(':')[0])), parseInt(formStartTime.split(':')[1] || '0'));
       const { error } = await supabase.from('reservations').update({
-        court_id: parseInt(formCourtId), booked_for_first_name: firstName.trim(), booked_for_last_name: lastName.trim(),
+        court_id: parseInt(formCourtId), booked_for_first_name: firstName.trim() || null, booked_for_last_name: lastName.trim() || null,
         starts_at: start.toISOString(), ends_at: addHours(start, 1).toISOString(),
         notes: formNotes.trim() || null, updated_at: new Date().toISOString()
       }).eq('id', selectedReservation.id);

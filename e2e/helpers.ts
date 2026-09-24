@@ -16,7 +16,7 @@ export const eur = (cents: number) => `€${(Math.abs(cents) / 100).toFixed(2).r
 export class Db {
   constructor(readonly page: Page) {}
 
-  private async call<T>(path: string, method: 'GET' | 'POST', body?: unknown): Promise<T> {
+  private async call<T>(path: string, method: 'GET' | 'POST' | 'PATCH', body?: unknown): Promise<T> {
     const res = await this.page.evaluate(async ({ url, anonKey, storageKey, method, body }) => {
       const session = JSON.parse(localStorage.getItem(storageKey) || 'null');
       if (!session?.access_token) return { status: 0, text: 'sessione assente' };
@@ -39,6 +39,10 @@ export class Db {
 
   select<T = Record<string, unknown>>(table: string, query: string) {
     return this.call<T[]>(`/rest/v1/${table}?${query}`, 'GET');
+  }
+
+  update(table: string, query: string, values: Record<string, unknown>) {
+    return this.call<null>(`/rest/v1/${table}?${query}`, 'PATCH', values);
   }
 
   rpc<T = unknown>(fn: string, args: Record<string, unknown>) {
@@ -77,6 +81,7 @@ export type Scene = {
   marioName: string;
   luigiName: string;
   dayRate: number;       // centesimi a persona all'ora, di giorno
+  lightsRate: number;    // centesimi a persona all'ora, con luci
   date: Date;            // giorno delle prove (settimana prossima, senza override luci)
   court: { id: number; name: string };
   /** Primo orario libero (di giorno) con anche l'ora successiva libera. */
@@ -119,8 +124,8 @@ async function buildScene(admin: Actor, mario: Actor, luigi: Actor): Promise<Sce
   if (flag[0]?.value !== 'true') {
     throw new Error('Su staging i pagamenti in app sono spenti (app_settings.pagamenti_attivi ≠ true): accendili prima dei test.');
   }
-  const rates = await admin.db.select<{ rate_day_cents: number }>('court_rates',
-    `select=rate_day_cents&valid_from=lte.${encodeURIComponent(new Date().toISOString())}&order=valid_from.desc&limit=1`);
+  const rates = await admin.db.select<{ rate_day_cents: number; rate_lights_cents: number }>('court_rates',
+    `select=rate_day_cents,rate_lights_cents&valid_from=lte.${encodeURIComponent(new Date().toISOString())}&order=valid_from.desc&limit=1`);
   if (!rates[0] || rates[0].rate_day_cents <= 0) {
     throw new Error('Nessuna tariffa di giorno > €0 in vigore su staging: impostala da Portafogli Soci → Tariffe.');
   }
@@ -150,7 +155,7 @@ async function buildScene(admin: Actor, mario: Actor, luigi: Actor): Promise<Sce
   for (const court of courts) {
     for (let hour = 9; hour <= 13; hour++) {
       if (isFree(court.id, hour) && isFree(court.id, hour + 1)) {
-        return { marioName: nameOf(mario.id), luigiName: nameOf(luigi.id), dayRate: rates[0].rate_day_cents, date, court, hour };
+        return { marioName: nameOf(mario.id), luigiName: nameOf(luigi.id), dayRate: rates[0].rate_day_cents, lightsRate: rates[0].rate_lights_cents, date, court, hour };
       }
     }
   }
@@ -183,13 +188,9 @@ export const rangeLabel = (hour: number, hours: number) =>
 export async function openBooking(page: Page, scene: Scene, type: 'Singolare' | 'Doppio' | 'Lezione' = 'Singolare') {
   await page.goto('/book');
   await expect(page.getByRole('heading', { name: 'Prenota un Campo' })).toBeVisible();
-  const today = new Date();
-  if (scene.date.getMonth() !== today.getMonth()) {
-    await page.getByRole('button', { name: /next month/i }).click();
-  }
-  await page.locator('button[name="day"]:not(.day-outside)', { hasText: new RegExp(`^${scene.date.getDate()}$`) }).click();
+  await (await pickDate(page, scene.date)).click();
   await expect(page.getByText(format(scene.date, 'EEEE d MMMM', { locale: it }), { exact: true })).toBeVisible();
-  await page.locator('button', { has: page.locator('h4', { hasText: new RegExp(`^${escapeRe(scene.court.name)}$`) }) }).click();
+  await selectCourt(page, scene.court.name);
   await page.getByRole('button', { name: type, exact: true }).click();
 }
 
@@ -204,15 +205,87 @@ export async function clickSlot(page: Page, hour: number) {
   await page.getByRole('button', { name: new RegExp(`^${escapeRe(slotLabel(hour))}`) }).click();
 }
 
+type BookingOpts = {
+  type?: 'singolare' | 'doppio' | 'lezione';
+  guests?: string[];               // nomi ospiti (anche 'Da definire')
+  date?: Date;
+  hour?: number;
+  courtId?: number;
+  coachName?: string;
+};
+
 /** Crea una prenotazione wallet direttamente con la RPC ufficiale del socio (per preparare i test di modifica/disdetta). */
-export async function createBookingViaRpc(booker: Actor, scene: Scene, hours: number, otherMemberIds: string[]) {
-  const starts = Array.from({ length: hours }, (_, i) => slotStart(scene.date, scene.hour + i).toISOString());
+export async function createBookingViaRpc(booker: Actor, scene: Scene, hours: number, otherMemberIds: string[], opts: BookingOpts = {}) {
+  const date = opts.date ?? scene.date;
+  const hour = opts.hour ?? scene.hour;
+  const starts = Array.from({ length: hours }, (_, i) => slotStart(date, hour + i).toISOString());
   return booker.db.rpc<{ booking_id: string }>('create_booking', {
-    p_court_id: scene.court.id,
+    p_court_id: opts.courtId ?? scene.court.id,
     p_starts: starts,
-    p_booking_type: 'singolare',
-    p_participants: [{ user_id: booker.id }, ...otherMemberIds.map(id => ({ user_id: id }))],
+    p_booking_type: opts.type ?? 'singolare',
+    p_participants: [
+      { user_id: booker.id },
+      ...otherMemberIds.map(id => ({ user_id: id })),
+      ...(opts.guests ?? []).map(guest_name => ({ guest_name })),
+    ],
+    p_coach_name: opts.coachName ?? null,
   });
+}
+
+/** Primo slot libero (court + ora di pieno giorno) in una data, con `span` ore consecutive libere. */
+export async function findFreeSlot(admin: Actor, date: Date, span = 1): Promise<{ courtId: number; hour: number }> {
+  const courts = await admin.db.select<{ id: number }>('courts', 'select=id&is_active=eq.true&order=id');
+  const taken = await admin.db.select<{ court_id: number; starts_at: string }>('reservations',
+    `select=court_id,starts_at&status=neq.cancelled&starts_at=gte.${encodeURIComponent(slotStart(date, 0).toISOString())}&starts_at=lt.${encodeURIComponent(slotStart(addDays(date, 1), 0).toISOString())}`);
+  const free = (c: number, h: number) => !taken.some(r => r.court_id === c && new Date(r.starts_at).getTime() === slotStart(date, h).getTime());
+  for (const c of courts) for (let h = 9; h + span - 1 <= 14; h++) {
+    if (Array.from({ length: span }, (_, i) => free(c.id, h + i)).every(Boolean)) return { courtId: c.id, hour: h };
+  }
+  throw new Error(`Nessuno slot libero il ${format(date, 'dd/MM')}.`);
+}
+
+export async function setLightsOverride(admin: Actor, date: Date, force: boolean | null) {
+  await admin.db.rpc('admin_set_lights_override', { p_day: format(date, 'yyyy-MM-dd'), p_force_lights: force, p_reason: force === null ? null : 'Test automatici' });
+}
+
+export async function getSetting(admin: Actor, key: string) {
+  const rows = await admin.db.select<{ value: string }>('app_settings', `select=value&key=eq.${key}`);
+  return rows[0]?.value;
+}
+
+/** Aggiorna app_settings come fa la pagina Luci (UPDATE diretto, permesso dalle RLS admin). */
+export async function setSetting(admin: Actor, key: string, value: string) {
+  await admin.db.update('app_settings', `key=eq.${key}`, { value });
+}
+
+/** Aggiunge un ospite dalla combobox dei partecipanti. */
+export async function addGuest(page: Page, name: string) {
+  await page.getByRole('button', { name: 'Ospite', exact: true }).click();
+  await page.getByPlaceholder('Nome ospite').fill(name);
+  await page.getByPlaceholder('Nome ospite').press('Enter');
+}
+
+/** Toglie un partecipante (chip con la crocetta). */
+export async function removeParticipant(page: Page, label: string) {
+  await page.locator('div.rounded-full', { hasText: label }).getByRole('button').click();
+}
+
+/** Seleziona una data nel calendario (react-day-picker) della pagina corrente. */
+export async function pickDate(page: Page, date: Date) {
+  const today = new Date();
+  const monthsAhead = (date.getFullYear() - today.getFullYear()) * 12 + date.getMonth() - today.getMonth();
+  for (let i = 0; i < monthsAhead; i++) await page.getByRole('button', { name: /next month/i }).click();
+  return page.locator('button[name="day"]:not(.day-outside)', { hasText: new RegExp(`^${date.getDate()}$`) });
+}
+
+export async function selectCourt(page: Page, courtName: string) {
+  await page.locator('button', { has: page.locator('h4', { hasText: new RegExp(`^${escapeRe(courtName)}$`) }) }).click();
+}
+
+/** Ledger e saldo coincidono? (controllo di coerenza A-28) */
+export async function ledgerSum(admin: Actor, userId: string) {
+  const rows = await admin.db.select<{ amount_cents: number }>('wallet_ledger', `select=amount_cents&user_id=eq.${userId}`);
+  return rows.reduce((s, r) => s + r.amount_cents, 0);
 }
 
 /** La card di "I miei Campi" per il giorno e l'orario dati. */

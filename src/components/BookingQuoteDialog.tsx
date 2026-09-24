@@ -119,7 +119,9 @@ const BookingQuoteDialog: React.FC<BookingQuoteDialogProps> = ({
     const { data, error } = await supabase.rpc(rpcName, params);
     setConfirming(false);
     if (error) {
-      if (error.code === '23505') {
+      // 23505 = indice univoco, 23P01 = vincolo di esclusione sugli orari del campo:
+      // entrambi significano "slot appena preso da un altro"
+      if (error.code === '23505' || error.code === '23P01') {
         showError("Uno o più slot sono stati appena prenotati da qualcun altro. Ricarica la pagina e riprova.");
       } else {
         showError(error.message);
