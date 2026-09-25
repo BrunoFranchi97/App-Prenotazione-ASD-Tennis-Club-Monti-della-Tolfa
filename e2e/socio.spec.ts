@@ -93,7 +93,10 @@ test.describe('prenotare', () => {
     await clickSlot(page, scene.hour);
     await page.getByRole('button', { name: confirmBtn }).click();
     const dialog = page.getByRole('dialog');
-    await expect(dialog.getByText('(comprende eventuali ospiti)')).toBeVisible();
+    // la cifra in evidenza è quanto paga Mario, scomposta: sua quota + ospite + posto da definire
+    await expect(dialog.getByText('Paghi tu', { exact: true })).toBeVisible();
+    await expect(dialog.getByText('Ospite: Paolo Ospite')).toBeVisible();
+    await expect(dialog.getByText('Giocatore da definire')).toBeVisible();
     await expect(dialog.getByText(`${scene.luigiName} paga la sua quota`)).toBeVisible();
     await dialog.getByRole('button', { name: `Conferma e paga ${eur(3 * scene.dayRate)}` }).click();
     await expect(page.getByRole('dialog').getByText('Prenotazione Confermata!')).toBeVisible();

@@ -245,13 +245,7 @@ const BookingQuoteDialog: React.FC<BookingQuoteDialogProps> = ({
                     <p className="text-xs font-semibold text-gray-700">Il costo non cambia: nessun addebito e nessun rimborso.</p>
                   </div>
                 )}
-                <WalletMovementsSummary movements={movements} bookerId={bookerId} mode="preview" hours={quote.hours} />
-                <div className="flex justify-between items-center px-4 pt-1">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Saldo dopo l'operazione</span>
-                  <span className="text-sm font-bold text-gray-600">
-                    {quote.booker_balance_cents != null ? formatEur(quote.booker_balance_cents) : '—'}
-                  </span>
-                </div>
+                <WalletMovementsSummary movements={movements} bookerId={bookerId} mode="preview" hours={quote.hours} participants={isEdit ? undefined : participants} />
               </div>
             )}
           </div>

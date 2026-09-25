@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { CheckCircle2, CalendarDays, Clock, MapPin, User, ArrowRight, History, AlertTriangle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { it } from 'date-fns/locale';
-import { Reservation, PaymentMode, BookingSummary } from '@/types/supabase';
+import { Reservation, PaymentMode, BookingSummary, BookingParticipantInput } from '@/types/supabase';
 import WalletMovementsSummary from '@/components/WalletMovementsSummary';
 
 interface BookingSuccessDialogProps {
@@ -29,6 +29,7 @@ interface BookingSuccessDialogProps {
   movements?: BookingSummary['movements'];
   hours?: BookingSummary['hours'];
   bookerId?: string;
+  participants?: BookingParticipantInput[];
 }
 
 const BookingSuccessDialog: React.FC<BookingSuccessDialogProps> = ({
@@ -43,6 +44,7 @@ const BookingSuccessDialog: React.FC<BookingSuccessDialogProps> = ({
   movements,
   hours,
   bookerId,
+  participants,
 }) => {
   const navigate = useNavigate();
 
@@ -119,7 +121,7 @@ const BookingSuccessDialog: React.FC<BookingSuccessDialogProps> = ({
         {paymentMode === 'wallet' && !!quotaCents && quotaCents > 0 && movements && movements.length > 0 && bookerId && (
           <div className="space-y-2">
             <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em] px-1">Riepilogo pagamenti</p>
-            <WalletMovementsSummary movements={movements} bookerId={bookerId} mode="confirmed" hours={hours} />
+            <WalletMovementsSummary movements={movements} bookerId={bookerId} mode="confirmed" hours={hours} participants={participants} />
           </div>
         )}
 

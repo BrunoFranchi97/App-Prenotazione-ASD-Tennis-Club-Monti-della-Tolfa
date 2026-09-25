@@ -146,6 +146,13 @@ export interface WalletLedgerEntry {
   created_at: string;
 }
 
+// Campo e primo orario della prenotazione a cui si riferisce un movimento del portafoglio
+// (per dire "quale partita" nello storico, non solo "Prenotazione campo")
+export interface WalletBookingInfo {
+  courtName: string;
+  startsAt: string;
+}
+
 export interface WalletTopup {
   id: string;
   user_id: string;

@@ -34,7 +34,7 @@ const MyWallet = () => {
   // Realtime subscription dedicata (sotto) segnala l'accredito fatto da payment-webhook.
   const [ricaricaPending, setRicaricaPending] = useState(searchParams.get('ricarica') === 'in-corso');
 
-  const { wallet, movements, coverNamesById, ricaricaTagli, saldoBassoSogliaCents, loading } = useWallet(userId);
+  const { wallet, movements, coverNamesById, bookingInfoById, ricaricaTagli, saldoBassoSogliaCents, loading } = useWallet(userId);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -224,7 +224,7 @@ const MyWallet = () => {
             ) : (
               <div className="space-y-2">
                 {movements.map(m => (
-                  <WalletMovementRow key={m.id} movement={m} coverNamesById={coverNamesById} />
+                  <WalletMovementRow key={m.id} movement={m} coverNamesById={coverNamesById} bookingInfoById={bookingInfoById} />
                 ))}
               </div>
             )}

@@ -74,6 +74,7 @@ const ThirdPartyBooking = () => {
     paymentMode?: BookingSummary['payment_mode'],
     movements?: BookingSummary['movements'],
     hours?: BookingSummary['hours'],
+    participants?: BookingParticipantInput[],
   } | null>(null);
 
   // Si azzera quando cambia la tipologia (il numero richiesto di partecipanti cambia con essa)
@@ -285,6 +286,7 @@ const ThirdPartyBooking = () => {
       paymentMode: summary.payment_mode,
       movements: summary.movements,
       hours: summary.hours,
+      participants,
     });
     setShowQuoteDialog(false);
     setShowSuccessModal(true);
@@ -541,6 +543,7 @@ const ThirdPartyBooking = () => {
         movements={lastBookingData?.movements}
         hours={lastBookingData?.hours}
         bookerId={bookerId ?? undefined}
+        participants={lastBookingData?.participants}
       />
     </div>
   );

@@ -3,7 +3,8 @@
 import React from 'react';
 import { AlertTriangle, CheckCircle2, Lightbulb, Undo2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-import { BookingSummary } from '@/types/supabase';
+import { BookingSummary, BookingParticipantInput } from '@/types/supabase';
+import { PLACEHOLDER_GUEST_NAME } from '@/components/ParticipantPicker';
 import { cn } from '@/lib/utils';
 
 interface WalletMovementsSummaryProps {
@@ -11,17 +12,22 @@ interface WalletMovementsSummaryProps {
   bookerId: string;
   /** 'preview' = dentro il dialog di anteprima, prima di scrivere nulla.
    *  'confirmed' = dopo la scrittura riuscita: stesso specchietto ma con toni affermativi
-   *  ("hai pagato", "ha pagato"), per rassicurare chi controlla che i conti tornino. */
+   *  ("hai pagato", "ha pagato"), per rassicurare chi controlla che i conti tornano. */
   mode: 'preview' | 'confirmed';
   /** Se presente e almeno un'ora ha le luci, mostra il dettaglio orario prima della
    *  scomposizione per persona: spiega perché il totale è più alto (tariffa con luci). */
   hours?: BookingSummary['hours'];
+  /** Partecipanti della prenotazione NUOVA: permettono di scomporre l'addebito del
+   *  prenotante in "tua quota" + una riga per ospite/"Da definire" (e di non parlare di
+   *  "tua quota" quando il prenotante non gioca, v. ThirdPartyBooking). Da NON passare
+   *  nella modifica: lì i movimenti sono solo la differenza e la scomposizione non vale. */
+  participants?: BookingParticipantInput[];
   className?: string;
 }
 
 const formatEur = (cents: number) => `€${(Math.abs(cents) / 100).toFixed(2).replace('.', ',')}`;
 
-const WalletMovementsSummary: React.FC<WalletMovementsSummaryProps> = ({ movements, bookerId, mode, hours, className }) => {
+const WalletMovementsSummary: React.FC<WalletMovementsSummaryProps> = ({ movements, bookerId, mode, hours, participants, className }) => {
   const hasLights = !!hours?.some(h => h.lights);
   // Scomposizione (vedi anche wallet_settle_booking):
   // - 'booking_charge' del prenotante = sua quota, comprende ospiti/segnaposto (non hanno un saldo proprio)
@@ -33,14 +39,43 @@ const WalletMovementsSummary: React.FC<WalletMovementsSummaryProps> = ({ movemen
   const othersOwnLines = movements.filter(m => m.kind === 'booking_charge' && m.user_id !== bookerId);
   const refundLines = movements.filter(m => m.kind === 'booking_refund');
 
-  // Totale realmente movimentato per questa prenotazione: ogni quota (propria, coperta o
-  // pagata da altri) genera esattamente una riga di addebito — sommandole si ottiene il
-  // valore totale della prenotazione, un modo semplice per verificare "i conti tornano".
-  const totalCents = movements
-    .filter(m => m.kind === 'booking_charge' || m.kind === 'booking_cover')
-    .reduce((s, m) => s + Math.abs(m.amount_cents), 0);
+  // Quanto esce davvero dal saldo del prenotante: è la cifra in evidenza (feedback test
+  // direttivo: prima risaltava la sola "tua quota" e sembrava di pagare meno del vero).
+  const bookerPaidCents = (ownCharge ? Math.abs(ownCharge.amount_cents) : 0)
+    + coverLines.reduce((s, m) => s + Math.abs(m.amount_cents), 0);
 
   const confirmed = mode === 'confirmed';
+
+  // Righe della scomposizione dell'addebito del prenotante. Ogni partecipante paga la
+  // stessa quota intera, quindi l'addebito si divide in parti uguali tra lui (se gioca)
+  // e i suoi ospiti/"Da definire".
+  type Line = { key: string; label: React.ReactNode; cents: number; cover?: boolean };
+  const lines: Line[] = [];
+  if (ownCharge) {
+    const guests = participants?.filter((p): p is { guest_name: string } => 'guest_name' in p) ?? [];
+    const bookerPlays = !!participants?.some(p => 'user_id' in p && p.user_id === bookerId);
+    const shares = (bookerPlays ? 1 : 0) + guests.length;
+    const ownCents = Math.abs(ownCharge.amount_cents);
+    if (participants && shares > 0) {
+      const shareCents = Math.round(ownCents / shares);
+      if (bookerPlays) lines.push({ key: 'me', label: 'La tua quota', cents: ownCents - shareCents * guests.length });
+      guests.forEach((g, i) => lines.push({
+        key: `guest-${i}`,
+        label: g.guest_name === PLACEHOLDER_GUEST_NAME ? 'Giocatore da definire' : <>Ospite: {g.guest_name}</>,
+        cents: shareCents,
+      }));
+    } else {
+      lines.push({ key: 'me', label: <>La tua quota <span className="font-medium text-gray-400">(comprende eventuali ospiti)</span></>, cents: ownCents });
+    }
+  }
+  coverLines.forEach((m, i) => lines.push({
+    key: `cover-${i}`,
+    cover: true,
+    label: confirmed
+      ? <>Hai coperto tu la quota di <span className="font-black">{m.covers_full_name}</span>: non aveva credito</>
+      : <>Quota di <span className="font-black">{m.covers_full_name}</span>: non ha credito, la paghi tu</>,
+    cents: Math.abs(m.amount_cents),
+  }));
 
   return (
     <div className={cn('space-y-2', className)}>
@@ -64,40 +99,48 @@ const WalletMovementsSummary: React.FC<WalletMovementsSummaryProps> = ({ movemen
           ))}
         </div>
       )}
-      {ownCharge && (
+      {bookerPaidCents > 0 && (
         <div className={cn(
-          'flex justify-between items-center rounded-xl px-4 py-3',
-          confirmed ? 'bg-green-50' : 'bg-gray-50'
+          'rounded-xl border-2 px-4 py-3',
+          confirmed ? 'bg-green-50 border-green-200' : 'bg-primary/5 border-primary/15'
         )}>
-          <span className={cn('text-xs font-bold flex items-center gap-1.5', confirmed ? 'text-green-800' : 'text-gray-600')}>
-            {confirmed && <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />}
-            {confirmed ? 'Hai pagato la tua quota' : 'Tua quota'}{' '}
-            <span className={cn('font-medium', confirmed ? 'text-green-700/70' : 'text-gray-400')}>(comprende eventuali ospiti)</span>
-          </span>
-          <span className={cn('text-sm font-black shrink-0', confirmed ? 'text-green-800' : 'text-gray-900')}>
-            {formatEur(ownCharge.amount_cents)}
-          </span>
+          <div className="flex justify-between items-center">
+            <span className={cn('text-sm font-black flex items-center gap-1.5', confirmed ? 'text-green-800' : 'text-gray-900')}>
+              {confirmed && <CheckCircle2 className="h-4 w-4 shrink-0" />}
+              {confirmed ? 'Hai pagato' : 'Paghi tu'}
+            </span>
+            <span className={cn('text-2xl font-black tracking-tight shrink-0', confirmed ? 'text-green-800' : 'text-primary')}>
+              {formatEur(bookerPaidCents)}
+            </span>
+          </div>
+          {/* Scomposizione solo se c'è davvero qualcosa da spiegare: se paghi solo la tua
+              quota basta la cifra in evidenza (feedback test direttivo: riepilogo più snello). */}
+          {(lines.length > 1 || (lines.length === 1 && lines[0].key !== 'me')) && (
+            <div className="mt-2 pt-2 border-t border-black/5 space-y-1.5">
+              {lines.map(l => (
+                <div key={l.key} className="flex justify-between items-start gap-3 text-xs">
+                  <span className={cn('font-semibold leading-snug flex items-start gap-1.5', l.cover ? 'text-amber-800' : 'text-gray-600')}>
+                    {l.cover && <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-px" />}
+                    <span>{l.label}</span>
+                  </span>
+                  <span className={cn('font-bold shrink-0', l.cover ? 'text-amber-800' : 'text-gray-600')}>{formatEur(l.cents)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
-      {coverLines.map((m, i) => (
-        <div key={`cover-${i}`} className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-          <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
-          <p className="text-xs font-semibold text-amber-800 leading-snug flex-1">
-            {confirmed ? (
-              <>Hai coperto tu la quota di <span className="font-black">{m.covers_full_name}</span> ({formatEur(m.amount_cents)}): non aveva credito sufficiente.</>
-            ) : (
-              <><span className="font-black">{m.covers_full_name}</span> non ha credito sufficiente → i {formatEur(m.amount_cents)} verranno scalati dal <span className="font-black">TUO</span> saldo.</>
-            )}
-          </p>
-        </div>
-      ))}
       {othersOwnLines.map((m, i) => (
-        <div key={`own-${i}`} className="flex justify-between items-center bg-green-50 rounded-xl px-4 py-3">
-          <span className="text-xs font-bold text-green-800 flex items-center gap-1.5">
-            {confirmed && <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />}
-            {m.full_name} {confirmed ? 'ha pagato la sua quota' : 'paga la sua quota'}
+        // Una sola riga compatta: chi ha credito paga da sé, al prenotante basta saperlo.
+        <div key={`own-${i}`} className="flex justify-between items-center gap-3 px-4 py-1">
+          <span className="text-xs font-semibold text-gray-500 flex items-center gap-1.5">
+            <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />
+            <span>
+              {m.full_name} {confirmed ? 'ha pagato la sua quota' : 'paga la sua quota'}{' '}
+              <span className="font-medium text-gray-400">con il suo credito</span>
+            </span>
           </span>
-          <span className="text-sm font-black text-green-800 shrink-0">{formatEur(m.amount_cents)}</span>
+          <span className="text-xs font-bold text-gray-400 shrink-0">{formatEur(m.amount_cents)}</span>
         </div>
       ))}
       {refundLines.length > 0 && (
@@ -118,14 +161,6 @@ const WalletMovementsSummary: React.FC<WalletMovementsSummaryProps> = ({ movemen
           <span className="text-sm font-black text-primary shrink-0">+{formatEur(m.amount_cents)}</span>
         </div>
       ))}
-      {totalCents > 0 && (
-        <div className="flex justify-between items-center px-4 pt-1">
-          <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
-            {confirmed ? 'Totale pagato da tutti' : 'Totale prenotazione'}
-          </span>
-          <span className="text-xs font-bold text-gray-500">{formatEur(totalCents)}</span>
-        </div>
-      )}
     </div>
   );
 };

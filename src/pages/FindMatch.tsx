@@ -97,7 +97,8 @@ const FindMatch = () => {
         return isAfter(reqDate, today) || format(reqDate, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd');
       });
 
-      setMyRequests(activeRequests.filter(r => r.user_id === user.id));
+      // Solo le sfide ancora aperte: una volta accettata, la partita si ritrova in "I miei Campi"
+      setMyRequests(activeRequests.filter(r => r.user_id === user.id && r.status === 'open'));
       setOthersRequests(activeRequests.filter(r => r.user_id !== user.id && r.status === 'open'));
 
       const { data: profilesData } = await supabase.from('member_names').select('id, full_name');

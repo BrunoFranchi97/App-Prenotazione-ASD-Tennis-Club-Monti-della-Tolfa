@@ -68,6 +68,7 @@ const BookingCalendar = () => {
     paymentMode?: BookingSummary['payment_mode'],
     movements?: BookingSummary['movements'],
     hours?: BookingSummary['hours'],
+    participants?: BookingParticipantInput[],
   } | null>(null);
 
   // Il prenotante è sempre incluso; si azzera quando cambia la tipologia (il numero
@@ -306,6 +307,7 @@ const BookingCalendar = () => {
       paymentMode: summary.payment_mode,
       movements: summary.movements,
       hours: summary.hours,
+      participants,
     });
     setShowQuoteDialog(false);
     setShowSuccessModal(true);
@@ -592,6 +594,7 @@ const BookingCalendar = () => {
         movements={lastBookingData?.movements}
         hours={lastBookingData?.hours}
         bookerId={bookerId ?? undefined}
+        participants={lastBookingData?.participants}
       />
     </div>
   );

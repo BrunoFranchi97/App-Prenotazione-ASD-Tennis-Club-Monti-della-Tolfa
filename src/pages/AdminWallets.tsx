@@ -44,7 +44,7 @@ const AdminWallets = () => {
   const [search, setSearch] = useState('');
   const [selectedMember, setSelectedMember] = useState<MemberRow | null>(null);
 
-  const { wallet, movements, coverNamesById, refetch: refetchWallet } = useWallet(selectedMember?.id ?? null);
+  const { wallet, movements, coverNamesById, bookingInfoById, refetch: refetchWallet } = useWallet(selectedMember?.id ?? null);
 
   const [topupOpen, setTopupOpen] = useState(false);
   const [adjustOpen, setAdjustOpen] = useState(false);
@@ -291,7 +291,7 @@ const AdminWallets = () => {
                       ) : (
                         <div className="space-y-2">
                           {movements.map(m => (
-                            <WalletMovementRow key={m.id} movement={m} coverNamesById={coverNamesById} />
+                            <WalletMovementRow key={m.id} movement={m} coverNamesById={coverNamesById} bookingInfoById={bookingInfoById} />
                           ))}
                         </div>
                       )}

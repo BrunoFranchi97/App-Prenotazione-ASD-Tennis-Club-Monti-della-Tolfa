@@ -219,7 +219,9 @@ const ParticipantPicker: React.FC<ParticipantPickerProps> = ({ bookingType, book
 
           <div className="flex flex-wrap gap-2">
             {addingGuest ? (
-              <div className="flex items-center gap-1">
+              // Bottone con testo esplicito (feedback test direttivo: la sola spunta non
+              // faceva capire che andava premuta per aggiungere l'ospite)
+              <div className="flex flex-wrap items-center gap-1.5">
                 <Input
                   autoFocus
                   value={guestName}
@@ -228,8 +230,23 @@ const ParticipantPicker: React.FC<ParticipantPickerProps> = ({ bookingType, book
                   placeholder="Nome ospite"
                   className="h-9 w-40 rounded-full border-gray-100 text-xs"
                 />
-                <Button type="button" size="icon" variant="ghost" className="h-9 w-9 text-primary" onClick={() => addGuest(guestName)}>
-                  <Check className="h-4 w-4" />
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-9 rounded-full px-4 text-xs font-bold bg-primary text-white"
+                  disabled={!guestName.trim()}
+                  onClick={() => addGuest(guestName)}
+                >
+                  <Check className="h-3.5 w-3.5 mr-1" /> Aggiungi
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-9 rounded-full px-3 text-xs font-bold text-gray-400"
+                  onClick={() => { setAddingGuest(false); setGuestName(''); }}
+                >
+                  Annulla
                 </Button>
               </div>
             ) : (

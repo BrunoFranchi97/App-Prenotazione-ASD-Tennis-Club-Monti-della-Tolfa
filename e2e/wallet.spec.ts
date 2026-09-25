@@ -26,7 +26,7 @@ test('prenotazione: ognuno paga la propria quota (S-15, S-16)', async ({ mario, 
 
   const done = page.getByRole('dialog');
   await expect(done.getByText('Prenotazione Confermata!')).toBeVisible();
-  await expect(done.getByText('Hai pagato la tua quota')).toBeVisible();
+  await expect(done.getByText('Hai pagato', { exact: true })).toBeVisible();
   await expect(done.getByText(`${scene.luigiName} ha pagato la sua quota`)).toBeVisible();
 
   expect(await balance(admin, mario.id)).toBe(2000 - scene.dayRate);

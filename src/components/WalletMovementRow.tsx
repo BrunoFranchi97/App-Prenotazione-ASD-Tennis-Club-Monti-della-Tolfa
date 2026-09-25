@@ -5,25 +5,33 @@ import { format, parseISO } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { formatEur, walletKindLabels } from '@/utils/wallet';
-import type { WalletLedgerEntry } from '@/types/supabase';
+import type { WalletLedgerEntry, WalletBookingInfo } from '@/types/supabase';
 
 interface WalletMovementRowProps {
   movement: WalletLedgerEntry;
   coverNamesById: Record<string, string>;
+  bookingInfoById?: Record<string, WalletBookingInfo>;
 }
 
-const WalletMovementRow: React.FC<WalletMovementRowProps> = ({ movement, coverNamesById }) => {
+const WalletMovementRow: React.FC<WalletMovementRowProps> = ({ movement, coverNamesById, bookingInfoById }) => {
   const isCredit = movement.amount_cents > 0;
   const label = movement.kind === 'booking_cover' && movement.covers_user_id
     ? `Copertura quota di ${coverNamesById[movement.covers_user_id] || 'un socio'}`
     : walletKindLabels[movement.kind];
+  const booking = movement.booking_id ? bookingInfoById?.[movement.booking_id] : undefined;
 
   return (
     <div className="flex justify-between items-center px-4 py-3 rounded-xl bg-gray-50/50">
       <div className="flex flex-col">
         <span className="text-sm font-bold text-gray-700">{label}</span>
+        {/* Quale partita: campo e giorno in cui si gioca (distinto dalla data del movimento) */}
+        {booking && (
+          <span className="text-xs font-semibold text-gray-500">
+            {booking.courtName} · {format(parseISO(booking.startsAt), "EEEE d MMMM 'ore' HH:mm", { locale: it })}
+          </span>
+        )}
         <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">
-          {format(parseISO(movement.created_at), "d MMM yyyy 'alle' HH:mm", { locale: it })}
+          {format(parseISO(movement.created_at), "'Movimento del' d MMM yyyy 'alle' HH:mm", { locale: it })}
         </span>
       </div>
       <span className={cn("text-sm font-black shrink-0", isCredit ? "text-primary" : "text-gray-700")}>

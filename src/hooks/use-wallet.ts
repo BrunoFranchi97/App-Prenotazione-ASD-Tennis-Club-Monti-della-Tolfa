@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import type { Wallet, WalletLedgerEntry } from '@/types/supabase';
+import type { Wallet, WalletLedgerEntry, WalletBookingInfo } from '@/types/supabase';
 
 const DEFAULT_RICARICA_TAGLI = [1000, 2000, 5000];
 const DEFAULT_SALDO_BASSO_SOGLIA_CENTS = 500;
@@ -13,6 +13,7 @@ export function useWallet(userId: string | null) {
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [movements, setMovements] = useState<WalletLedgerEntry[]>([]);
   const [coverNamesById, setCoverNamesById] = useState<Record<string, string>>({});
+  const [bookingInfoById, setBookingInfoById] = useState<Record<string, WalletBookingInfo>>({});
   const [ricaricaTagli, setRicaricaTagli] = useState<number[]>(DEFAULT_RICARICA_TAGLI);
   const [saldoBassoSogliaCents, setSaldoBassoSogliaCents] = useState<number>(DEFAULT_SALDO_BASSO_SOGLIA_CENTS);
   const [loading, setLoading] = useState(true);
@@ -33,6 +34,24 @@ export function useWallet(userId: string | null) {
       const map: Record<string, string> = {};
       names?.forEach(n => { map[n.id] = n.full_name || 'Socio'; });
       setCoverNamesById(map);
+    }
+
+    // Campo e giorno della partita di ogni movimento legato a una prenotazione. Si
+    // includono anche le ore annullate: i rimborsi si riferiscono proprio a quelle.
+    const bookingIds = Array.from(new Set(rows.map(m => m.booking_id).filter((id): id is string => !!id)));
+    if (bookingIds.length > 0) {
+      const { data: resRows } = await supabase
+        .from('reservations')
+        .select('booking_id, starts_at, court:court_id(name)')
+        .in('booking_id', bookingIds);
+      const map: Record<string, WalletBookingInfo> = {};
+      ((resRows || []) as unknown as { booking_id: string; starts_at: string; court: { name: string } | null }[]).forEach(r => {
+        const prev = map[r.booking_id];
+        if (!prev || r.starts_at < prev.startsAt) {
+          map[r.booking_id] = { courtName: r.court?.name || 'Campo', startsAt: r.starts_at };
+        }
+      });
+      setBookingInfoById(map);
     }
     setLoading(false);
   }, [userId]);
@@ -69,5 +88,5 @@ export function useWallet(userId: string | null) {
     return () => { supabase.removeChannel(channel); };
   }, [userId, refetch]);
 
-  return { wallet, movements, coverNamesById, ricaricaTagli, saldoBassoSogliaCents, loading, refetch };
+  return { wallet, movements, coverNamesById, bookingInfoById, ricaricaTagli, saldoBassoSogliaCents, loading, refetch };
 }

@@ -42,6 +42,7 @@ const MatchBooking = () => {
     paymentMode?: BookingSummary['payment_mode'],
     movements?: BookingSummary['movements'],
     hours?: BookingSummary['hours'],
+    participants?: BookingParticipantInput[],
   } | null>(null);
 
   const bookingType = matchRequest?.match_type as BookingType | undefined;
@@ -140,6 +141,7 @@ const MatchBooking = () => {
       paymentMode: summary.payment_mode,
       movements: summary.movements,
       hours: summary.hours,
+      participants,
     });
     setShowQuoteDialog(false);
     setShowSuccessModal(true);
@@ -260,6 +262,7 @@ const MatchBooking = () => {
         movements={lastBookingData?.movements}
         hours={lastBookingData?.hours}
         bookerId={bookerId ?? undefined}
+        participants={lastBookingData?.participants}
       />
     </div>
   );
