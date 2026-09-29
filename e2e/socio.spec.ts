@@ -17,13 +17,29 @@ test.describe('portafoglio', () => {
     await page.goto('/dashboard');
     await expect(page.getByRole('heading', { name: 'Il mio Portafoglio' })).toBeVisible();
     await expect(page.getByText(`Saldo disponibile: ${eur(1234)}`)).toBeVisible();
-    await page.getByRole('button', { name: /Vai al Portafoglio/ }).click();
+    await page.getByRole('link', { name: /Il mio Portafoglio/ }).click();
 
     await expect(page).toHaveURL(/\/wallet$/);
     await expect(page.getByText('Saldo disponibile', { exact: true })).toBeVisible();
     await expect(page.getByText(eur(1234), { exact: true })).toBeVisible();
     await expect(page.getByText('Movimenti recenti')).toBeVisible();
     await expect(page.getByPlaceholder('Altro importo (€)')).toBeVisible();
+  });
+
+  test('dashboard da telefono: le tre funzioni principali nel primo schermo', async ({ mario }) => {
+    const page = mario.page;
+    await page.setViewportSize({ width: 390, height: 664 }); // iPhone, tolta la barra del browser
+    await page.goto('/dashboard');
+    for (const name of ['Prenota un Campo', 'Vista Settimanale', 'I miei Campi']) {
+      await expect(page.getByRole('heading', { name, exact: true })).toBeInViewport();
+    }
+    // Vista e I miei Campi affiancati, nessuno scorrimento orizzontale
+    const vista = await page.getByRole('link', { name: /Vista Settimanale/ }).boundingBox();
+    const mieiCampi = await page.getByRole('link', { name: /I miei Campi/ }).boundingBox();
+    expect(Math.abs((vista?.y ?? 0) - (mieiCampi?.y ?? 1))).toBeLessThan(2);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await expect(page.getByRole('heading', { name: 'Gioca con altri' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Area personale' })).toBeVisible();
   });
 
   test('importo di ricarica non valido (S-06)', async ({ mario }) => {

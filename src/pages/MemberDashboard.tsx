@@ -2,16 +2,28 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { CalendarDays, History, LogOut, Users, Settings, Search, FileText, AlertTriangle, ShieldCheck, ChevronRight, LayoutGrid } from 'lucide-react';
+import { CalendarDays, History, LogOut, Users, Settings, Search, FileText, AlertTriangle, ShieldCheck, ChevronRight, LayoutGrid, type LucideIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { format } from 'date-fns';
 import Footer from '@/components/Footer';
 import UserNav from '@/components/UserNav';
 import WalletDashboardTile from '@/components/WalletDashboardTile';
+import DashboardRow from '@/components/DashboardRow';
+import { cn } from '@/lib/utils';
+
+interface CoreTile {
+  path: string;
+  title: string;
+  icon: LucideIcon;
+  description: string;
+  /** Descrizione breve per i riquadri affiancati sul telefono */
+  shortDescription?: string;
+  buttonText: string;
+  isPrimary?: boolean;
+}
 
 const MemberDashboard = () => {
   const navigate = useNavigate();
@@ -94,109 +106,110 @@ const MemberDashboard = () => {
     );
   }
 
-  const bookingRoutes = [
-    {
-      path: "/book",
-      title: "Prenota un Campo",
-      icon: CalendarDays,
-      description: "Riserva il tuo slot orario per giocare.",
-      buttonText: "Vai al Calendario",
-      isPrimary: true
-    },
-    {
-      path: "/weekly-view",
-      title: "Vista Settimanale",
-      icon: LayoutGrid,
-      description: "Guarda la situazione dei campi settimana per settimana, come il foglio in bacheca.",
-      buttonText: "Vedi la Griglia"
-    },
-    {
-      path: "/book-for-third-party",
-      title: "Prenota per Socio",
-      icon: Users,
-      description: isAdmin || isSocioEffettivo
-        ? "Gestisci la prenotazione per un altro socio."
-        : "Funzione riservata ai Soci Effettivi.",
-      buttonText: "Prenota per terzi",
-      requiresSocioEffettivo: true
-    },
-    {
-      path: "/find-match",
-      title: "Cerco Partita",
-      icon: Search,
-      description: "Trova nuovi avversari e organizza sfide.",
-      buttonText: "Apri la Bacheca",
-      liveBadge: hasOpenChallenges
-    },
-  ];
+  // Le tre funzioni più usate, sempre in cima e in quest'ordine
+  const bookCourt: CoreTile = {
+    path: "/book",
+    title: "Prenota un Campo",
+    icon: CalendarDays,
+    description: "Riserva il tuo slot orario per giocare.",
+    buttonText: "Vai al Calendario",
+    isPrimary: true
+  };
+  const weeklyView: CoreTile = {
+    path: "/weekly-view",
+    title: "Vista Settimanale",
+    icon: LayoutGrid,
+    description: "Guarda la situazione dei campi settimana per settimana, come il foglio in bacheca.",
+    shortDescription: "La griglia dei campi",
+    buttonText: "Vedi la Griglia"
+  };
+  const myBookings: CoreTile = {
+    path: "/history",
+    title: "I miei Campi",
+    icon: History,
+    description: "Visualizza i tuoi impegni passati e futuri.",
+    shortDescription: "Le tue prenotazioni",
+    buttonText: "Vedi Prenotazioni"
+  };
 
-  const nonBookingRoutes = [
-    {
-      path: "/history",
-      title: "I miei Campi",
-      icon: History,
-      description: "Visualizza i tuoi impegni passati e futuri.",
-      buttonText: "Vedi Prenotazioni"
-    },
-    { 
-      path: "/medical-certificates", 
-      title: "Certificato Medico", 
-      icon: FileText, 
-      description: "Carica e verifica l'idoneità sportiva.",
-      buttonText: "Gestisci Documenti"
-    },
-  ];
+  const canBookForOthers = isAdmin || isSocioEffettivo;
 
-  const renderCard = (item: any, disabled: boolean, isAdminCard: boolean = false) => {
+  // Tutta la superficie porta alla pagina: bersaglio pieno per il pollice. Sul telefono
+  // Prenota occupa la riga intera, Vista e I miei Campi stanno affiancati (senza bottone,
+  // con la descrizione breve); da desktop tornano tre riquadri uguali con il bottone.
+  const renderCoreTile = (item: CoreTile, disabled: boolean) => {
     const Icon = item.icon;
-    return (
-      <Card key={item.path} className={`group relative border-none shadow-[0_2px_12px_rgba(0,0,0,0.06)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] rounded-[1.5rem] transition-all duration-500 overflow-hidden bg-white ${disabled ? 'opacity-60 cursor-not-allowed' : 'hover:-translate-y-2'}`}>
-        <div className={`h-1.5 w-full ${item.liveBadge ? 'bg-amber-400' : isAdminCard ? 'bg-club-orange' : item.isPrimary ? 'bg-primary' : 'bg-gray-100'}`}></div>
-        <CardHeader className="pb-2">
-          <div className="flex justify-between items-start">
-            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-2 ${item.liveBadge ? 'bg-amber-100 text-amber-600' : isAdminCard ? 'bg-club-orange/10 text-club-orange' : item.isPrimary ? 'bg-primary/10 text-primary' : 'bg-gray-50 text-gray-400'}`}>
-              <Icon size={24} />
-            </div>
-            {item.liveBadge && (
-              <div className="bg-amber-500 text-white text-[10px] font-black px-2.5 py-1 rounded-full animate-pulse shadow-md shadow-amber-500/20">
-                SFIDE APERTE
-              </div>
-            )}
+    const isCompactOnMobile = !item.isPrimary;
+    const card = (
+      <Card className={cn(
+        "h-full flex flex-col border-none shadow-[0_2px_12px_rgba(0,0,0,0.06)] rounded-[1.5rem] transition-all duration-500 overflow-hidden bg-white",
+        disabled ? "opacity-60 cursor-not-allowed" : "active:scale-[0.98] md:hover:-translate-y-2 md:hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)]"
+      )}>
+        <div className={cn("h-1.5 w-full", item.isPrimary ? "bg-primary" : "bg-primary/15")}></div>
+        <CardHeader className="p-4 pb-2 sm:p-6 sm:pb-2">
+          <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center mb-2 bg-primary/10 text-primary">
+            <Icon size={22} />
           </div>
-          <CardTitle className={`text-xl font-bold tracking-tight ${isAdminCard ? 'text-club-orange' : 'text-gray-900'}`}>
+          <CardTitle className="text-lg sm:text-xl font-bold tracking-tight text-gray-900 leading-tight">
             {item.title}
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <p className="text-gray-500 text-sm mb-6 leading-relaxed">{item.description}</p>
-          <Link to={item.path} className="block" onClick={(e) => disabled && e.preventDefault()}>
-            <Button 
-              className={`w-full h-12 rounded-xl font-bold transition-all flex items-center justify-between px-5 ${item.isPrimary ? 'bg-primary hover:bg-[#357a46] text-white shadow-lg shadow-primary/10' : isAdminCard ? 'bg-club-orange hover:bg-opacity-90 text-white' : 'bg-white border-2 border-gray-100 text-gray-700 hover:border-primary/20 hover:bg-primary/5 hover:text-primary'}`}
-              disabled={disabled}
-              variant={item.isPrimary || isAdminCard ? 'default' : 'outline'}
-            >
-              {item.buttonText || "Visualizza"}
-              <ChevronRight size={18} className={`transition-transform group-hover:translate-x-1 ${disabled ? 'opacity-0' : ''}`} />
-            </Button>
-          </Link>
+        <CardContent className="flex-1 flex flex-col p-4 pt-0 sm:p-6 sm:pt-0">
+          {isCompactOnMobile ? (
+            <>
+              <p className="text-gray-500 text-sm leading-snug lg:hidden">{item.shortDescription}</p>
+              <p className="text-gray-500 text-sm leading-relaxed hidden lg:block lg:mb-6">{item.description}</p>
+            </>
+          ) : (
+            <p className="text-gray-500 text-sm mb-4 sm:mb-6 leading-relaxed">{item.description}</p>
+          )}
+          <span className={cn(
+            "w-full h-12 mt-auto rounded-xl font-bold items-center justify-between px-5 transition-all",
+            isCompactOnMobile ? "hidden lg:flex" : "flex",
+            item.isPrimary
+              ? "bg-primary group-hover:bg-[#357a46] text-white shadow-lg shadow-primary/10"
+              : "bg-white border-2 border-gray-100 text-gray-700 group-hover:border-primary/20 group-hover:bg-primary/5 group-hover:text-primary"
+          )}>
+            {item.buttonText}
+            <ChevronRight size={18} className={cn("transition-transform group-hover:translate-x-1", disabled && "opacity-0")} />
+          </span>
         </CardContent>
       </Card>
     );
+
+    const wrapperClass = cn("group block", item.isPrimary && "col-span-2 lg:col-span-1");
+    if (disabled) {
+      return <div key={item.path} className={wrapperClass} aria-disabled="true">{card}</div>;
+    }
+    return <Link key={item.path} to={item.path} className={wrapperClass}>{card}</Link>;
   };
+
+  const renderSection = (label: string, rows: React.ReactNode, isAdminSection: boolean = false) => (
+    <section>
+      <h2 className={cn("text-xs font-black uppercase tracking-[0.2em] mb-3 ml-1", isAdminSection ? "text-club-orange" : "text-gray-400")}>
+        {label}
+      </h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+        {rows}
+      </div>
+    </section>
+  );
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F8FAFC]">
       <div className="flex-grow p-6 sm:p-10 lg:p-12 max-w-7xl mx-auto w-full">
-        <header className="flex justify-between items-end mb-12">
-          <div className="space-y-1">
-            <p className="text-sm font-bold text-primary uppercase tracking-[0.2em] mb-1">Bentornato</p>
-            <h1 className="text-4xl font-extrabold text-gray-900 tracking-tighter">Ciao, {firstName}!</h1>
+        <header className="flex justify-between items-center gap-4 mb-8 sm:mb-12">
+          <div className="min-w-0 space-y-1">
+            <p className="text-xs sm:text-sm font-bold text-primary uppercase tracking-[0.2em] mb-1">Bentornato</p>
+            <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 tracking-tighter truncate">Ciao, {firstName}!</h1>
           </div>
-          <UserNav />
+          <div className="shrink-0">
+            <UserNav />
+          </div>
         </header>
 
         {!isApproved && (
-          <Alert className="mb-10 border-none bg-amber-50 rounded-[1.5rem] p-6 shadow-sm">
+          <Alert className="mb-8 sm:mb-10 border-none bg-amber-50 rounded-[1.5rem] p-6 shadow-sm">
             <AlertTriangle className="h-6 w-6 text-amber-600 mt-1" />
             <div className="ml-4">
               <AlertTitle className="text-amber-800 font-bold text-lg">In attesa di approvazione</AlertTitle>
@@ -207,19 +220,51 @@ const MemberDashboard = () => {
           </Alert>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {bookingRoutes.slice(0, 2).map(item => renderCard(item, !isApproved || (item.requiresSocioEffettivo && !isAdmin && !isSocioEffettivo)))}
-          <WalletDashboardTile userId={userId} />
-          {bookingRoutes.slice(2).map(item => renderCard(item, !isApproved || (item.requiresSocioEffettivo && !isAdmin && !isSocioEffettivo)))}
-          {nonBookingRoutes.map(item => renderCard(item, false))}
-          
-          {isAdmin && renderCard({ 
-            path: "/admin", 
-            title: "Pannello Admin", 
-            icon: ShieldCheck, 
-            description: "Strumenti di gestione per l'amministrazione del club.",
-            buttonText: "Accedi agli Strumenti"
-          }, false, true)}
+        <div className="space-y-8 sm:space-y-10">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
+            {renderCoreTile(bookCourt, !isApproved)}
+            {renderCoreTile(weeklyView, !isApproved)}
+            {renderCoreTile(myBookings, false)}
+          </div>
+
+          {renderSection("Gioca con altri", <>
+            <DashboardRow
+              to="/book-for-third-party"
+              icon={Users}
+              title="Prenota per Socio"
+              subtitle={canBookForOthers ? "Gestisci la prenotazione per un altro socio." : "Funzione riservata ai Soci Effettivi."}
+              disabled={!isApproved || !canBookForOthers}
+            />
+            <DashboardRow
+              to="/find-match"
+              icon={Search}
+              title="Cerco Partita"
+              subtitle="Trova nuovi avversari e organizza sfide."
+              tone={hasOpenChallenges ? 'attention' : 'neutral'}
+              badge={hasOpenChallenges ? "Sfide aperte" : undefined}
+              disabled={!isApproved}
+            />
+          </>)}
+
+          {renderSection("Area personale", <>
+            <WalletDashboardTile userId={userId} />
+            <DashboardRow
+              to="/medical-certificates"
+              icon={FileText}
+              title="Certificato Medico"
+              subtitle="Carica e verifica l'idoneità sportiva."
+            />
+          </>)}
+
+          {isAdmin && renderSection("Amministrazione", (
+            <DashboardRow
+              to="/admin"
+              icon={ShieldCheck}
+              title="Pannello Admin"
+              subtitle="Strumenti di gestione per l'amministrazione del club."
+              tone="admin"
+            />
+          ), true)}
         </div>
       </div>
       <Footer />
