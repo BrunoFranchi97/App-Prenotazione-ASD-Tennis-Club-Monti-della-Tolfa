@@ -7,11 +7,14 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { CalendarDays, History, LogOut, Users, Settings, Search, FileText, AlertTriangle, ShieldCheck, ChevronRight, LayoutGrid, type LucideIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
-import { format } from 'date-fns';
+import { format, parseISO, isToday, isTomorrow } from 'date-fns';
+import { it } from 'date-fns/locale';
 import Footer from '@/components/Footer';
 import UserNav from '@/components/UserNav';
 import WalletDashboardTile from '@/components/WalletDashboardTile';
 import DashboardRow from '@/components/DashboardRow';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useDashboardHighlights } from '@/hooks/use-dashboard-highlights';
 import { cn } from '@/lib/utils';
 
 interface CoreTile {
@@ -21,6 +24,8 @@ interface CoreTile {
   description: string;
   /** Descrizione breve per i riquadri affiancati sul telefono */
   shortDescription?: string;
+  /** Riga viva che sostituisce la descrizione (es. la prossima partita) */
+  liveLine?: React.ReactNode;
   buttonText: string;
   isPrimary?: boolean;
 }
@@ -32,8 +37,9 @@ const MemberDashboard = () => {
   const [isApproved, setIsApproved] = useState(true);
   const [isSocioEffettivo, setIsSocioEffettivo] = useState(true);
   const [loading, setLoading] = useState(true);
-  const [hasOpenChallenges, setHasOpenChallenges] = useState(false);
+  const [openChallengesCount, setOpenChallengesCount] = useState(0);
   const [userId, setUserId] = useState<string | null>(null);
+  const { nextBooking, certificate, loading: highlightsLoading } = useDashboardHighlights(loading ? null : userId, fullName);
 
   useEffect(() => {
     let isMounted = true;
@@ -46,7 +52,7 @@ const MemberDashboard = () => {
         .eq('status', 'open')
         .neq('user_id', uid)
         .gte('requested_date', format(new Date(), 'yyyy-MM-dd'));
-      if (isMounted) setHasOpenChallenges((count || 0) > 0);
+      if (isMounted) setOpenChallengesCount(count || 0);
     };
 
     const initialize = async () => {
@@ -72,7 +78,8 @@ const MemberDashboard = () => {
           setFullName(user.email);
         }
 
-        await fetchOpenChallenges(user.id);
+        // Non blocca la pagina: il numero di sfide arriva quando arriva
+        fetchOpenChallenges(user.id);
       }
       if (isMounted) setLoading(false);
     };
@@ -123,16 +130,48 @@ const MemberDashboard = () => {
     shortDescription: "La griglia dei campi",
     buttonText: "Vedi la Griglia"
   };
+  const nextBookingLabel = (startsAt: string) => {
+    const d = parseISO(startsAt);
+    const day = isToday(d) ? 'Oggi' : isTomorrow(d) ? 'Domani' : format(d, 'EEE d MMM', { locale: it });
+    return `${day.charAt(0).toUpperCase()}${day.slice(1)} · ${format(d, 'HH:mm')}`;
+  };
+
   const myBookings: CoreTile = {
     path: "/history",
     title: "I miei Campi",
     icon: History,
     description: "Visualizza i tuoi impegni passati e futuri.",
     shortDescription: "Le tue prenotazioni",
+    liveLine: highlightsLoading ? (
+      <div className="space-y-1.5 py-0.5">
+        <Skeleton className="h-3 w-20 rounded-md" />
+        <Skeleton className="h-4 w-28 rounded-md" />
+      </div>
+    ) : nextBooking ? (
+      <>
+        <span className="block text-gray-500">Prossima partita</span>
+        <span className="block font-bold text-primary">{nextBookingLabel(nextBooking.starts_at)}</span>
+      </>
+    ) : (
+      <span className="block text-gray-500">Nessuna partita in programma</span>
+    ),
     buttonText: "Vedi Prenotazioni"
   };
 
   const canBookForOthers = isAdmin || isSocioEffettivo;
+  const hasOpenChallenges = openChallengesCount > 0;
+
+  const formatDate = (iso: string) => format(parseISO(iso), 'dd/MM/yyyy');
+  const certificateTone = certificate?.status === 'expiring' || certificate?.status === 'expired' ? 'attention' : 'neutral';
+  const certificateSubtitle: React.ReactNode = highlightsLoading
+    ? <Skeleton className="h-4 w-40 mt-1 rounded-md" />
+    : certificate?.status === 'valid' && certificate.expiry_date
+      ? `Valido fino al ${formatDate(certificate.expiry_date)}`
+      : certificate?.status === 'expiring'
+        ? <span className="font-bold text-amber-700">{certificate.days_left === 1 ? 'Scade domani' : `Scade tra ${certificate.days_left} giorni`}</span>
+        : certificate?.status === 'expired' && certificate.expiry_date
+          ? <span className="font-bold text-amber-700">Scaduto il {formatDate(certificate.expiry_date)}</span>
+          : "Carica e verifica l'idoneità sportiva.";
 
   // Tutta la superficie porta alla pagina: bersaglio pieno per il pollice. Sul telefono
   // Prenota occupa la riga intera, Vista e I miei Campi stanno affiancati (senza bottone,
@@ -155,7 +194,9 @@ const MemberDashboard = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="flex-1 flex flex-col p-4 pt-0 sm:p-6 sm:pt-0">
-          {isCompactOnMobile ? (
+          {item.liveLine ? (
+            <div className="text-sm leading-snug lg:mb-6">{item.liveLine}</div>
+          ) : isCompactOnMobile ? (
             <>
               <p className="text-gray-500 text-sm leading-snug lg:hidden">{item.shortDescription}</p>
               <p className="text-gray-500 text-sm leading-relaxed hidden lg:block lg:mb-6">{item.description}</p>
@@ -239,7 +280,9 @@ const MemberDashboard = () => {
               to="/find-match"
               icon={Search}
               title="Cerco Partita"
-              subtitle="Trova nuovi avversari e organizza sfide."
+              subtitle={hasOpenChallenges
+                ? `${openChallengesCount} ${openChallengesCount === 1 ? 'sfida aspetta' : 'sfide aspettano'} un avversario`
+                : "Trova nuovi avversari e organizza sfide."}
               tone={hasOpenChallenges ? 'attention' : 'neutral'}
               badge={hasOpenChallenges ? "Sfide aperte" : undefined}
               disabled={!isApproved}
@@ -252,7 +295,8 @@ const MemberDashboard = () => {
               to="/medical-certificates"
               icon={FileText}
               title="Certificato Medico"
-              subtitle="Carica e verifica l'idoneità sportiva."
+              subtitle={certificateSubtitle}
+              tone={certificateTone}
             />
           </>)}
 

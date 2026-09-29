@@ -249,3 +249,18 @@ export interface BookingSummary {
   }[];
   booker_balance_cents: number | null;
 }
+
+// Righe vive della dashboard socio
+export interface DashboardNextBooking {
+  starts_at: string;
+  court_id: number;
+}
+
+export type CertificateHighlightStatus = 'missing' | 'valid' | 'expiring' | 'expired';
+
+export interface DashboardCertificateHighlight {
+  status: CertificateHighlightStatus;
+  expiry_date: string | null;
+  /** Giorni di calendario alla scadenza (negativi se già scaduto) */
+  days_left: number | null;
+}

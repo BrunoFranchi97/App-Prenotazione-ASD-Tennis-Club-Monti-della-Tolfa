@@ -42,6 +42,19 @@ test.describe('portafoglio', () => {
     await expect(page.getByRole('heading', { name: 'Area personale' })).toBeVisible();
   });
 
+  test('dashboard: la prossima partita compare in "I miei Campi"', async ({ mario, luigi, admin, scene }) => {
+    await setBalance(admin, mario.id, 2000);
+    await setBalance(admin, luigi.id, 2000);
+    await createBookingViaRpc(mario, scene, 1, [luigi.id]);
+    const page = mario.page;
+    await page.goto('/dashboard');
+    const day = format(scene.date, 'EEE d MMM', { locale: itLocale });
+    const label = `${day.charAt(0).toUpperCase()}${day.slice(1)} · ${String(scene.hour).padStart(2, '0')}:00`;
+    const tile = page.getByRole('link', { name: /I miei Campi/ });
+    await expect(tile.getByText('Prossima partita')).toBeVisible();
+    await expect(tile.getByText(label)).toBeVisible();
+  });
+
   test('importo di ricarica non valido (S-06)', async ({ mario }) => {
     const page = mario.page;
     await page.goto('/wallet');

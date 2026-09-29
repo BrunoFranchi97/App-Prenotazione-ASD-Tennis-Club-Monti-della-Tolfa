@@ -40,7 +40,7 @@ const DashboardRow: React.FC<DashboardRowProps> = ({ to, icon: Icon, title, subt
             </span>
           )}
         </div>
-        <p className="text-gray-500 text-sm truncate">{subtitle}</p>
+        <div className="text-gray-500 text-sm truncate">{subtitle}</div>
       </div>
       {!disabled && (
         <ChevronRight size={18} className="shrink-0 text-gray-300 transition-transform group-hover:translate-x-1 group-hover:text-primary" />
